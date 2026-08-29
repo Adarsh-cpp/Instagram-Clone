@@ -1,0 +1,31 @@
+/* width */
+::-webkit-scrollbar {
+    width: 8px;
+    background-color: #000000;
+  }
+  
+  /* Track */
+  ::-webkit-scrollbar-track {
+    background: #00000001;
+  }
+  
+  /* Handle */
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);
+    border-radius:15px
+  }
+  
+  /* Handle on hover */
+  ::-webkit-scrollbar-thumb:hover {
+     background: linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);
+  }
+
+  /* To hide the scrollbar */
+  .hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none; /* IE and old Edge */
+  scrollbar-width: none; /* Firefox */
+}

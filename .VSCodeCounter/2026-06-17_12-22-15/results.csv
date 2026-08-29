@@ -1,0 +1,83 @@
+"filename", "language", "JavaScript", "JSON", "JavaScript JSX", "PostCSS", "Django HTML", "XML", "Markdown", "comment", "blank", "total"
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\config\cloudinary.js", "JavaScript", 7, 0, 0, 0, 0, 0, 0, 0, 2, 9
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\config\mongodb.js", "JavaScript", 14, 0, 0, 0, 0, 0, 0, 3, 6, 23
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\config\multer.js", "JavaScript", 5, 0, 0, 0, 0, 0, 0, 0, 2, 7
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\config\nodemailer.js", "JavaScript", 10, 0, 0, 0, 0, 0, 0, 1, 2, 13
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\config\passport-facebook.js", "JavaScript", 49, 0, 0, 0, 0, 0, 0, 5, 10, 64
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\controllers\authController.js", "JavaScript", 267, 0, 0, 0, 0, 0, 0, 20, 113, 400
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\controllers\postController.js", "JavaScript", 196, 0, 0, 0, 0, 0, 0, 2, 43, 241
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\controllers\profileController.js", "JavaScript", 188, 0, 0, 0, 0, 0, 0, 9, 71, 268
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\dns-server.js", "JavaScript", 9, 0, 0, 0, 0, 0, 0, 0, 2, 11
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\middlewares\authMiddleware.js", "JavaScript", 19, 0, 0, 0, 0, 0, 0, 4, 10, 33
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\models\comment.model.js", "JavaScript", 35, 0, 0, 0, 0, 0, 0, 0, 6, 41
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\models\conversation.model.js", "JavaScript", 13, 0, 0, 0, 0, 0, 0, 0, 8, 21
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\models\message.model.js", "JavaScript", 17, 0, 0, 0, 0, 0, 0, 0, 10, 27
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\models\post.model.js", "JavaScript", 52, 0, 0, 0, 0, 0, 0, 1, 15, 68
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\models\user.model.js", "JavaScript", 110, 0, 0, 0, 0, 0, 0, 2, 24, 136
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\package-lock.json", "JSON", 0, 1887, 0, 0, 0, 0, 0, 0, 1, 1888
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\package.json", "JSON", 0, 29, 0, 0, 0, 0, 0, 0, 1, 30
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\routes\authRoutes.js", "JavaScript", 25, 0, 0, 0, 0, 0, 0, 2, 14, 41
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\routes\postRoutes.js", "JavaScript", 12, 0, 0, 0, 0, 0, 0, 0, 7, 19
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\routes\profileRoutes.js", "JavaScript", 13, 0, 0, 0, 0, 0, 0, 0, 4, 17
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\server.js", "JavaScript", 39, 0, 0, 0, 0, 0, 0, 2, 16, 57
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\services\upload.service.js", "JavaScript", 41, 0, 0, 0, 0, 0, 0, 1, 8, 50
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\backend\utils\generateToken.js", "JavaScript", 9, 0, 0, 0, 0, 0, 0, 1, 3, 13
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\README.md", "Markdown", 0, 0, 0, 0, 0, 0, 7, 0, 6, 13
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\eslint.config.js", "JavaScript", 32, 0, 0, 0, 0, 0, 0, 0, 2, 34
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\index.html", "Django HTML", 0, 0, 0, 0, 14, 0, 0, 0, 2, 16
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\package-lock.json", "JSON", 0, 3819, 0, 0, 0, 0, 0, 0, 1, 3820
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\package.json", "JSON", 0, 37, 0, 0, 0, 0, 0, 0, 1, 38
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\public\stylesheets\customScrollbar.css", "PostCSS", 0, 0, 0, 21, 0, 0, 0, 5, 5, 31
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\App.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 1, 1
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\App.jsx", "JavaScript JSX", 0, 0, 11, 0, 0, 0, 0, 0, 6, 17
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\assets\react.svg", "XML", 0, 0, 0, 0, 0, 1, 0, 0, 0, 1
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\BioCard.jsx", "JavaScript JSX", 0, 0, 26, 0, 0, 0, 0, 1, 6, 33
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\Chat.jsx", "JavaScript JSX", 0, 0, 66, 0, 0, 0, 0, 0, 14, 80
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\Comment.jsx", "JavaScript JSX", 0, 0, 57, 0, 0, 0, 0, 0, 20, 77
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\CommentsOverlay.jsx", "JavaScript JSX", 0, 0, 189, 0, 0, 0, 0, 7, 34, 230
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\EditBio.jsx", "JavaScript JSX", 0, 0, 32, 0, 0, 0, 0, 0, 7, 39
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\EditProfilePic.jsx", "JavaScript JSX", 0, 0, 157, 0, 0, 0, 0, 7, 34, 198
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\ExplorePostCard.jsx", "JavaScript JSX", 0, 0, 155, 0, 0, 0, 0, 9, 54, 218
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\FollowingSuggestionCard.jsx", "JavaScript JSX", 0, 0, 54, 0, 0, 0, 0, 0, 13, 67
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\HamSettingsCard.jsx", "JavaScript JSX", 0, 0, 7, 0, 0, 0, 0, 0, 3, 10
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\HamburgerMenu.jsx", "JavaScript JSX", 0, 0, 21, 0, 0, 0, 0, 0, 6, 27
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\HighlightCircle.jsx", "JavaScript JSX", 0, 0, 9, 0, 0, 0, 0, 0, 3, 12
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\HomepagePostCard.jsx", "JavaScript JSX", 0, 0, 251, 0, 0, 0, 0, 12, 61, 324
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\IconSidebar.jsx", "JavaScript JSX", 0, 0, 25, 0, 0, 0, 0, 0, 10, 35
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\MessageCard.jsx", "JavaScript JSX", 0, 0, 19, 0, 0, 0, 0, 0, 3, 22
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\MobileFooter.jsx", "JavaScript JSX", 0, 0, 15, 0, 0, 0, 0, 0, 3, 18
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\MobileIcons.jsx", "JavaScript JSX", 0, 0, 9, 0, 0, 0, 0, 0, 3, 12
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\PostCard.jsx", "JavaScript JSX", 0, 0, 16, 0, 0, 0, 0, 0, 3, 19
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\PostType.jsx", "JavaScript JSX", 0, 0, 16, 0, 0, 0, 0, 0, 3, 19
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\ProfileIconCard.jsx", "JavaScript JSX", 0, 0, 8, 0, 0, 0, 0, 0, 3, 11
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\ProfilePermissions.jsx", "JavaScript JSX", 0, 0, 21, 0, 0, 0, 0, 0, 4, 25
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\ProfileSettingsCard.jsx", "JavaScript JSX", 0, 0, 7, 0, 0, 0, 0, 0, 3, 10
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\RecommendedFollowingcard.jsx", "JavaScript JSX", 0, 0, 33, 0, 0, 0, 0, 0, 8, 41
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\ReelCard.jsx", "JavaScript JSX", 0, 0, 16, 0, 0, 0, 0, 0, 3, 19
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\SavedCard.jsx", "JavaScript JSX", 0, 0, 16, 0, 0, 0, 0, 0, 3, 19
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\StoryCircle.jsx", "JavaScript JSX", 0, 0, 14, 0, 0, 0, 0, 0, 3, 17
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\StoryContainer.jsx", "JavaScript JSX", 0, 0, 44, 0, 0, 0, 0, 3, 16, 63
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\components\TagCard.jsx", "JavaScript JSX", 0, 0, 16, 0, 0, 0, 0, 0, 3, 19
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\index.css", "PostCSS", 0, 0, 0, 8, 0, 0, 0, 36, 3, 47
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\main.jsx", "JavaScript JSX", 0, 0, 10, 0, 0, 0, 0, 0, 5, 15
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\pages\CaptionSharePage.jsx", "JavaScript JSX", 0, 0, 169, 0, 0, 0, 0, 3, 53, 225
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\pages\ConfirmationPage.jsx", "JavaScript JSX", 0, 0, 89, 0, 0, 0, 0, 4, 36, 129
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\pages\CreatePostPage.jsx", "JavaScript JSX", 0, 0, 106, 0, 0, 0, 0, 1, 26, 133
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\pages\CropImagePage.jsx", "JavaScript JSX", 0, 0, 168, 0, 0, 0, 0, 6, 38, 212
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\pages\DobPage.jsx", "JavaScript JSX", 0, 0, 100, 0, 0, 0, 0, 4, 29, 133
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\pages\EditProfilePage.jsx", "JavaScript JSX", 0, 0, 270, 0, 0, 0, 0, 14, 69, 353
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\pages\ExplorePage.jsx", "JavaScript JSX", 0, 0, 77, 0, 0, 0, 0, 0, 20, 97
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\pages\FollowingSetupPage.jsx", "JavaScript JSX", 0, 0, 54, 0, 0, 0, 0, 0, 12, 66
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\pages\ForgotPasswordPage.jsx", "JavaScript JSX", 0, 0, 67, 0, 0, 0, 0, 0, 28, 95
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\pages\HomePage.jsx", "JavaScript JSX", 0, 0, 81, 0, 0, 0, 0, 1, 32, 114
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\pages\LoginPage.jsx", "JavaScript JSX", 0, 0, 120, 0, 0, 0, 0, 6, 27, 153
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\pages\LogoutPage.jsx", "JavaScript JSX", 0, 0, 11, 0, 0, 0, 0, 0, 3, 14
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\pages\MessagesPage.jsx", "JavaScript JSX", 0, 0, 41, 0, 0, 0, 0, 0, 4, 45
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\pages\ResetPasswordPage.jsx", "JavaScript JSX", 0, 0, 126, 0, 0, 0, 0, 3, 37, 166
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\pages\SelectImagePage.jsx", "JavaScript JSX", 0, 0, 50, 0, 0, 0, 0, 0, 22, 72
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\pages\SignupPage.jsx", "JavaScript JSX", 0, 0, 159, 0, 0, 0, 0, 7, 29, 195
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\pages\UserProfilePage.jsx", "JavaScript JSX", 0, 0, 197, 0, 0, 0, 0, 8, 46, 251
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\router\router.jsx", "JavaScript JSX", 0, 0, 43, 0, 0, 0, 0, 3, 13, 59
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\src\utils\cropImage.js", "JavaScript", 52, 0, 0, 0, 0, 0, 0, 0, 15, 67
+"c:\Users\Adarsh pattanayak\Desktop\Instagram Clone\frontend\vite.config.js", "JavaScript", 6, 0, 0, 0, 0, 0, 0, 1, 2, 9
+"Total", "-", 1220, 5772, 3248, 29, 14, 1, 7, 194, 1277, 11762

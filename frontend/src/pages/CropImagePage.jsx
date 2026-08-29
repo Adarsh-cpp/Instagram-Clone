@@ -1,0 +1,220 @@
+import React, { useState, useEffect } from "react";
+import Cropper from "react-easy-crop";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import getCroppedImg, { getDefaultCroppedArea } from "../utils/cropImage";
+
+const ASPECT_OPTIONS = [
+  { label: "1 : 1", value: 1, key: "1:1" },
+  { label: "16 : 9", value: 16 / 9, key: "16:9" },
+  { label: "4 : 5", value: 4 / 5, key: "4:5" },
+];
+
+const CropImagePage = ({
+  images,          // File[] — always an array, length 1-5
+  setEditedImages, // (Blob/File[]) => void
+  setAspectRatio,
+  next,
+  back,
+}) => {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [aspect, setAspect] = useState(1);
+  const [imageUrls, setImageUrls] = useState([]);
+  const [slides, setSlides] = useState(() =>
+    images.map(() => ({ crop: { x: 0, y: 0 }, zoom: 1, croppedAreaPixels: null }))
+  );
+  const [showAspectMenu, setShowAspectMenu] = useState(false);
+  const [showZoomSlider, setShowZoomSlider] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Build every object URL up front (filmstrip needs all of them),
+  // revoke them all on unmount
+  useEffect(() => {
+    const urls = images.map((file) => URL.createObjectURL(file));
+    setImageUrls(urls);
+    return () => urls.forEach((url) => URL.revokeObjectURL(url));
+  }, [images]);
+
+  const hasMultiple = images.length > 1;
+  const activeSlide = slides[activeIndex];
+
+  const updateActiveSlide = (patch) => {
+    setSlides((prev) => {
+      const updated = [...prev];
+      updated[activeIndex] = { ...updated[activeIndex], ...patch };
+      return updated;
+    });
+  };
+
+  const onCropChange = (crop) => updateActiveSlide({ crop });
+  const onZoomChange = (zoom) => updateActiveSlide({ zoom });
+  const onCropComplete = (_, croppedAreaPixels) => updateActiveSlide({ croppedAreaPixels });
+
+  const selectAspect = (opt) => {
+    setAspect(opt.value);
+    setAspectRatio(opt.key);
+    setShowAspectMenu(false);
+  };
+
+  const handleNext = async () => {
+    try {
+      setIsSaving(true);
+
+      const cropped = await Promise.all(
+        images.map(async (_, i) => {
+          const area = slides[i]?.croppedAreaPixels
+            ?? (await getDefaultCroppedArea(imageUrls[i], aspect));
+          return getCroppedImg(imageUrls[i], area);
+        })
+      );
+
+      setEditedImages(cropped);
+      next();
+    } catch (err) {
+      console.log(err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const menuBottom = hasMultiple ? "bottom-[111px]" : "bottom-[55px]";
+
+  return (
+    <div className="w-[100vw] h-[100vh] flex justify-center items-center bg-[#0c1014]">
+      <div className="cropContainerOverlay w-full h-full flex justify-center items-center bg-[rgba(0,0,0,0)] px-2 sm:px-4">
+        <div className="cropContainer relative w-full max-w-[500px] md:w-[70%] lg:w-[50%] xl:w-[30%] h-[70%] rounded-2xl bg-[#212328] overflow-hidden">
+          {/* Header */}
+          <div className="header w-full h-[40px] px-3 sm:px-4 flex justify-between items-center bg-[rgb(12,16,20)]">
+            <div onClick={back} className="back cursor-pointer">
+              <img
+                src="/images/arrow-back-icon.png"
+                className="w-[26px] h-[26px] sm:w-[30px] sm:h-[30px]"
+                alt="Back"
+              />
+            </div>
+
+            <div className="heading text-white text-[16px] sm:text-[18px] font-semibold">
+              {hasMultiple ? `Crop  ${activeIndex + 1}/${images?.length}` : "Crop"}
+            </div>
+
+            <div
+              onClick={isSaving ? undefined : handleNext}
+              className={`next text-[rgb(53,121,234)] hover:text-[rgb(20,100,255)] hover:underline cursor-pointer text-sm sm:text-base ${
+                isSaving ? "opacity-50 pointer-events-none" : ""
+              }`}
+            >
+              Next
+            </div>
+          </div>
+
+          <hr />
+
+          {/* Crop Area */}
+          <div className="relative w-full h-[calc(100%-40px)] overflow-hidden bg-[#25292e]">
+            {imageUrls[activeIndex] && (
+              <Cropper
+                image={imageUrls[activeIndex]}
+                crop={activeSlide.crop}
+                zoom={activeSlide.zoom}
+                aspect={aspect}
+                onCropChange={onCropChange}
+                onZoomChange={onZoomChange}
+                onCropComplete={onCropComplete}
+              />
+            )}
+
+            {hasMultiple && activeIndex > 0 && (
+              <div
+                onClick={() => setActiveIndex((i) => i - 1)}
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10"
+              >
+                <ChevronLeft size={18} color="white" />
+              </div>
+            )}
+            {hasMultiple && activeIndex < images?.length - 1 && (
+              <div
+                onClick={() => setActiveIndex((i) => i + 1)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10"
+              >
+                <ChevronRight size={18} color="white" />
+              </div>
+            )}
+
+            {/* Aspect Ratio Menu — applies globally to every slide */}
+            {showAspectMenu && (
+              <div className={`absolute ${menuBottom} left-3 bg-[#2a2d32] rounded-lg overflow-hidden z-50 min-w-[100px]`}>
+                {ASPECT_OPTIONS.map((opt) => (
+                  <div
+                    key={opt.key}
+                    onClick={() => selectAspect(opt)}
+                    className="px-4 py-2 text-white hover:bg-[#3a3d42] cursor-pointer text-sm"
+                  >
+                    {opt?.label}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Zoom Slider — per slide */}
+            {showZoomSlider && (
+              <div
+                className={`instagram-slider absolute ${menuBottom} left-[60px] sm:left-[70px] bg-[#2a2d32] rounded-lg p-3 z-50 max-w-[calc(100%-80px)]`}
+              >
+                <input
+                  type="range"
+                  min={1}
+                  max={3}
+                  step={0.1}
+                  value={activeSlide.zoom}
+                  onChange={(e) => onZoomChange(Number(e.target.value))}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Filmstrip — only for multi-image */}
+          {hasMultiple && (
+            <div className="absolute bottom-[40px] w-full h-[56px] bg-[rgb(12,16,20)] flex items-center gap-2 px-2 overflow-x-auto z-20">
+              {imageUrls.map((url, i) => (
+                <div
+                  key={i}
+                  onClick={() => setActiveIndex(i)}
+                  className={`flex-shrink-0 w-[40px] h-[40px] rounded-md overflow-hidden cursor-pointer border-2 ${
+                    i === activeIndex ? "border-[rgb(53,121,234)]" : "border-transparent"
+                  }`}
+                >
+                  <img src={url} className="w-full h-full object-cover" alt="" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Bottom Toolbar */}
+          <div className="absolute bottom-0 w-full h-[40px] flex z-20">
+            <div className="left w-[50%] h-full px-2 flex gap-2 items-center">
+              <div
+                onClick={() => setShowAspectMenu(!showAspectMenu)}
+                className="crop w-[34px] h-[34px] rounded-full flex justify-center items-center bg-[rgba(0,0,0,0.6)] cursor-pointer flex-shrink-0"
+              >
+                <img src="/images/crop1-icon.png" alt="" />
+              </div>
+
+              <div
+                onClick={() => setShowZoomSlider(!showZoomSlider)}
+                className="magnify w-[34px] h-[34px] rounded-full flex justify-center items-center bg-[rgba(0,0,0,0.6)] cursor-pointer flex-shrink-0"
+              >
+                <img src="/images/magnify-icon.png" alt="" />
+              </div>
+            </div>
+
+            {/* DON'T TOUCH THIS */}
+            <div className="right w-[50%] h-full px-2 flex justify-end items-center">
+              <div className="multiselect w-[34px] h-[34px] rounded-full flex justify-center items-center bg-[rgba(0,0,0,0.6)]"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CropImagePage;

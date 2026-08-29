@@ -1,0 +1,639 @@
+backend/config/socket.js
+import { Server } from "socket.io";
+
+export const onlineUsers = new Map();
+
+let io;
+
+export const initializeSocket = (server) => {
+
+  io = new Server(server, {
+    cors: {
+      origin: "http://localhost:5173",
+      credentials: true,
+    },
+  });
+
+  io.on("connection", (socket) => {
+
+    console.log("User Connected:", socket.id);
+
+    socket.on("join", (userId) => {
+
+      onlineUsers.set(userId, socket.id);
+
+      console.log("Online Users:", onlineUsers);
+
+    });
+
+    socket.on("disconnect", () => {
+
+      for (const [userId, socketId] of onlineUsers.entries()) {
+
+        if (socketId === socket.id) {
+          onlineUsers.delete(userId);
+          break;
+        }
+
+      }
+
+      console.log("User Disconnected:", socket.id);
+
+    });
+
+  });
+
+};
+
+export const getIO = () => io;
+
+backend/server.js 
+import dns from "dns";
+
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
+
+console.log("DNS:", dns.getServers());
+
+import dotenv from "dotenv";
+dotenv.config();
+
+// console.log(process.cwd());
+// console.log(process.env.MONGODB_URI);
+
+import http from "http";
+import { initializeSocket } from "./config/socket.js";
+
+import express from "express";
+import cors from "cors";
+import session from "express-session";
+
+import cookieParser from "cookie-parser"
+import connectDB from "./config/mongodb.js";
+
+import passport from "./config/passport-facebook.js"; 
+
+import authRoutes from "./routes/authRoutes.js";
+import profileRoutes from "./routes/profileRoutes.js";
+import postRoutes from "./routes/postRoutes.js";
+import conversationRoutes from "./routes/conversationRoutes.js";
+import messageRoutes from "./routes/messageRoutes.js";
+
+const app = express();
+const server = http.createServer(app);
+initializeSocket(server);
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+app.use(cors({origin: "http://localhost:5173", credentials: true }));
+app.use(
+  session({
+    secret: "your_secret_key",
+    resave: false,
+    saveUninitialized: true,
+  })
+);
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+app.use("/auth", authRoutes);
+app.use("/user/profile", profileRoutes);
+app.use("/post", postRoutes);
+app.use("/conversation", conversationRoutes)
+app.use("/message", messageRoutes)
+
+const port = process.env.PORT || 4000;
+connectDB();
+
+app.get("/", (req,res) => {
+  res.send("helllo world !!!");
+})
+
+server.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+})
+
+
+backend/models/conversation.model.js
+import mongoose from "mongoose";
+
+const conversationSchema = new mongoose.Schema(
+  {
+    participants: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+      },
+    ],
+
+    lastMessage: {
+      type: String,
+      default: "",
+    },
+
+    lastMessageTime: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Faster participant lookup
+conversationSchema.index({ participants: 1 });
+
+const Conversation = mongoose.model("Conversation", conversationSchema);
+
+export default Conversation;
+
+
+backend/models/message.model.js
+import mongoose from "mongoose";
+
+const messageSchema = new mongoose.Schema(
+  {
+    conversationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Conversation",
+      required: true,
+    },
+
+    senderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    receiverId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    text: {
+      type: String,
+      trim: true,
+    },
+
+    image: {
+      type: String,
+      default: "",
+    },
+
+    seen: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Faster message fetching
+messageSchema.index({ conversationId: 1, createdAt: 1 });
+
+const Message = mongoose.model("Message", messageSchema);
+
+export default Message;
+
+
+
+backend/controllers/conversationController.js
+import conversationModel from "../models/conversation.model.js";
+
+export const createOrGetConversation = async (req, res) => {
+  try {
+
+    const loggedInUserId = req.user._id;
+    const otherUserId = req.params.userId;
+
+    console.log(loggedInUserId, otherUserId)
+
+    if (loggedInUserId.toString() === otherUserId.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot start a conversation with yourself",
+      });
+    }
+
+    let conversation = await conversationModel.findOne({
+      participants: {
+        $all: [loggedInUserId, otherUserId],
+      },
+    });
+
+    if (!conversation) {
+
+      conversation = await conversationModel.create({
+        participants: [loggedInUserId, otherUserId],
+      });
+
+    }
+
+    return res.status(200).json({
+      success: true,
+      conversation,
+    });
+
+  } catch (error) {
+
+    console.log(error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const getAllConversations = async (req, res) => {
+  try {
+
+  const userId = req.user._id;
+  console.log(userId)
+
+  const allConversations = await conversationModel
+    .find({ participants: userId })
+    .populate("participants", "username fullname profilePic")
+    .sort({ updatedAt: -1 });
+
+  return res.status(200).json({
+    success: true,
+    message: "All conversations fetched successfully",
+    conversations: allConversations,
+  });
+
+} catch (error) {
+
+  console.log(error.message);
+
+  return res.status(500).json({
+    success: false,
+    message: "Internal Server Error",
+  });
+
+}
+}
+
+
+
+backend/controllers/messageController.js
+import conversationModel from "../models/conversation.model.js";
+import messageModel from "../models/message.model.js";
+import { getIO, onlineUsers } from "../config/socket.js";
+
+export const getMessages = async (req, res) => {
+
+  try {
+
+    const userId = req.user._id
+    const conversationId = req.params.conversationId;
+
+    console.log(userId, conversationId)
+
+
+    if (!conversationId) {
+      return res.status(400).json({
+        success: false,
+        message: "Conversation ID is required",
+      });
+    }
+
+    const messages = await messageModel
+      .find({ conversationId })
+      .sort({ createdAt: 1 })
+      .populate("senderId", "fullname username profilePic")
+      .populate("receiverId", "fullname username profilePic")
+
+    return res.status(200).json({
+      success: true,
+      message: "Messages fetched successfully",
+      messages,
+    });
+
+  } catch (error) {
+
+    console.log(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+
+  }
+};
+
+export const postMessage = async (req, res) => {
+  try {
+
+    const senderId = req.user._id;
+    const conversationId = req.params.conversationId;
+    const {message} = req.body
+
+    const conversation = await conversationModel.findById(conversationId);
+
+        if (!conversation) {
+        return res.status(404).json({
+            success: false,
+            message: "Conversation not found",
+        });
+        }
+
+        const receiverId = conversation.participants.find(
+        id => id.toString() !== senderId.toString()
+        );
+
+    if (!receiverId || !conversationId) {
+      return res.status(400).json({
+        success: false,
+        message: "Conversation not found",
+      });
+    }
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Message cannot be empty",
+      });
+    }
+
+
+    const newMessage = await messageModel.create({
+      conversationId,
+      senderId,
+      receiverId,
+      text: message,
+    });
+
+    conversation.lastMessage = message;
+    conversation.updatedAt = Date.now();
+    await conversation.save();
+
+    const receiverSocketId = onlineUsers.get(receiverId);
+    if (receiverSocketId) {
+    getIO().to(receiverSocketId).emit("newMessage", newMessage);
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: "Message sent successfully",
+      data: newMessage,
+    });
+
+  } catch (error) {
+
+    console.log(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+
+  }
+};
+
+
+
+frontend/src/components/Chat.jsx
+import React, { useEffect, useState } from 'react'
+import { Smile } from "lucide-react";
+import socket from '../socket';
+import axios from 'axios';
+import { toast } from 'react-toastify';
+import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
+
+const Chat = ({...props}) => {
+
+  const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState([])
+  
+  const { user, setUser } = useAuth()
+
+const friend = messages[0]?.receiverId
+
+  useEffect(() => {
+console.log(messages)
+  }, [messages])
+  
+
+useEffect(() => {
+const getAllMessages = async () => {
+  try {
+    const token = localStorage.getItem("authToken")
+     const url = `http://localhost:4000/message/${props.conversationId}`
+     
+     const response = await axios.get(url,{
+      headers:{
+        Authorization:`Bearer ${token}`
+      }
+     })
+
+     if(response.status === 200){
+      setMessages(response.data.messages)
+      // console.log(response.data.messages)
+     }
+     else{
+      toast.error("Error fetching messages")
+     }
+     
+  } catch (error) {
+    toast.error("Something went wrong")
+  }
+}
+getAllMessages()
+}, [])
+
+
+
+ useEffect(() => {
+  const handleNewMessage = (message) => {
+    setMessages((prev) => [...prev, message]);
+  };
+
+  socket.on("newMessage", handleNewMessage);
+
+  return () => {
+    socket.off("newMessage", handleNewMessage);
+  };
+}, []);
+
+  const handleSendMessage = async () => {
+    if (!message.trim()) return;
+
+   try {
+    const token = localStorage.getItem("authToken")
+     const url = `http://localhost:4000/message/${props.conversationId}`
+
+     const response = await axios.post(url,{message},{
+      headers:{
+        Authorization: `Bearer ${token}`
+      }
+     })
+
+     if(response.status === 201){
+      console.log("Message model created")
+      setMessages(prev => [...prev, response.data.data]);
+      setMessage("");
+     }
+     else{
+      toast.error("Error sending message")
+     }
+
+   } catch (error) {
+    toast.error("Something went wrong")
+   }
+  }
+  
+
+  return (
+    <div className="messageDisplay hidden md:block relative md:w-[65%] lg:w-[70%] h-full bg-[#0c1014]">
+
+      <div className="reciverDetails w-full h-[85px] flex border-b border-gray-600">
+
+        <div className="messageCard w-[70%] lg:w-[50%] h-full flex justify-center items-center cursor-pointer">
+
+          <div className="profilePicSection w-[20%] h-full flex justify-center items-center">
+
+            <div className="profilePic w-[50px] h-[50px] lg:w-[70px] lg:h-[70px] rounded-full overflow-hidden">
+              <img
+                src={user?.profilePic}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+          </div>
+
+          <div className="messageDetails w-[80%] h-full">
+
+            <div className="fullname w-full h-[50%] flex justify-start items-end text-white text-[15px] lg:text-[18px]">
+              <span className="ml-2">{user?.fullname}</span>
+            </div>
+
+            <div className="lastMsg w-full h-[50%] flex justify-start items-start text-[#a2a3a3] text-[12px] lg:text-[14px]">
+              <span className="ml-2">{user?.username}</span>
+            </div>
+
+          </div>
+
+        </div>
+
+        <div className="profileInfoBtnSection flex-1 h-full flex justify-end items-center">
+
+          <div className="btn w-[35px] h-[35px] mr-4 overflow-hidden">
+            <img
+              src="/images/info-icon.png"
+              alt=""
+              className="w-full h-full"
+            />
+          </div>
+
+        </div>
+
+      </div>
+
+      <div className="chatContainer w-full h-[calc(100vh-165px)] overflow-y-auto ">
+
+        <div className="viewProfileSection w-full h-[250px] flex flex-col justify-center items-center">
+
+          <div className="profilePicSection w-full h-[120px] flex justify-center items-center">
+
+            <div className="profilePic w-[80px] h-[80px] lg:w-[100px] lg:h-[100px] rounded-full overflow-hidden">
+              <img
+                src={friend?.profilePic}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+          </div>
+
+          <div className="namesSection w-full h-[60px]">
+
+            <div className="fullname w-full h-[50%] flex justify-center items-center text-white text-[20px] lg:text-[24px]">
+              <span>{friend?.fullname}</span>
+            </div>
+
+            <div className="username w-full h-[50%] flex justify-center items-center text-[#a2a3a3] text-[14px] lg:text-[18px]">
+              <span>{friend?.username}</span>
+            </div>
+
+          </div>
+
+          <div className="viewProfileBtn mt-2 w-[150px] h-[40px] flex justify-center items-center">
+
+            <Link to={`/user/get-profile/${friend?._id}`}>
+            <button className='w-[100px] sm:w-[150px] h-[40px] bg-[#25292e] hover:bg-[#363c44] cursor-pointer text-white text-[14px] sm:text-[16px] font-bold rounded-xl'>
+              View Profile
+              </button>
+            </Link>
+
+          </div>
+
+        </div>
+
+        <div className="emptyChat w-full h-[200vh]"></div>
+
+      </div>
+
+      <div className="footer absolute bottom-0 left-0 w-full h-[80px] flex justify-center items-center px-2">
+
+        <div className="messageBar w-full h-[65%] rounded-3xl flex border border-gray-400 overflow-hidden">
+
+          <div className="emojiSection w-[12%] sm:w-[8%] md:w-[6%] flex justify-center items-center">
+            <Smile
+              size={28}
+              className="text-white cursor-pointer"
+            />
+          </div>
+
+          <div className="messageInput flex-1 h-full">
+            <input
+              type="text"
+              name="message"
+              id="message"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="w-full h-full outline-none text-white text-[16px] lg:text-[18px] px-4 bg-transparent"
+              placeholder="Message..."
+            />
+          </div>
+
+          <div className="gllerySection w-[15%] sm:w-[12%] md:w-[10%] h-full flex gap-2 ">
+
+            <div onClick={handleSendMessage} className="send w-[50%] h-full flex justify-center items-center">
+
+              <img
+                src="/images/messages-icon.png"
+                alt=""
+                className="w-[28px] h-[30px] lg:w-[40px] lg:h-[30px]"
+              />
+
+            </div>
+            <div className="gallery w-[50%] h-full flex justify-center items-center">
+
+              <img
+                src="/images/gallery-icon.png"
+                alt=""
+                className="w-[28px] h-[22px] lg:w-[40px] lg:h-[30px]"
+              />
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  )
+}
+
+export default Chat

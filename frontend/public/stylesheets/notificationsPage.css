@@ -1,0 +1,366 @@
+.notifications-page {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  background: #000;
+  color: #fff;
+  overflow: hidden;
+}
+
+/* =========================================
+   MAIN CONTENT
+========================================= */
+
+.notifications-main {
+  width: 100%;
+  height: 100%;
+  margin-left: 0;
+  display: flex;
+  justify-content: center;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.notifications-container {
+  width: 100%;
+  max-width: 850px;
+  min-height: 100%;
+  padding: 45px 35px 80px;
+}
+
+/* =========================================
+   HEADER
+========================================= */
+
+.notifications-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 25px;
+  border-bottom: 1px solid #262626;
+}
+
+.notifications-header h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.notifications-count {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 20px;
+  background: #4a5df9;
+  color: #fff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* =========================================
+   SECTION
+========================================= */
+
+.notification-section {
+  width: 100%;
+}
+
+.notification-section-title {
+  margin: 28px 0 12px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* =========================================
+   NOTIFICATION ITEM
+========================================= */
+
+.notification-list {
+  width: 100%;
+}
+
+.notification-item {
+  width: 100%;
+  min-height: 76px;
+  padding: 12px 8px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border-radius: 12px;
+  transition: background 0.2s ease;
+}
+
+.notification-item:hover {
+  background: #111;
+}
+
+.notification-unread {
+  background: #0d0f14;
+}
+
+/* =========================================
+   MEDIA
+========================================= */
+
+.notification-media {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  display: block;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.notification-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/*
+  For likes/comments the notification
+  shows the post instead of the sender DP.
+*/
+
+.notification-post-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 7px;
+}
+
+/* =========================================
+   DETAILS
+========================================= */
+
+.notification-details {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+}
+
+.notification-message {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.5;
+  font-size: 14px;
+  color: #b7b7b7;
+}
+
+.notification-username {
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.notification-username:hover {
+  text-decoration: underline;
+}
+
+.notification-text {
+  color: #b7b7b7;
+}
+
+.notification-action {
+  color: #b7b7b7;
+}
+
+.notification-comment {
+  color: #888;
+  margin-left: 5px;
+}
+
+.notification-time {
+  color: #666;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* =========================================
+   FOLLOW VIEW BUTTON
+========================================= */
+
+.notification-view-button {
+  flex-shrink: 0;
+  min-width: 75px;
+  height: 34px;
+  padding: 0 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 8px;
+  background: #25292e;
+  color: #fff;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.2s ease;
+}
+
+.notification-view-button:hover {
+  background: #363c44;
+}
+
+/* =========================================
+   LOAD MORE
+========================================= */
+
+.notifications-load-more {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 30px 0;
+}
+
+.load-more-button {
+  border: none;
+  background: transparent;
+  color: #8090ff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.load-more-button:hover {
+  color: #a5b0ff;
+}
+
+.load-more-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* =========================================
+   EMPTY STATE
+========================================= */
+
+.empty-notifications {
+  width: 100%;
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 30px;
+}
+
+.empty-notification-icon {
+  width: 75px;
+  height: 75px;
+  border: 2px solid #363636;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.empty-notification-icon img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+
+.empty-notifications h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.empty-notifications p {
+  max-width: 380px;
+  margin: 0;
+  color: #777;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* =========================================
+   RESPONSIVE
+========================================= */
+
+@media (max-width: 768px) {
+  .notifications-main {
+    width: 100%;
+  }
+
+  .notifications-container {
+    padding: 25px 15px 80px;
+  }
+
+  .notifications-header {
+    padding-bottom: 20px;
+  }
+
+  .notifications-header h1 {
+    font-size: 20px;
+  }
+
+  .notification-item {
+    padding: 12px 4px;
+    gap: 11px;
+  }
+
+  .notification-media {
+    width: 45px;
+    height: 45px;
+  }
+
+  .notification-message {
+    font-size: 13px;
+  }
+
+  .notification-view-button {
+    min-width: 65px;
+    height: 32px;
+    padding: 0 12px;
+    font-size: 12px;
+  }
+
+  .notification-time {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .notifications-container {
+    padding: 20px 12px 90px;
+  }
+
+  .notification-item {
+    min-height: 68px;
+  }
+
+  .notification-media {
+    width: 42px;
+    height: 42px;
+  }
+
+  .notification-details {
+    gap: 8px;
+  }
+
+  .notification-message {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .notification-view-button {
+    min-width: 58px;
+    height: 30px;
+    padding: 0 9px;
+  }
+}

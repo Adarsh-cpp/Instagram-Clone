@@ -1,0 +1,304 @@
+import React, { useState, useRef, useEffect } from "react";
+import EmojiPicker from "emoji-picker-react";
+import { Play, ChevronLeft, ChevronRight } from "lucide-react";
+
+const CaptionSharePage = ({
+  images,       // File[]/Blob[] — image posts only
+  video,        // File — reels only
+  mediaType,
+  trimData,
+  isPreTrimmed,
+  back,
+  handlePost,
+  user,
+  isLoading,
+}) => {
+  const [caption, setCaption] = useState("");
+  const [showPicker, setShowPicker] = useState(false);
+  const [mediaUrls, setMediaUrls] = useState([]);
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const captionRef = useRef(null);
+  const pickerRef = useRef(null);
+  const videoRef = useRef(null);
+  const touchStartX = useRef(null);
+
+  const isCarousel = mediaType === "image" && mediaUrls.length > 1;
+
+  useEffect(() => {
+    if (mediaType === "video") {
+      if (!video) {
+        setMediaUrls([]);
+        return;
+      }
+      const url = URL.createObjectURL(video);
+      setMediaUrls([url]);
+      return () => URL.revokeObjectURL(url);
+    }
+
+    if (!images || images.length === 0) {
+      setMediaUrls([]);
+      return;
+    }
+    const urls = images.map((f) => URL.createObjectURL(f));
+    setMediaUrls(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, [images, video, mediaType]);
+
+  useEffect(() => {
+    setActiveSlide(0);
+  }, [mediaUrls.length]);
+
+  const goPrev = () => setActiveSlide((i) => Math.max(0, i - 1));
+  const goNext = () => setActiveSlide((i) => Math.min(mediaUrls.length - 1, i + 1));
+
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current == null) return;
+    const delta = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(delta) > 40) {
+      delta > 0 ? goPrev() : goNext();
+    }
+    touchStartX.current = null;
+  };
+
+  const handleLoadedMetadata = () => {
+    if (mediaType === "video" && !isPreTrimmed && videoRef.current && trimData?.trimStart != null) {
+      videoRef.current.currentTime = trimData.trimStart;
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (mediaType !== "video" || isPreTrimmed || !trimData?.trimDuration) return;
+    const v = videoRef.current;
+    if (!v) return;
+    const windowEnd = trimData.trimStart + trimData.trimDuration;
+    if (v.currentTime >= windowEnd) {
+      v.currentTime = trimData.trimStart;
+    }
+  };
+
+  const togglePlay = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) {
+      v.play();
+      setIsPlaying(true);
+    } else {
+      v.pause();
+      setIsPlaying(false);
+    }
+  };
+
+  const handleEmojiClick = (emojiData) => {
+    const textarea = captionRef.current;
+    if (!textarea) return;
+
+    textarea.focus();
+    const start = textarea.selectionStart || 0;
+    const end = textarea.selectionEnd || 0;
+
+    const newCaption = caption.slice(0, start) + emojiData.emoji + caption.slice(end);
+    setCaption(newCaption);
+
+    setTimeout(() => {
+      textarea.selectionStart = textarea.selectionEnd = start + emojiData.emoji.length;
+    }, 0);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
+        setShowPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="w-[100vw] h-[100vh] flex justify-center items-center bg-[#0c1014]">
+      <div className="cropContainerOverlay w-full h-full flex justify-center items-center bg-[rgba(0,0,0,0)] px-2 sm:px-4">
+        <div className="cropContainer relative w-full max-w-[950px] md:w-[90%] lg:w-[80%] xl:w-[60%] h-[95vh] md:h-[70%] rounded-2xl bg-[#212328] overflow-hidden">
+          {/* Header */}
+          <div className="header w-full h-[40px] px-3 sm:px-4 flex justify-between items-center bg-[rgb(12,16,20)]">
+            <div onClick={back} className="back cursor-pointer">
+              <img
+                src="/images/arrow-back-icon.png"
+                className="w-[26px] h-[26px] sm:w-[30px] sm:h-[30px]"
+                alt="Back"
+              />
+            </div>
+
+            <div className="heading text-white text-[15px] sm:text-[18px] font-semibold">
+              {mediaType === "video" ? "Create new reel" : "Create new post"}
+            </div>
+
+            <div
+              onClick={() => handlePost(caption)}
+              className="next text-[rgb(53,121,234)] hover:text-[rgb(20,100,255)] hover:underline cursor-pointer text-sm sm:text-base"
+            >
+              Share
+            </div>
+          </div>
+
+          <hr />
+
+          <div className="main w-full h-[calc(100%-40px)] flex flex-col md:flex-row">
+            {/* Left — preview */}
+            <div
+              className="left relative w-full md:w-[50%] h-[40%] md:h-full flex justify-center items-center overflow-hidden bg-[#25292e]"
+              onTouchStart={isCarousel ? handleTouchStart : undefined}
+              onTouchEnd={isCarousel ? handleTouchEnd : undefined}
+            >
+              {mediaType === "video" ? (
+                mediaUrls[0] &&
+                (isPreTrimmed ? (
+                  <video
+                    ref={videoRef}
+                    src={mediaUrls[0]}
+                    className="w-full h-full object-contain"
+                    controls
+                    muted
+                    loop
+                    playsInline
+                  />
+                ) : (
+                  <div
+                    className="relative w-full h-full flex items-center justify-center cursor-pointer"
+                    onClick={togglePlay}
+                  >
+                    <video
+                      ref={videoRef}
+                      src={mediaUrls[0]}
+                      className="w-full h-full object-contain"
+                      muted
+                      loop
+                      playsInline
+                      onLoadedMetadata={handleLoadedMetadata}
+                      onTimeUpdate={handleTimeUpdate}
+                    />
+                    {!isPlaying && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="w-14 h-14 rounded-full bg-black/50 flex items-center justify-center">
+                          <Play size={22} fill="white" className="ml-0" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                mediaUrls[activeSlide] && (
+                  <img src={mediaUrls[activeSlide]} alt="Preview" className="w-full h-full object-contain" />
+                )
+              )}
+
+              {isCarousel && activeSlide > 0 && (
+                <div
+                  onClick={goPrev}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10"
+                >
+                  <ChevronLeft size={20} color="white" />
+                </div>
+              )}
+              {isCarousel && activeSlide < mediaUrls.length - 1 && (
+                <div
+                  onClick={goNext}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10"
+                >
+                  <ChevronRight size={20} color="white" />
+                </div>
+              )}
+
+              {isCarousel && (
+                <>
+                  <div className="absolute top-3 right-3 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full z-10">
+                    {activeSlide + 1}/{mediaUrls.length}
+                  </div>
+                  <div className="absolute top-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                    {mediaUrls.map((_, i) => (
+                      <div
+                        key={i}
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          i === activeSlide ? "bg-[rgb(53,121,234)]" : "bg-white/60"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Right */}
+            <div className="right relative w-full md:w-[50%] h-[60%] md:h-full">
+              <div className="accountDetails w-full h-[60px] flex justify-start items-center px-4">
+                <div className="profilePicSection w-[40px] h-[40px] rounded-full overflow-hidden">
+                  <img src={user?.profilePic} alt="" />
+                </div>
+                <div className="usernameSection h-full flex items-center px-2 text-white font-semibold text-sm sm:text-base">
+                  {user?.username}
+                </div>
+              </div>
+
+              <div className="caption w-full h-[calc(100%-110px)]">
+                <div className="captionSpace w-full h-full">
+                  <textarea
+                    ref={captionRef}
+                    value={caption}
+                    onChange={(e) => setCaption(e.target.value)}
+                    placeholder={mediaType === "video" ? "Describe your reel" : "Describe your post"}
+                    maxLength={2200}
+                    name="caption"
+                    id="caption"
+                    className="w-full h-full resize-none focus:outline-none text-white text-[16px] sm:text-[18px] px-4 bg-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="emojiSection relative w-full h-[50px] flex">
+                <div className="emojiPart w-[50%] h-full flex justify-start items-center px-4">
+                  <img
+                    onClick={() => setShowPicker(!showPicker)}
+                    src="/images/emoji-picker-icon.png"
+                    alt="Emoji"
+                    className="w-[28px] h-[28px] sm:w-[30px] sm:h-[30px] cursor-pointer"
+                  />
+
+                  {showPicker && (
+                    <div
+                      ref={pickerRef}
+                      className="absolute bottom-16 left-2 sm:left-4 z-50 max-w-[calc(100vw-20px)] overflow-hidden"
+                    >
+                      <EmojiPicker theme="dark" onEmojiClick={handleEmojiClick} />
+                    </div>
+                  )}
+                </div>
+
+                <div className="letterCount w-[50%] h-full flex justify-end items-center px-4 text-white text-sm sm:text-base">
+                  {caption.length}/2,200
+                </div>
+              </div>
+
+              {isLoading && (
+                <div className="loadingSection absolute z-50 w-full h-full top-0">
+                  <div className="absolute inset-0 flex items-center justify-center bg-[rgb(0,0,0,0.4)]">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 via-red-500 to-yellow-500 animate-spin p-[3px]">
+                      <div className="w-full h-full relative bg-[#141518] rounded-full">
+                        <div className="block absolute top-[-7px] w-[20px] h-[20px] rounded-full bg-[#141518]"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CaptionSharePage;
