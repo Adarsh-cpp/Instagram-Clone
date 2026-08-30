@@ -56,7 +56,7 @@ const SignupPage = () => {
           </div>
           <div className="signupContainer h-full w-[350px] flex items-center">
             <div className="signupBox w-full h-[80%]">
-              <div className="logoSection w-full h-[100px] flex flex-col items-center bg-black">
+              <div className="logoSection w-full h-[100px] flex flex-col items-center">
                 <img src="/images/instagram-logo.png" alt="" className=" h-[51px]" />
                 <div className="logoText text-center text-[16px] text-[#A8A8A8] font-bold">Sign up to see photos and videos <br /> from your friends.</div>
                 </div>
@@ -170,7 +170,7 @@ const SignupPage = () => {
               </div>
             </div>
           
-          <div className="facebook w-full h-[80px] bg-black">
+          <div className="facebook w-full h-[80px]">
             <div className="top h-[50%] w-full flex justify-center items-center text-[rgb(53,121,234)] hover:text-[rgb(20,100,255)]  text-[14px] font-bold cursor-pointer ">
               <img src="/images/facebook-logo.png" alt="" className="w-[30px] h-[20px]" /> Log in with Facebook
             </div>

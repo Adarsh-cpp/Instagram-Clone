@@ -324,7 +324,7 @@ const ReelsPage = () => {
 
       <div
         ref={sectionRef}
-        className="reelSection w-full md:w-[80%] min-h-full flex justify-center items-center overflow-y-auto bg-black relative"
+        className="reelSection w-full md:w-[80%] min-h-full flex justify-center items-center overflow-y-auto bg-[#0c1014] relative"
       >
         {/* up / down nav arrows */}
         <div className="hidden sm:flex fixed right-4 md:right-6 top-1/2 -translate-y-1/2 flex-col gap-3 md:gap-4 z-30">

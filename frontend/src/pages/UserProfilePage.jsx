@@ -11,6 +11,7 @@ import MobileIcons from '../components/MobileIcons';
 import BioCard from '../components/BioCard';
 import MobileFooter from '../components/MobileFooter';
 import IconSidebar from '../components/IconSidebar';
+import { X } from "lucide-react";
 
 
 import axios from "axios"
@@ -36,6 +37,9 @@ const UserProfilePage = () => {
   // Followers/Following overlay state
   const [isFollowOverlayOpen, setIsFollowOverlayOpen] = useState(false)
   const [followOverlayTab, setFollowOverlayTab] = useState("followers")
+
+  // Profile pic overlay state
+  const [isDpOverlayOpen, setIsDpOverlayOpen] = useState(false)
 
   const {userId} = useParams()
 
@@ -199,11 +203,23 @@ const UserProfilePage = () => {
     }
     getSavedPosts()
   }, [])
-  
-  
-  
 
- 
+  // lock background scroll while the dp overlay is open
+  useEffect(() => {
+    document.body.style.overflow = isDpOverlayOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isDpOverlayOpen]);
+
+  // close dp overlay on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setIsDpOverlayOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   return (
     <div className="UserProfilePage w-[100vw] h-[100vh] flex justify-between items-center bg-[#0c1014]">
@@ -217,11 +233,42 @@ const UserProfilePage = () => {
             mode={followOverlayTab}
             userId={user._id}
           />
+
+        {/* Profile picture overlay */}
+        {isDpOverlayOpen && (
+          <div
+            className="dpOverlay fixed inset-0 z-50 bg-black/80 flex justify-center items-center"
+            onClick={() => setIsDpOverlayOpen(false)}
+          >
+            <button
+              onClick={() => setIsDpOverlayOpen(false)}
+              className="absolute top-6 right-6 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 flex justify-center items-center text-white cursor-pointer"
+              aria-label="Close"
+            >
+              <X size={22} />
+            </button>
+
+            <div
+              className="dpOverlayContent w-[80vw] max-w-[500px] aspect-square rounded-full overflow-hidden"
+              onClick={(e) => e.stopPropagation()} // prevents click on image from closing overlay
+            >
+              <img
+                src={user.profilePic}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+            </div>
+          </div>
+        )}
+
         <div className="profileContainer w-full 2xl:w-[80%] h-full relative ">
             <div className="profileInfo w-full h-[46%]  ">
                 <div className="personalInfoSection w-full h-[75%] sm:h-[62%] flex justify-start items-center ">
                     <div className="profilePicSection w-[30%] md:w-[25%] lg:w-[20%] h-full flex justify-center items-center ">
-                        <div className="profilePic w-[120px] h-[120px] sm:w-[180px] sm:h-[180px] md:w-[150px] md:h-[150px] lg:w-[180px] lg:h-[180px] rounded-full overflow-hidden object-cover ">
+                        <div
+                          onClick={() => setIsDpOverlayOpen(true)}
+                          className="profilePic w-[120px] h-[120px] sm:w-[180px] sm:h-[180px] md:w-[150px] md:h-[150px] lg:w-[180px] lg:h-[180px] rounded-full overflow-hidden object-cover cursor-pointer "
+                        >
                             <img src={user.profilePic} alt="" className='w-full h-full' />
                         </div>
                     </div>

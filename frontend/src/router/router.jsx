@@ -24,6 +24,7 @@ import MessagesPage from "../pages/MessagesPage.jsx";
 import Chat from "../components/Chat.jsx";
 import NotificationsPage from "../pages/NotificationsPage.jsx";
 import ReelsPage from "../pages/ReelsPage.jsx";
+import UserStoryPage from "../pages/UserStoryPage.jsx";
 
 
 
@@ -60,6 +61,8 @@ const router = createBrowserRouter([
       { path: "/user/notifications", element: <NotificationsPage /> },
 
       { path: "/reels", element: <ReelsPage /> },
+
+      {path: "/story/create", element: <UserStoryPage /> }
     ],
   },
 ]);

@@ -71,7 +71,7 @@ const DobPage = () => {
                  { required: "Month is required" 
 
                  })}
-                 className={`h-[36px] w-[100px] bg-black text-[12px] outline-none placeholder-[#A8A8A8] text-[#F5F5F5] rounded-[5px]  px-[10px] my-[3px] ${errors.month ? " border border-[#FF3040]" : "border border-[#262626]" }`}
+                 className={`h-[36px] w-[100px] bg-[#0c1014] text-[12px] outline-none placeholder-[#A8A8A8] text-[#F5F5F5] rounded-[5px]  px-[10px] my-[3px] ${errors.month ? " border border-[#FF3040]" : "border border-[#262626]" }`}
                  >
         <option value="">Month</option>
         {months.map((month) => (
@@ -85,7 +85,7 @@ const DobPage = () => {
                  { required: "Date is required" 
 
                  })}
-                    className={`h-[36px] w-[70px] bg-black text-[12px] outline-none placeholder-[#A8A8A8] text-[#F5F5F5] rounded-[5px]  px-[10px] my-[3px] ${errors.date ? " border border-[#FF3040]" : "border border-[#262626]" }`}
+                    className={`h-[36px] w-[70px] bg-[#0c1014] text-[12px] outline-none placeholder-[#A8A8A8] text-[#F5F5F5] rounded-[5px]  px-[10px] my-[3px] ${errors.date ? " border border-[#FF3040]" : "border border-[#262626]" }`}
                  >
         <option value="">Date</option>
         {dates.map((date) => (
@@ -99,7 +99,7 @@ const DobPage = () => {
                  { required: "Year is required" 
 
                  })}
-                    className={`h-[36px] w-[80px] bg-black text-[12px] outline-none placeholder-[#A8A8A8] text-[#F5F5F5] rounded-[5px]  px-[10px] my-[3px] ${errors.year ? " border border-[#FF3040]" : "border border-[#262626]" }`}
+                    className={`h-[36px] w-[80px] bg-[#0c1014] text-[12px] outline-none placeholder-[#A8A8A8] text-[#F5F5F5] rounded-[5px]  px-[10px] my-[3px] ${errors.year ? " border border-[#FF3040]" : "border border-[#262626]" }`}
                  >
         <option value="">Year</option>
         {years.map((year) => (

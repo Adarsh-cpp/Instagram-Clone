@@ -59,11 +59,11 @@ const LoginPage = () => {
           </div>
           <div className="loginContainer h-full w-[350px] flex items-center ">
             <div className="loginBox w-full h-[60%]">
-              <div className="logoSection w-full h-[51px] flex justify-center bg-black">
+              <div className="logoSection w-full h-[51px] flex justify-center ">
                 <img src="/images/instagram-logo.png" alt="" className=" h-full" />
                 </div>
 
-                <div className="formSection w-full min-h-[170px] bg-black ">
+                <div className="formSection w-full min-h-[170px] ">
 
                   <form onSubmit={handleSubmit(onSubmit)} className="w-full h-full flex flex-col items-center pt-[20px]">
         {/* Username/Email/Phone Field */}
@@ -132,7 +132,7 @@ const LoginPage = () => {
               </div>
             </div>
           
-          <div className="facebook w-full h-[80px] bg-black">
+          <div className="facebook w-full h-[80px] ">
             <div className="top h-[50%] w-full flex justify-center items-center text-[rgb(53,121,234)] hover:text-[rgb(20,100,255)] text-[14px] font-bold cursor-pointer ">
               <img src="/images/facebook-logo.png" alt="" className="w-[30px] h-[20px]" /> <span onClick={handleFacebookLogin}>Log in with Facebook</span>
             </div>
