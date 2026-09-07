@@ -15,11 +15,22 @@ const MessageCard = ({ ...props }) => {
   const isOnline = onlineUsers?.includes(friend?._id);
 
   const limit = 6;
-  const text = props.conversation?.lastMessage || "";
-  const words = text.split(" ");
+
+  const isLastMessageMine =
+    props.conversation?.lastMessageSenderId &&
+    String(props.conversation.lastMessageSenderId) === String(user?._id);
+
+  const rawLastMessage =
+    props.conversation?.lastMessageType === "story_reply"
+      ? isLastMessageMine
+        ? "Replied to their story"
+        : "Replied to your story"
+      : props.conversation?.lastMessage || "";
+
+  const words = rawLastMessage.split(" ");
 
   const shortText =
-    words.length > limit ? words.slice(0, limit).join(" ") + "..." : text;
+    words.length > limit ? words.slice(0, limit).join(" ") + "..." : rawLastMessage;
 
   const unreadCount = props.conversation?.unreadCount || 0;
 
@@ -33,7 +44,7 @@ const MessageCard = ({ ...props }) => {
           <div className="profilePic relative w-[55px] h-[55px] sm:w-[70px] sm:h-[70px]">
             <div className="w-full h-full rounded-full overflow-hidden">
               <img
-                src={friend?.profilePic}
+                src={friend?.profilePic ? friend.profilePic : "/images/default-profile-pic.jpg" }
                 alt=""
                 className="w-full h-full object-cover"
               />

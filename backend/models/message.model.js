@@ -71,6 +71,30 @@ const messageSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Snapshot, same reasoning as sharedStory above (story may TTL-expire
+    // out from under this message). Set only when this message was created
+    // via "reply to story" — distinct from sharedStory, which is for
+    // forwarding a story to someone else. A message will only ever have
+    // ONE of sharedStory / repliedStory set, never both.
+    repliedStory: {
+      type: new mongoose.Schema(
+        {
+          storyId: { type: mongoose.Schema.Types.ObjectId, ref: "Story" },
+          mediaType: { type: String, enum: ["image", "video"] },
+          mediaUrl: String,
+          bgColor: String,
+          createdAt: Date, // original story's createdAt — used for the 24h expiry check
+          author: {
+            _id: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+            username: String,
+            profilePic: String,
+          },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
+
     seen: {
       type: Boolean,
       default: false,

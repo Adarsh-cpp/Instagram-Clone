@@ -1,7 +1,10 @@
 import storyModel from "../models/story.model.js";
-import Highlight from "../models/highlight.model.js";
+import highlightModel from "../models/highlight.model.js";
+import conversationModel from "../models/conversation.model.js";
+import messageModel from "../models/message.model.js";
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
+import { getIO, onlineUsers } from "../config/socket.js";
 
 // helper — uploads a buffer to Cloudinary via upload_stream (needed since we use multer memoryStorage)
 const uploadBufferToCloudinary = (buffer, resourceType) => {
@@ -177,7 +180,7 @@ export const deleteStory = async (req, res) => {
 
     // if it belonged to a highlight, pull it out of that highlight's stories array
     if (story.highlight) {
-      await Highlight.findByIdAndUpdate(story.highlight, {
+      await highlightModel.findByIdAndUpdate(story.highlight, {
         $pull: { stories: story._id },
       });
     }
@@ -237,6 +240,113 @@ export const getStoryLikes = async (req, res) => {
 
     res.status(200).json({ success: true, likes: story.likes });
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// POST /story/:storyId/reply — send a DM to the story's author quoting the
+// story, e.g. replying "nice" renders in chat as:
+//   [thumb] Replied to your story
+//   nice
+//
+// NOTE: Conversation model shape is still assumed here as
+// { participants: [ObjectId, ObjectId], lastMessage, ... } since I haven't
+// seen conversation.model.js — send it over and I'll line this up exactly
+// (e.g. if you already have a getOrCreateConversation helper elsewhere,
+// this should call that instead of duplicating the find-or-create logic).
+export const replyToStory = async (req, res) => {
+  try {
+    const { storyId } = req.params;
+    const { message } = req.body;
+    const senderId = req.user._id;
+
+    const text = (message || "").trim();
+    if (!text) {
+      return res.status(400).json({ success: false, message: "Reply message is required" });
+    }
+
+    const story = await storyModel.findById(storyId).populate("author", "username profilePic");
+    if (!story) {
+      return res.status(404).json({ success: false, message: "Story not found" });
+    }
+
+    // stories older than the TTL window shouldn't be repliable even if the
+    // TTL delete hasn't swept them yet
+    if (story.expiresAt && story.expiresAt.getTime() < Date.now()) {
+      return res.status(410).json({ success: false, message: "This story has expired" });
+    }
+
+    const authorId = story.author._id;
+    if (authorId.toString() === senderId.toString()) {
+      return res.status(400).json({ success: false, message: "You can't reply to your own story" });
+    }
+
+    // find or create the 1:1 conversation between viewer and story author
+    let conversation = await conversationModel.findOne({
+      participants: { $all: [senderId, authorId], $size: 2 },
+    });
+
+    if (!conversation) {
+      conversation = await conversationModel.create({
+        participants: [senderId, authorId],
+      });
+    }
+
+    // snapshot of the story at reply-time — used to render the thumbnail
+    // even after the story itself expires/gets deleted (matches the
+    // sharedStory snapshot shape in message.model.js)
+    const repliedStorySnapshot = {
+      storyId: story._id,
+      mediaType: story.mediaType,
+      mediaUrl: story.mediaUrl,
+      bgColor: story.bgColor,
+      createdAt: story.createdAt,
+      author: {
+        _id: story.author._id,
+        username: story.author.username,
+        profilePic: story.author.profilePic,
+      },
+    };
+
+    const newMessage = await messageModel.create({
+      conversationId: conversation._id,
+      senderId,
+      receiverId: authorId,
+      text,
+      repliedStory: repliedStorySnapshot,
+    });
+
+    // conversation preview fields — kept in sync so MessageCard can render
+    // the correct "Replied to your/their story" label per viewer, and so
+    // the timestamp used for sorting/"time ago" actually updates
+    conversation.lastMessage = text;
+    conversation.lastMessageType = "story_reply";
+    conversation.lastMessageSenderId = senderId;
+    conversation.lastMessageTime = new Date();
+    await conversation.save();
+
+    const populatedMessage = await newMessage.populate("senderId", "username profilePic");
+
+    // emit over the socket exactly like a normal chat message, so it shows
+    // up live for the story author if they're in the Chat view. onlineUsers
+    // maps userId -> Set of socketIds (a user can have several tabs/devices
+    // open at once), so emit to every socket in that set rather than a
+    // single id.
+    const receiverSockets = onlineUsers.get(authorId.toString());
+    if (receiverSockets && receiverSockets.size > 0) {
+      const io = getIO();
+      const payload = {
+        ...populatedMessage.toObject(),
+        conversationId: conversation._id,
+      };
+      receiverSockets.forEach((socketId) => {
+        io.to(socketId).emit("newMessage", payload);
+      });
+    }
+
+    res.status(201).json({ success: true, data: populatedMessage });
+  } catch (error) {
+    console.error("replyToStory error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { X, Download, ChevronLeft, ChevronRight, Video, Film, Clapperboard } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -8,6 +8,7 @@ import CommentsOverlay from './CommentsOverlay';
 const TILT_ANGLES = [-8, 5, -4, 7];
 const CAPTION_TRIM_LENGTH = 60;
 const STORY_TTL_MS = 24 * 60 * 60 * 1000; // matches story.model.js expiresAt window
+const LONG_PRESS_MS = 500;
 
 const trimCaption = (text) => {
   if (!text) return "";
@@ -16,12 +17,18 @@ const trimCaption = (text) => {
     : text;
 };
 
-const MessageBox = ({ message, showSeen }) => {
+const MessageBox = ({ message, showSeen, onDelete }) => {
   const { user } = useAuth();
   const [isImageOpen, setIsImageOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+
+  // right-click (desktop) / long-press (mobile) unsend menu — own messages only
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  const longPressTimerRef = useRef(null);
+  const menuRef = useRef(null);
 
   const senderId =
     typeof message?.senderId === "object"
@@ -42,6 +49,17 @@ const MessageBox = ({ message, showSeen }) => {
   // only one of these is ever set on a given message
   const shareKind = sharedPost ? 'post' : sharedReel ? 'reel' : sharedStory ? 'story' : null;
   const sharedItem = sharedPost || sharedReel || sharedStory;
+
+  // ---- reply-to-story snapshot (separate from sharedStory/forwarding) ----
+  // Set when this message was created via the "Reply to story" flow in
+  // StoryViewerPage. Renders as a small portrait thumbnail with a
+  // "Replied to your/their story" label above, and the reply text below,
+  // Instagram-style.
+  const repliedStory = message?.repliedStory;
+  const isRepliedStoryExpired =
+    !!repliedStory &&
+    (!repliedStory.createdAt ||
+      Date.now() - new Date(repliedStory.createdAt).getTime() > STORY_TTL_MS);
 
   const isStoryExpired =
     shareKind === 'story' &&
@@ -160,12 +178,67 @@ const MessageBox = ({ message, showSeen }) => {
     }
   };
 
-  const hasMedia = imageList.length > 0 || !!sharedItem;
+  // ---- unsend menu: right-click on desktop, long-press on mobile ----
+  const openMenuAt = (x, y) => {
+    setMenuPosition({ x, y });
+    setIsMenuOpen(true);
+  };
+
+  const handleContextMenu = (e) => {
+    if (!isSenderMessage) return; // recipients never get an unsend option
+    e.preventDefault();
+    openMenuAt(e.clientX, e.clientY);
+  };
+
+  const handleTouchStart = (e) => {
+    if (!isSenderMessage) return;
+    const touch = e.touches[0];
+    longPressTimerRef.current = setTimeout(() => {
+      openMenuAt(touch.clientX, touch.clientY);
+    }, LONG_PRESS_MS);
+  };
+
+  const cancelLongPress = () => {
+    clearTimeout(longPressTimerRef.current);
+  };
+
+  useEffect(() => {
+    return () => clearTimeout(longPressTimerRef.current);
+  }, []);
+
+  // close the menu on any click/tap outside it
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const handleOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("touchstart", handleOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("touchstart", handleOutside);
+    };
+  }, [isMenuOpen]);
+
+  const handleUnsend = () => {
+    setIsMenuOpen(false);
+    onDelete?.(message._id);
+  };
+
+  const hasMedia = imageList.length > 0 || !!sharedItem || !!repliedStory;
 
   return (
     <div className={`w-full flex flex-col ${isSenderMessage ? "items-end" : "items-start"} px-4`}>
       <div
-        className={`messageBox max-w-[70%] w-fit min-h-[40px] rounded-3xl my-1 text-white ${
+        onContextMenu={handleContextMenu}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={cancelLongPress}
+        onTouchMove={cancelLongPress}
+        className={`messageBox max-w-[70%] w-fit min-h-[40px] rounded-3xl my-1 text-white select-none ${
           hasMedia ? "px-0 py-2 bg-transparent" : "px-4 py-2"
         } ${isSenderMessage ? "bg-[#4a5df9]" : "bg-gray-500"}`}
       >
@@ -324,7 +397,47 @@ const MessageBox = ({ message, showSeen }) => {
           </div>
         )}
 
-        {message?.text && (
+        {repliedStory && (
+          <div className="repliedStoryCard w-[130px] rounded-xl overflow-hidden bg-[#1a1e23] border border-white/10">
+            <div className="px-2.5 pt-2 pb-1.5">
+              <span className="text-white/70 text-[11px] leading-tight">
+                {isSenderMessage ? "Replied to their story" : "Replied to your story"}
+              </span>
+            </div>
+
+            <div className="relative w-full h-[190px]">
+              {isRepliedStoryExpired ? (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-[#0f1114] text-center px-2">
+                  <Clapperboard size={20} className="text-white/30" />
+                  <span className="text-white/50 text-[10px]">Story no longer available</span>
+                </div>
+              ) : repliedStory.mediaType === "video" ? (
+                <video
+                  src={repliedStory.mediaUrl}
+                  className="w-full h-full object-cover"
+                  muted
+                  loop
+                  playsInline
+                />
+              ) : (
+                <img
+                  src={repliedStory.mediaUrl}
+                  alt="story"
+                  className="w-full h-full object-cover"
+                  style={{ backgroundColor: repliedStory.bgColor || undefined }}
+                />
+              )}
+            </div>
+
+            {message?.text && (
+              <div className="px-2.5 py-2 text-white text-[13px] leading-snug">
+                {message.text}
+              </div>
+            )}
+          </div>
+        )}
+
+        {message?.text && !repliedStory && (
           <span className={hasMedia ? "block px-3 pb-2" : ""}>{message.text}</span>
         )}
       </div>
@@ -332,6 +445,21 @@ const MessageBox = ({ message, showSeen }) => {
       {showSeen && (
         <div className="text-[#a2a3a3] text-[11px] mr-1 mb-1">
           Seen {getTimeAgo(message?.updatedAt)}
+        </div>
+      )}
+
+      {isMenuOpen && (
+        <div
+          ref={menuRef}
+          style={{ position: "fixed", top: menuPosition.y, left: menuPosition.x }}
+          className="z-[110] bg-[#25292e] border border-white/10 rounded-xl shadow-lg overflow-hidden min-w-[140px]"
+        >
+          <button
+            onClick={handleUnsend}
+            className="w-full text-left px-4 py-2.5 text-red-400 text-[14px] hover:bg-white/5 cursor-pointer"
+          >
+            Unsend
+          </button>
         </div>
       )}
 

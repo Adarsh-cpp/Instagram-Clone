@@ -1,6 +1,7 @@
 // UserProfilePage.jsx
 import React, { useEffect, useRef, useState } from 'react'
 import HighlightCircle from '../components/HighlightCircle'
+import NewHighlightModal from '../components/NewHighlightModal'
 import PostType from '../components/PostType';
 import PostCard from '../components/PostCard';
 import ReelCard from '../components/ReelCard';
@@ -15,6 +16,7 @@ import { X } from "lucide-react";
 
 
 import axios from "axios"
+import axiosInstance from "../utils/axiosInstance"
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import FollowersFollowingOverlay from '../components/FollowersFollowingOverlay';
@@ -40,6 +42,10 @@ const UserProfilePage = () => {
 
   // Profile pic overlay state
   const [isDpOverlayOpen, setIsDpOverlayOpen] = useState(false)
+
+  // Highlights
+  const [highlights, setHighlights] = useState([])
+  const [showNewHighlightModal, setShowNewHighlightModal] = useState(false)
 
   const {userId} = useParams()
 
@@ -204,6 +210,26 @@ const UserProfilePage = () => {
     getSavedPosts()
   }, [])
 
+  // fetch this profile's highlights (works for own profile and others' —
+  // getUserHighlights isn't owner-gated on the backend)
+  useEffect(() => {
+    const getHighlights = async () => {
+      if (!user._id) return
+      try {
+        const res = await axiosInstance.get(`/highlight/user/${user._id}`)
+        setHighlights(res.data.highlights || [])
+      } catch (error) {
+        console.log(error)
+      }
+    }
+    getHighlights()
+  }, [user._id])
+
+  const handleHighlightCreated = (highlight) => {
+    setHighlights((prev) => [highlight, ...prev])
+    setShowNewHighlightModal(false)
+  }
+
   // lock background scroll while the dp overlay is open
   useEffect(() => {
     document.body.style.overflow = isDpOverlayOpen ? "hidden" : "";
@@ -338,32 +364,31 @@ const UserProfilePage = () => {
                      onMouseLeave={handleMouseLeave}
                      onMouseUp={handleMouseUp}
                      onMouseMove={handleMouseMove}
-                     className="highlightSection w-full h-[30%] sm:h-[38%] p-2 flex justify-start items-center sm:items-start gap-10 overflow-x-auto scrollbar-hide select-none cursor-grab ">
-                           <div className="newHighlightsection h-full w-[100px] flex flex-col justify-center sm:justify-start items-center" >
+                     className="highlightSection w-full h-[30%] sm:h-[43%] p-2 flex justify-start items-center sm:items-start gap-10 overflow-x-auto scrollbar-hide select-none cursor-grab ">
+                        {isOwnProfile && (
+                          <div
+                            onClick={() => setShowNewHighlightModal(true)}
+                            className="newHighlightsection h-full w-[100px] flex flex-col justify-center sm:justify-start items-center cursor-pointer"
+                          >
                              <div className="newHighLightCircle w-[70px] h-[70px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-full object-fit object-center border-[4px] border-[#363636] overflow-hidden flex justify-center items-center bg-[#121212]">
                                <img src="/images/plus-icon.png" alt="" draggable="false" className='w-[60%] h-[60%] select-none' />
                             </div>
                             <div className="newtext text-white text-[12px]">New</div>
                            </div>
-                        <HighlightCircle />
-                        <HighlightCircle />
-                        <HighlightCircle />
-                        <HighlightCircle />
-                        <HighlightCircle />
-                        <HighlightCircle />
-                        <HighlightCircle />
-                        <HighlightCircle />
-                        <HighlightCircle />
-                        <HighlightCircle />
-                        <HighlightCircle />
-                        <HighlightCircle />
-                        <HighlightCircle />
-                        <HighlightCircle />
+                        )}
+                        {highlights.map((h) => (
+                          <HighlightCircle
+                            key={h._id}
+                            title={h.title}
+                            coverImage={h.coverImage}
+                            onClick={() => navigate(`/highlight/view/${h._id}`)}
+                          />
+                        ))}
                 </div>
 
             </div>
 
-            <div className="postHeader w-full h-[10%] border flex justify-center items-center border-b-[#2b3036]">
+            <div className="postHeader w-full h-[10%] flex justify-center items-center ">
 
              <PostType type={"Posts"} imgSrc={"/images/grid-icon.png"} activeTab={activeTab} setActiveTab={setActiveTab} />
              <PostType type={"Reels"} imgSrc={"/images/reel-icon.png"} activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -463,6 +488,13 @@ const UserProfilePage = () => {
 
         </div>
       </div>
+
+      {showNewHighlightModal && (
+        <NewHighlightModal
+          onClose={() => setShowNewHighlightModal(false)}
+          onCreated={handleHighlightCreated}
+        />
+      )}
 
     </div>
   )

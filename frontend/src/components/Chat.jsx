@@ -1,4 +1,3 @@
-// Chat.jsx
 import React, { useEffect, useState, useRef } from 'react'
 import { Image, Send, Smile, X } from "lucide-react";
 import socket from '../socket';
@@ -193,6 +192,17 @@ const Chat = () => {
     return () => socket.off("newMessage", handleNewMessage);
   }, [conversationId, user?._id]);
 
+  // handle a message being unsent — by us (other tab/device) or by the friend
+  useEffect(() => {
+    const handleMessageDeleted = ({ messageId, conversationId: convId }) => {
+      if (convId !== conversationId) return;
+      setMessages((prev) => prev.filter((msg) => msg._id !== messageId));
+    };
+
+    socket.on("messageDeleted", handleMessageDeleted);
+    return () => socket.off("messageDeleted", handleMessageDeleted);
+  }, [conversationId]);
+
   // handle the seen feature during a tab switch
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -354,6 +364,25 @@ const Chat = () => {
     }
   };
 
+  // unsend a message — sender-only, enforced again server-side. Removes it
+  // outright from local state; the server recomputes the conversation's
+  // preview and notifies the friend over the socket.
+  const handleDeleteMessage = async (messageId) => {
+    // optimistic — remove immediately, roll back if the request fails
+    const previousMessages = messages;
+    setMessages((prev) => prev.filter((msg) => msg._id !== messageId));
+
+    try {
+      const token = localStorage.getItem("authToken");
+      await axios.delete(`http://localhost:4000/message/${messageId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (error) {
+      setMessages(previousMessages);
+      toast.error("Could not unsend message");
+    }
+  };
+
   return (
     <div className="messageDisplay hidden md:block relative md:w-[65%] lg:w-[70%] h-full bg-[#0c1014]">
 
@@ -422,7 +451,8 @@ const Chat = () => {
             <MessageBox
              key={msg._id}
              message={msg}
-             showSeen={msg._id === lastSeenMessageId} />
+             showSeen={msg._id === lastSeenMessageId}
+             onDelete={handleDeleteMessage} />
           ))}
 
           {isFriendTyping && (

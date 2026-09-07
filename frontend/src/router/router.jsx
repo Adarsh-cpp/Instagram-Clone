@@ -27,6 +27,7 @@ import ReelsPage from "../pages/ReelsPage.jsx";
 import UserStoryPage from "../pages/UserStoryPage.jsx";
 import StoryPage from "../pages/StoryViewerPage.jsx";
 import StoryViewerPage from "../pages/StoryViewerPage.jsx";
+import HighlightViewerPage from "../pages/HighlightViewerPage.jsx";
 
 
 
@@ -65,7 +66,9 @@ const router = createBrowserRouter([
       { path: "/reels", element: <ReelsPage /> },
 
       {path: "/story/create", element: <UserStoryPage /> },
-      {path: "/story/view/:userId", element: <StoryViewerPage /> }
+      {path: "/story/view/:userId", element: <StoryViewerPage /> },
+      {path: "/highlight/view/:highlightId", element: <HighlightViewerPage/> }
+
     ],
   },
 ]);

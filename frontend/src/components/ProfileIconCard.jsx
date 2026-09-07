@@ -8,8 +8,8 @@ import {
   MessagesIcon,
   NotificationsIcon,
   CreateIcon,
-  MoreIcon,
 } from "./Icons";
+
 
 const iconMap = {
   Home: HomeIcon,
@@ -19,11 +19,12 @@ const iconMap = {
   Messages: MessagesIcon,
   Notifications: NotificationsIcon,
   Create: CreateIcon,
-  More: MoreIcon,
 };
+
 
 const ProfileIconCard = ({ imgSrc, iconName, isActive, badgeCount = 0 }) => {
   const IconComponent = iconMap[iconName];
+
 
   return (
     <div
@@ -44,9 +45,11 @@ const ProfileIconCard = ({ imgSrc, iconName, isActive, badgeCount = 0 }) => {
         )}
       </div>
 
+
       <span className="m-4 hidden 2xl:inline">{iconName}</span>
     </div>
   );
 };
+
 
 export default ProfileIconCard;

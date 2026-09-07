@@ -10,6 +10,7 @@ import {
   deleteStory,
   toggleLikeStory,
   getStoryLikes,
+  replyToStory,
 } from "../controllers/storyController.js";
 
 const router = express.Router();
@@ -22,5 +23,6 @@ router.get("/:storyId/viewers", authUser, getStoryViewers);
 router.delete("/:storyId", authUser, deleteStory);
 router.post("/:storyId/like", authUser, toggleLikeStory);
 router.get("/:storyId/likes", authUser, getStoryLikes);
+router.post("/:storyId/reply", authUser, replyToStory);
 
 export default router;

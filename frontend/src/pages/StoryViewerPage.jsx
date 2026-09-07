@@ -3,15 +3,17 @@ import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   X, ChevronLeft, ChevronRight, Volume2, VolumeX,
-  Heart, Send, MoreHorizontal, Eye, Trash2,
+  Heart, Send, MoreHorizontal, Eye, Trash2, Layers,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import axiosInstance from "../utils/axiosInstance";
 import { useAuth } from "../context/AuthContext";
 import ShareOverlay from "../components/ShareOverlay"; // adjust path if your folder layout differs
+import HighlightPickerSheet from "../components/HighlightPickerSheet";
 
 const DEFAULT_IMAGE_SECONDS = 5;
 const HOLD_THRESHOLD_MS = 200;
+const DOUBLE_TAP_MS = 300;
 const DEFAULT_AVATAR = "/images/default-profile-pic.jpg";
 
 // ---- carousel geometry ----
@@ -44,13 +46,17 @@ const StoryViewerPage = () => {
   const [muted, setMuted] = useState(true);
   const [progress, setProgress] = useState(0);
   const [reply, setReply] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
   const [likedMap, setLikedMap] = useState({});
   const [likesCountMap, setLikesCountMap] = useState({});
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetLoading, setSheetLoading] = useState(false);
   const [sheetData, setSheetData] = useState({ viewers: [], likes: [] });
+  const [sheetTab, setSheetTab] = useState("viewers");
   const [moreOpen, setMoreOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [highlightSheetOpen, setHighlightSheetOpen] = useState(false);
+  const [burst, setBurst] = useState(null); // { x, y, key }
 
   const videoRef = useRef(null);
   const playingRef = useRef(true);
@@ -59,6 +65,9 @@ const StoryViewerPage = () => {
   const markedViewedRef = useRef(new Set());
   const advanceRef = useRef(() => {});
   const retreatRef = useRef(() => {});
+  const replyInputRef = useRef(null);
+  const lastTapRef = useRef({ time: 0, side: null });
+  const singleTapTimerRef = useRef(null);
 
   playingRef.current = playing;
 
@@ -128,6 +137,13 @@ const StoryViewerPage = () => {
     setLikesCountMap(lc);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accounts.length]);
+
+  // clear any in-progress reply draft whenever the active story changes,
+  // so text typed for one story never accidentally gets sent to the next
+  useEffect(() => {
+    setReply("");
+    return () => clearTimeout(singleTapTimerRef.current);
+  }, [accountIndex, storyIndex]);
 
   // ---- within-account story navigation ----
   // NOTE: these no longer fall through to the adjacent account. Per spec,
@@ -252,10 +268,30 @@ const StoryViewerPage = () => {
     }
   };
 
+  // ---- double-tap to like (mirrors the small heart button, but always
+  // "likes" rather than toggling — matches standard double-tap UX) ----
+  const triggerDoubleTapLike = (e) => {
+    if (isOwnAccount || !currentStory) return;
+
+    const rect = e.currentTarget.parentElement.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const key = Date.now();
+    setBurst({ x, y, key });
+    setTimeout(() => {
+      setBurst((b) => (b?.key === key ? null : b));
+    }, 800);
+
+    if (!likedMap[currentStory._id]) {
+      handleLikeToggle();
+    }
+  };
+
   // ---- viewers/likes sheet (owner only) ----
   const openSheet = async () => {
     if (!currentStory) return;
     setSheetOpen(true);
+    setSheetTab("viewers");
     setSheetLoading(true);
     setPlaying(false);
     try {
@@ -284,6 +320,39 @@ const StoryViewerPage = () => {
   const closeShare = () => {
     setShareOpen(false);
     setPlaying(true);
+  };
+
+  // ---- add to highlight (owner only) ----
+  const openHighlightSheet = () => {
+    if (!currentStory) return;
+    setHighlightSheetOpen(true);
+    setPlaying(false);
+  };
+  const closeHighlightSheet = () => {
+    setHighlightSheetOpen(false);
+    setPlaying(true);
+  };
+
+  // ---- reply to story (non-owner only) ----
+  // Sends a chat message to the story author with a `repliedStory` snapshot
+  // attached, so it renders in the DM thread as "Replied to your story"
+  // followed by the text, with the story's cover pic as a thumbnail.
+  const handleReplySend = async () => {
+    const text = reply.trim();
+    if (!text || !currentStory || isOwnAccount || sendingReply) return;
+
+    setSendingReply(true);
+    try {
+      await axiosInstance.post(`/story/${currentStory._id}/reply`, { message: text });
+      setReply("");
+      toast.success("Reply sent");
+    } catch (err) {
+      toast.error("Couldn't send reply");
+    } finally {
+      setSendingReply(false);
+      setPlaying(true);
+      replyInputRef.current?.blur();
+    }
   };
 
   // ---- delete (owner only) ----
@@ -317,7 +386,7 @@ const StoryViewerPage = () => {
     }
   };
 
-  // ---- tap-to-navigate (within account only) / hold-to-pause ----
+  // ---- tap-to-navigate (within account only) / hold-to-pause / double-tap-to-like ----
   const onPointerDown = () => {
     wasHeldRef.current = false;
     holdTimerRef.current = setTimeout(() => {
@@ -325,15 +394,28 @@ const StoryViewerPage = () => {
       setPlaying(false);
     }, HOLD_THRESHOLD_MS);
   };
-  const onPointerUp = (side) => {
+  const onPointerUp = (side, e) => {
     clearTimeout(holdTimerRef.current);
     if (wasHeldRef.current) {
       setPlaying(true);
-    } else if (side === "left") {
-      retreatRef.current();
-    } else {
-      advanceRef.current();
+      return;
     }
+
+    const now = Date.now();
+    const isDoubleTap = now - lastTapRef.current.time < DOUBLE_TAP_MS;
+
+    if (isDoubleTap) {
+      clearTimeout(singleTapTimerRef.current);
+      lastTapRef.current = { time: 0, side: null };
+      triggerDoubleTapLike(e);
+      return;
+    }
+
+    lastTapRef.current = { time: now, side };
+    singleTapTimerRef.current = setTimeout(() => {
+      if (side === "left") retreatRef.current();
+      else advanceRef.current();
+    }, DOUBLE_TAP_MS);
   };
 
   if (loading || !currentAccount || !currentStory) return null;
@@ -341,6 +423,7 @@ const StoryViewerPage = () => {
   const liked = likedMap[currentStory._id];
   const likesCount = likesCountMap[currentStory._id] || 0;
   const viewsCount = currentStory.viewers?.length || 0;
+  const hasReplyDraft = reply.trim().length > 0;
 
   // ---- build the carousel slot list ----
   const slots = [];
@@ -370,6 +453,16 @@ const StoryViewerPage = () => {
 
   return (
     <div className="w-full h-screen bg-black relative overflow-hidden flex items-center justify-center">
+      <style>{`
+        @keyframes heartBurstAnim {
+          0% { transform: scale(0); opacity: 0; }
+          15% { transform: scale(1.2); opacity: 1; }
+          30% { transform: scale(1); opacity: 1; }
+          100% { transform: scale(1); opacity: 0; }
+        }
+        .heartBurst { animation: heartBurstAnim 0.8s ease forwards; }
+      `}</style>
+
       {/* desktop chevrons — the only way to cross accounts */}
       <button
         onClick={handlePrevAccount}
@@ -476,6 +569,11 @@ const StoryViewerPage = () => {
                     </button>
                   )}
                   {isOwnAccount && (
+                    <button onClick={openHighlightSheet} aria-label="Add to highlights">
+                      <Layers size={19} />
+                    </button>
+                  )}
+                  {isOwnAccount && (
                     <button onClick={() => setMoreOpen((v) => !v)}>
                       <MoreHorizontal size={19} />
                     </button>
@@ -515,19 +613,30 @@ const StoryViewerPage = () => {
                 />
               )}
 
-              {/* tap zones — within-account story nav only */}
+              {/* tap zones — within-account story nav / double-tap like */}
               <button
                 onPointerDown={onPointerDown}
-                onPointerUp={() => onPointerUp("left")}
+                onPointerUp={(e) => onPointerUp("left", e)}
                 className="absolute inset-y-0 left-0 w-1/3 z-10"
                 aria-label="Previous story"
               />
               <button
                 onPointerDown={onPointerDown}
-                onPointerUp={() => onPointerUp("right")}
+                onPointerUp={(e) => onPointerUp("right", e)}
                 className="absolute inset-y-0 right-0 w-1/3 z-10"
                 aria-label="Next story"
               />
+
+              {/* double-tap gradient heart burst */}
+              {burst && (
+                <img
+                  key={burst.key}
+                  src="/images/gradient-like-icon.png"
+                  alt=""
+                  className="absolute w-40 h-30 pointer-events-none z-20 heartBurst"
+                  style={{ left: burst.x - 40, top: burst.y - 40 }}
+                />
+              )}
 
               {/* footer */}
               <div className="absolute bottom-0 left-0 right-0 px-3 pb-3 z-20">
@@ -542,12 +651,24 @@ const StoryViewerPage = () => {
                 <div className="flex items-center gap-3">
                   {!isOwnAccount && (
                     <input
+                      ref={replyInputRef}
                       value={reply}
                       onChange={(e) => setReply(e.target.value)}
                       onFocus={() => setPlaying(false)}
-                      onBlur={() => setPlaying(true)}
+                      onBlur={() => {
+                        // only resume autoplay if the draft was cleared/sent;
+                        // otherwise keep it paused so the user can keep typing
+                        if (!reply.trim()) setPlaying(true);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleReplySend();
+                        }
+                      }}
+                      disabled={sendingReply}
                       placeholder={`Reply to ${currentAccount.author.username}...`}
-                      className="flex-1 min-w-0 bg-transparent border border-white/40 text-white placeholder-white/60 text-sm rounded-full px-4 py-2 focus:outline-none focus:border-white"
+                      className="flex-1 min-w-0 bg-transparent border border-white/40 text-white placeholder-white/60 text-sm rounded-full px-4 py-2 focus:outline-none focus:border-white disabled:opacity-60"
                     />
                   )}
                   {!isOwnAccount && (
@@ -556,8 +677,17 @@ const StoryViewerPage = () => {
                     </button>
                   )}
                   {!isOwnAccount && (
-                    <button onClick={openShare} className="text-white/90">
-                      <Send size={20} />
+                    <button
+                      onClick={() => (hasReplyDraft ? handleReplySend() : openShare())}
+                      disabled={sendingReply}
+                      className="text-white/90 disabled:opacity-50"
+                      aria-label={hasReplyDraft ? "Send reply" : "Share story"}
+                    >
+                      {sendingReply ? (
+                        <div className="w-[18px] h-[18px] border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <Send size={20} />
+                      )}
                     </button>
                   )}
                   {isOwnAccount && likesCount > 0 && (
@@ -579,33 +709,75 @@ const StoryViewerPage = () => {
             className="bg-[#161616] w-full max-w-md rounded-t-2xl max-h-[60vh] overflow-y-auto p-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="text-white text-sm font-semibold mb-3">
-              Viewed by {sheetData.viewers.length}
+            <div className="flex items-center gap-4 mb-3 border-b border-white/10 pb-2">
+              <button
+                onClick={() => setSheetTab("viewers")}
+                className={`text-sm font-semibold pb-1 ${
+                  sheetTab === "viewers" ? "text-white border-b-2 border-white" : "text-white/50"
+                }`}
+              >
+                Viewers {sheetData.viewers.length > 0 && `(${sheetData.viewers.length})`}
+              </button>
+              <button
+                onClick={() => setSheetTab("likes")}
+                className={`text-sm font-semibold pb-1 ${
+                  sheetTab === "likes" ? "text-white border-b-2 border-white" : "text-white/50"
+                }`}
+              >
+                Likes {sheetData.likes.length > 0 && `(${sheetData.likes.length})`}
+              </button>
             </div>
+
             {sheetLoading ? (
               <div className="text-white/60 text-sm">Loading...</div>
-            ) : sheetData.viewers.length === 0 ? (
-              <div className="text-white/60 text-sm">No views yet</div>
+            ) : sheetTab === "viewers" ? (
+              sheetData.viewers.length === 0 ? (
+                <div className="text-white/60 text-sm">No views yet</div>
+              ) : (
+                sheetData.viewers.map((v) => {
+                  const hasLiked = sheetData.likes.some((l) => l.user._id === v.user._id);
+                  return (
+                    <div key={v.user._id} className="flex items-center gap-2 py-2">
+                      <img
+                        src={v.user.profilePic || DEFAULT_AVATAR}
+                        alt=""
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
+                      <span className="text-white text-sm flex-1 truncate">
+                        {v.user.username}
+                      </span>
+                      {hasLiked && <Heart size={16} fill="#ff3040" color="#ff3040" />}
+                    </div>
+                  );
+                })
+              )
+            ) : sheetData.likes.length === 0 ? (
+              <div className="text-white/60 text-sm">No likes yet</div>
             ) : (
-              sheetData.viewers.map((v) => {
-                const hasLiked = sheetData.likes.some((l) => l.user._id === v.user._id);
-                return (
-                  <div key={v.user._id} className="flex items-center gap-2 py-2">
-                    <img
-                      src={v.user.profilePic}
-                      alt=""
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                    <span className="text-white text-sm flex-1 truncate">
-                      {v.user.username}
-                    </span>
-                    {hasLiked && <Heart size={16} fill="#ff3040" color="#ff3040" />}
-                  </div>
-                );
-              })
+              sheetData.likes.map((l) => (
+                <div key={l.user._id} className="flex items-center gap-2 py-2">
+                  <img
+                    src={l.user.profilePic || DEFAULT_AVATAR}
+                    alt=""
+                    className="w-8 h-8 rounded-full object-cover"
+                  />
+                  <span className="text-white text-sm flex-1 truncate">{l.user.username}</span>
+                  <Heart size={16} fill="#ff3040" color="#ff3040" />
+                </div>
+              ))
             )}
           </div>
         </div>
+      )}
+
+      {/* add-to-highlight sheet — owner only */}
+      {highlightSheetOpen && currentStory && (
+        <HighlightPickerSheet
+          ownerId={user._id}
+          storyId={currentStory._id}
+          onClose={closeHighlightSheet}
+          onAdded={() => {}}
+        />
       )}
 
       {/* share overlay — non-owner only */}

@@ -19,6 +19,55 @@ const SHARED_MEDIA_POPULATE = [
   // message document automatically, no populate needed.
 ];
 
+// Builds the conversation-preview fields (lastMessage/lastMessageType/etc.)
+// from a single message document. Shared by postMessage (new message) and
+// deleteMessage (recomputing the preview after an unsend) so the "what
+// should the chat list show" logic only lives in one place.
+const buildLastMessagePreview = (msg) => {
+  if (!msg) {
+    // conversation has no messages left at all
+    return {
+      lastMessage: "",
+      lastMessageType: "text",
+      lastMessageSenderId: undefined,
+      lastMessageTime: new Date(),
+    };
+  }
+
+  let lastMessageType = "text";
+  let lastMessageText = msg.text || "";
+
+  if (msg.repliedStory) {
+    lastMessageType = "story_reply";
+    lastMessageText = msg.text || "";
+  } else if (msg.sharedPost) {
+    lastMessageType = "post_share";
+    lastMessageText = msg.text?.trim() ? msg.text.trim() : "📤 Shared a post";
+  } else if (msg.sharedReel) {
+    lastMessageType = "reel_share";
+    lastMessageText = msg.text?.trim() ? msg.text.trim() : "🎬 Shared a reel";
+  } else if (msg.sharedStory) {
+    lastMessageType = "story_share";
+    lastMessageText = msg.text?.trim() ? msg.text.trim() : "📖 Shared a story";
+  } else if (msg.images?.length > 1) {
+    lastMessageType = "image";
+    lastMessageText = `📷 ${msg.images.length} Photos`;
+  } else if (msg.images?.length === 1) {
+    lastMessageType = "image";
+    lastMessageText = "📷 Photo";
+  } else {
+    lastMessageType = "text";
+    lastMessageText = msg.text || "";
+  }
+
+  return {
+    lastMessage: lastMessageText,
+    lastMessageType,
+    lastMessageSenderId: msg.senderId?._id || msg.senderId,
+    lastMessageTime: msg.createdAt || new Date(),
+  };
+};
+
 export const getMessages = async (req, res) => {
 
   try {
@@ -155,24 +204,11 @@ export const postMessage = async (req, res) => {
       sharedStory: sharedStorySnapshot || undefined,
     });
 
-    let lastMessageText;
-    if (sharedPost) {
-      lastMessageText = message?.trim() ? message.trim() : "📤 Shared a post";
-    } else if (sharedReel) {
-      lastMessageText = message?.trim() ? message.trim() : "🎬 Shared a reel";
-    } else if (sharedStorySnapshot) {
-      lastMessageText = message?.trim() ? message.trim() : "📖 Shared a story";
-    } else if (imageUrls.length > 1) {
-      lastMessageText = `📷 ${imageUrls.length} Photos`;
-    } else if (imageUrls.length === 1) {
-      lastMessageText = "📷 Photo";
-    } else {
-      lastMessageText = message;
-    }
-
-    conversation.lastMessage = lastMessageText;
-    conversation.lastMessageTime = Date.now();
-    conversation.updatedAt = Date.now();
+    const preview = buildLastMessagePreview(newMessage);
+    conversation.lastMessage = preview.lastMessage;
+    conversation.lastMessageType = preview.lastMessageType;
+    conversation.lastMessageSenderId = preview.lastMessageSenderId;
+    conversation.lastMessageTime = preview.lastMessageTime;
     await conversation.save();
 
     // populate shared post/reel before emitting/returning, so both sender's
@@ -190,6 +226,65 @@ export const postMessage = async (req, res) => {
       message: "Message sent successfully",
       data: newMessage,
     });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};
+
+// Unsend a message — sender only. Deletes it outright (no "this message
+// was deleted" placeholder), then recomputes the conversation's preview
+// fields from whatever message is now the most recent one, so the chat
+// list falls back correctly instead of showing stale/wrong info.
+export const deleteMessage = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { messageId } = req.params;
+
+    const message = await messageModel.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, message: "Message not found" });
+    }
+
+    if (message.senderId.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: "You can only unsend your own messages" });
+    }
+
+    const { conversationId, receiverId } = message;
+
+    await messageModel.deleteOne({ _id: messageId });
+
+    const conversation = await conversationModel.findById(conversationId);
+    if (conversation) {
+      const newLastMessage = await messageModel
+        .findOne({ conversationId })
+        .sort({ createdAt: -1 });
+
+      const preview = buildLastMessagePreview(newLastMessage);
+      conversation.lastMessage = preview.lastMessage;
+      conversation.lastMessageType = preview.lastMessageType;
+      conversation.lastMessageSenderId = preview.lastMessageSenderId;
+      conversation.lastMessageTime = preview.lastMessageTime;
+      await conversation.save();
+    }
+
+    // let the other participant's open chat drop the message live too.
+    // Handles onlineUsers storing either a single socketId (as in
+    // postMessage above) or a Set of socketIds (as in replyToStory) —
+    // worth reconciling those to one shape in socket.js.
+    const receiverSocketEntry = onlineUsers.get(receiverId.toString());
+    if (receiverSocketEntry) {
+      const io = getIO();
+      const payload = { messageId, conversationId: conversationId.toString() };
+
+      if (receiverSocketEntry instanceof Set) {
+        receiverSocketEntry.forEach((socketId) => io.to(socketId).emit("messageDeleted", payload));
+      } else {
+        io.to(receiverSocketEntry).emit("messageDeleted", payload);
+      }
+    }
+
+    return res.status(200).json({ success: true, message: "Message unsent" });
   } catch (error) {
     console.log(error);
     return res.status(500).json({ success: false, message: "Internal Server Error" });

@@ -1,14 +1,18 @@
 import { useState } from "react";
-import { Layers } from "lucide-react";
+import { Layers, Heart, MessageCircle } from "lucide-react";
 import CommentsOverlay from "./CommentsOverlay";
 import { useAuth } from "../context/AuthContext";
 
+
 const ExplorePostCard = ({ post }) => {
+
 
     const { user } = useAuth();
 
+
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likes.length || 0);
+
 
  const [isSaved, setIsSaved] = useState(
     () =>
@@ -17,15 +21,19 @@ const ExplorePostCard = ({ post }) => {
       ) || false
   );
 
+
   const likedBool = post?.likes?.some(
     (like) => (like?._id || like)?.toString() === user?._id?.toString()
   ) || false;
 
+
   const isCarousel = (post.media?.length || 0) > 1;
 
+
   return (
-    <div className="w-full h-full relative overflow-hidden">
+    <div className="w-full h-full relative rounded-2xl overflow-hidden">
       <img src={post.media[0]?.url} alt="" className="w-full h-full object-cover" />
+
 
       {isCarousel && (
         <div className="absolute top-2 right-2 z-10">
@@ -33,19 +41,21 @@ const ExplorePostCard = ({ post }) => {
         </div>
       )}
 
+
       <div
         onClick={() => setIsCommentsOpen(true)}
         className="overlay group w-full h-full absolute top-0 left-0 flex justify-center items-center text-[12px] font-bold text-white bg-[rgba(0,0,0,0)] hover:bg-[rgba(0,0,0,0.8)] cursor-pointer"
       >
         <div className="details w-[120px] h-[40px] flex justify-center items-center opacity-0 group-hover:opacity-100 transition-all ease-in-out">
-          <div className="likeCount w-[50%] h-full flex justify-center items-center">
-            <img src="/images/like-icon.png" alt="" /> {likesCount}
+          <div className="likeCount w-[50%] h-full flex justify-center items-center gap-1">
+            <Heart size={16} fill="white" /> {likesCount}
           </div>
-          <div className="cmntCount w-[50%] h-full flex justify-center items-center">
-            <img src="/images/comment-icon.png" alt="" /> {post.commentsCount}
+          <div className="cmntCount w-[50%] h-full flex justify-center items-center gap-1">
+            <MessageCircle size={16} fill="white" /> {post.commentsCount}
           </div>
         </div>
       </div>
+
 
       {isCommentsOpen && (
         <CommentsOverlay
@@ -61,5 +71,6 @@ const ExplorePostCard = ({ post }) => {
     </div>
   );
 };
+
 
 export default ExplorePostCard;

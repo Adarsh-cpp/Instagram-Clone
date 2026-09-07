@@ -279,7 +279,7 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
                     >
                       <div className="relative">
                         <img
-                          src={user.profilePic || '/default-avatar.png'}
+                          src={user.profilePic || "/images/default-profile-pic.jpg"}
                           alt={user.username}
                           className={`w-[60px] h-[60px] rounded-full object-cover border-2 ${
                             isSelected ? 'border-[#0095F6]' : 'border-[#363636]'

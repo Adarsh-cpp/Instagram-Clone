@@ -1,13 +1,19 @@
+// ExplorePage.jsx
 import React, { useEffect, useState } from 'react'
 import axios from "axios"
 import IconSidebar from '../components/IconSidebar'
 import FollowingSuggestionCard from '../components/FollowingSuggestionCard'
 import ExplorePostCard from '../components/ExplorePostCard'
 
+
 const ExplorePage = () => {
+
 
     const [posts, setPosts] = useState([])
     const [users, setUsers] = useState([])
+    const [searchQuery, setSearchQuery] = useState("")
+    const [filteredUsers, setFilteredUsers] = useState([])
+
 
     useEffect(() => {
         const fetchAllPosts = async () => {
@@ -23,7 +29,7 @@ const ExplorePage = () => {
         }
     fetchAllPosts()
     }, [])
-    
+   
 
 useEffect(() => {
 const fetchAllUsers = async () => {
@@ -37,6 +43,7 @@ try {
         });
     if(response.status === 200){
         setUsers(response.data.users)
+        setFilteredUsers(response.data.users)
     } 
 } catch (error) {
     console.log(error.message)
@@ -45,21 +52,38 @@ try {
 fetchAllUsers()
 }, [])
 
+// Search functionality
+useEffect(() => {
+    if (searchQuery.trim() === "") {
+        setFilteredUsers(users)
+    } else {
+        const query = searchQuery.toLowerCase()
+        const filtered = users.filter(user => 
+            user.username?.toLowerCase().includes(query) ||
+            user.fullname?.toLowerCase().includes(query)
+        )
+        setFilteredUsers(filtered)
+    }
+}, [searchQuery, users])
 
-    
 
-  return (
+   
+    return (
     <div className="explorePage w-screen min-h-screen md:h-screen bg-[#0c1014] flex flex-col md:flex-row text-white overflow-y-auto md:overflow-hidden">
       <IconSidebar />
 
-      <div className="exploreSection w-full md:w-[80%] h-auto md:h-full flex flex-col md:flex-row border">
+
+      <div className="exploreSection w-full md:w-[80%] h-auto md:h-full flex flex-col md:flex-row ">
+
 
        <div className="exploreContainer w-full md:w-[70%] lg:w-[65%] md:min-h-full grid grid-cols-3 auto-rows-[110px] xs:auto-rows-[130px] sm:auto-rows-[160px] md:auto-rows-[200px] lg:auto-rows-[250px] gap-[2px] md:overflow-y-auto hide-scrollbar bg-black">
   {posts.map((post, index) => {
     const group = Math.floor(index / 5);
     const position = index % 5;
 
+
     let className = "";
+
 
     if (
       (group % 2 === 0 && position === 2) || // right
@@ -67,6 +91,7 @@ fetchAllUsers()
     ) {
       className = "row-span-2";
     }
+
 
     return (
       <div key={post._id} className={className}>
@@ -76,25 +101,81 @@ fetchAllUsers()
   })}
 </div>
 
-<div className="followingSuggestions w-full md:w-[30%] lg:w-[35%] h-auto md:h-full flex justify-start items-start content-start flex-wrap md:overflow-y-auto bg-black">
+
+<div className="followingSuggestions w-full md:w-[30%] lg:w-[35%] h-auto md:h-full flex flex-col md:overflow-y-auto bg-black border-l border-[#2b3036]">
+
 
   <div className="heading w-full h-[60px] flex justify-center items-center text-[14px] font-semibold text-center px-2">
     Find friends and accounts that you like
   </div>
 
-  {users?.map((user) => (
-    <FollowingSuggestionCard
-      key={user._id}
-      suggestedUserId={user._id}
-      user={user}
-    />
-  ))}
+
+  {/* Search Bar */}
+  <div className="searchSection w-full px-3 py-2">
+    <div className="searchContainer w-full h-[40px] bg-[#1e1e1e] rounded-lg flex items-center px-3 border border-[#2b3036] focus-within:border-[#0095f6] transition-colors">
+      <svg 
+        className="w-5 h-5 text-gray-400 mr-2" 
+        fill="none" 
+        stroke="currentColor" 
+        viewBox="0 0 24 24"
+      >
+        <path 
+          strokeLinecap="round" 
+          strokeLinejoin="round" 
+          strokeWidth={2} 
+          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" 
+        />
+      </svg>
+      <input
+        type="text"
+        placeholder="Search users..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="w-full bg-transparent text-white text-sm outline-none placeholder-gray-500"
+      />
+      {searchQuery && (
+        <button
+          onClick={() => setSearchQuery("")}
+          className="text-gray-400 hover:text-white transition-colors"
+        >
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path 
+              fillRule="evenodd" 
+              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" 
+              clipRule="evenodd" 
+            />
+          </svg>
+        </button>
+      )}
+    </div>
+  </div>
+
+
+  {/* Suggestions List */}
+  <div className="suggestionsList w-full flex flex-wrap justify-start items-start content-start p-2">
+    {filteredUsers?.length > 0 ? (
+      filteredUsers.map((user) => (
+        <FollowingSuggestionCard
+          key={user._id}
+          suggestedUserId={user._id}
+          user={user}
+        />
+      ))
+    ) : (
+      <div className="w-full flex justify-center items-center py-8 text-gray-400 text-sm">
+        No users found
+      </div>
+    )}
+  </div>
+
 
 </div>
+
 
       </div>
     </div>
   )
 }
+
 
 export default ExplorePage

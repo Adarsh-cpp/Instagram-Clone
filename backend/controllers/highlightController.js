@@ -1,40 +1,48 @@
 import Highlight from "../models/highlight.model.js";
 import storyModel from "../models/story.model.js";
 
-// POST /highlight/create  { title, storyIds: [...] }
+// POST /highlight/create  { title, storyIds?: [...] }
+// storyIds is now optional — lets the "+" button on the profile page create
+// an empty, named highlight that stories get added to later via
+// addStoryToHighlight.
 export const createHighlight = async (req, res) => {
   try {
     const userId = req.user._id;
     const { title, storyIds } = req.body;
+    const ids = Array.isArray(storyIds) ? storyIds : [];
 
-    if (!title || !storyIds || storyIds.length === 0) {
-      return res.status(400).json({ success: false, message: "Title and at least one story are required" });
+    if (!title || !title.trim()) {
+      return res.status(400).json({ success: false, message: "Title is required" });
     }
 
-    // verify all stories belong to this user and aren't already in another highlight
-    const stories = await storyModel.find({ _id: { $in: storyIds } });
+    let stories = [];
+    if (ids.length > 0) {
+      stories = await storyModel.find({ _id: { $in: ids } });
 
-    for (const story of stories) {
-      if (story.author.toString() !== userId.toString()) {
-        return res.status(403).json({ success: false, message: "Cannot use another user's story" });
-      }
-      if (story.isHighlighted) {
-        return res.status(400).json({ success: false, message: "A story can only belong to one highlight" });
+      for (const story of stories) {
+        if (story.author.toString() !== userId.toString()) {
+          return res.status(403).json({ success: false, message: "Cannot use another user's story" });
+        }
+        if (story.isHighlighted) {
+          return res.status(400).json({ success: false, message: "A story can only belong to one highlight" });
+        }
       }
     }
 
     const highlight = await Highlight.create({
       owner: userId,
-      title,
+      title: title.trim(),
       coverImage: stories[0]?.mediaUrl || "",
-      stories: storyIds,
+      stories: ids,
     });
 
-    // mark stories as highlighted and $unset expiresAt so the TTL index leaves them alone forever
-    await storyModel.updateMany(
-      { _id: { $in: storyIds } },
-      { $set: { isHighlighted: true, highlight: highlight._id }, $unset: { expiresAt: "" } }
-    );
+    if (ids.length > 0) {
+      // mark stories as highlighted and $unset expiresAt so the TTL index leaves them alone forever
+      await storyModel.updateMany(
+        { _id: { $in: ids } },
+        { $set: { isHighlighted: true, highlight: highlight._id }, $unset: { expiresAt: "" } }
+      );
+    }
 
     res.status(201).json({ success: true, highlight });
   } catch (error) {
@@ -63,6 +71,12 @@ export const addStoryToHighlight = async (req, res) => {
     }
     if (story.isHighlighted) {
       return res.status(400).json({ success: false, message: "Story already belongs to a highlight" });
+    }
+
+    // if this highlight has no cover yet (created empty via the "+" flow,
+    // or this is simply its first story), use this story's media as the cover
+    if (!highlight.coverImage) {
+      highlight.coverImage = story.mediaUrl;
     }
 
     highlight.stories.push(storyId);
