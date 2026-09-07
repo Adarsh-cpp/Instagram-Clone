@@ -41,6 +41,7 @@ const NotificationsPage = () => {
         `${BASE_URL}/api/notifications?page=${pageNum}&limit=20`,
         authHeaders()
       );
+      console.log(data.notifications.map(n => ({ type: n.type, reel: n.reel })));
       setItems((prev) => (pageNum === 1 ? data.notifications : [...prev, ...data.notifications]));
       setHasMore(data.hasMore);
     } catch (err) {
@@ -97,8 +98,10 @@ const NotificationsPage = () => {
                 const isFollowingBack = followBackState[n.sender._id] ?? n.isFollowingSender ?? false;
               // follow -> sender's avatar; like/comment -> the post image
               const thumbSrc = isFollow
-                ? n.sender.profilePic || "/images/profile-pic.JPG"
-                : n.post?.media?.[0]?.url || "/images/profile-pic.JPG";
+                  ? n.sender.profilePic || "/images/default-profile-pic.jpg"
+                  : n.reel
+                  ? n.reel.media?.thumbnailUrl || "/images/default-profile-pic.jpg"
+                  : n.post?.media?.[0]?.url || "/images/default-profile-pic.jpg";
 
               return (
                 <div
@@ -108,10 +111,12 @@ const NotificationsPage = () => {
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <Link
+                   <Link
                       to={
                         isFollow
                           ? `/user/get-profile/${n.sender._id}`
+                          : n.reel
+                          ? `/reel/${n.reel._id}`
                           : `/post/${n.post?._id}`
                       }
                       className="shrink-0"

@@ -25,6 +25,8 @@ import Chat from "../components/Chat.jsx";
 import NotificationsPage from "../pages/NotificationsPage.jsx";
 import ReelsPage from "../pages/ReelsPage.jsx";
 import UserStoryPage from "../pages/UserStoryPage.jsx";
+import StoryPage from "../pages/StoryViewerPage.jsx";
+import StoryViewerPage from "../pages/StoryViewerPage.jsx";
 
 
 
@@ -62,7 +64,8 @@ const router = createBrowserRouter([
 
       { path: "/reels", element: <ReelsPage /> },
 
-      {path: "/story/create", element: <UserStoryPage /> }
+      {path: "/story/create", element: <UserStoryPage /> },
+      {path: "/story/view/:userId", element: <StoryViewerPage /> }
     ],
   },
 ]);

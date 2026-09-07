@@ -45,7 +45,7 @@ const FollowingSuggestionCard = ({...props}) => {
     <div className="suggestedCard w-[180px] h-[250px] rounded-md m-2 cursor-pointer bg-[#121212] hover:bg-[#201f1f] ">
       <div className="profilePicSection w-full h-[56%] flex justify-center items-center ">
         <div className="pic w-[125px] h-[125px] rounded-full overflow-hidden ">
-          <img src={props.user.profilePic} alt="" className="w-full h-full object-cover" />
+          <img src={props.user.profilePic ? props.user.profilePic : "/images/default-profile-pic.jpg"} alt="" className="w-full h-full object-cover" />
         </div>
       </div>
       <div className="nameSection w-full h-[20%] ">

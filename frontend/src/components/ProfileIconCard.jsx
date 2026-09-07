@@ -33,12 +33,12 @@ const ProfileIconCard = ({ imgSrc, iconName, isActive, badgeCount = 0 }) => {
     >
       <div className="relative shrink-0 rounded-full overflow-hidden w-[40px] h-[40px] flex items-center justify-center">
         {iconName === "Profile" ? (
-          <img src={imgSrc} alt="" className="w-[40px] h-[40px]" />
+          <img src={imgSrc?imgSrc:"/images/default-profile-pic.jpg"} alt="" className="w-[40px] h-[40px]" />
         ) : (
           IconComponent && <IconComponent active={isActive} />
         )}
         {badgeCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-[3px] rounded-full bg-[#ED4956] text-white text-[10px] font-bold flex items-center justify-center leading-none">
+          <span className="absolute top-[3px] right-[3px] min-w-[16px] h-[16px] px-[3px] rounded-full bg-[#ED4956] text-white text-[10px] font-bold flex items-center justify-center leading-none">
             {badgeCount > 99 ? "99+" : badgeCount}
           </span>
         )}

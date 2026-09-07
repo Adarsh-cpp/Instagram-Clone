@@ -269,7 +269,15 @@ const UserProfilePage = () => {
                           onClick={() => setIsDpOverlayOpen(true)}
                           className="profilePic w-[120px] h-[120px] sm:w-[180px] sm:h-[180px] md:w-[150px] md:h-[150px] lg:w-[180px] lg:h-[180px] rounded-full overflow-hidden object-cover cursor-pointer "
                         >
-                            <img src={user.profilePic} alt="" className='w-full h-full' />
+                            <img
+                                src={
+                                  user?.profilePic
+                                    ? user.profilePic
+                                    : "/images/default-profile-pic.jpg"
+                                }
+                                alt=""
+                                className="w-full h-full"
+                              />
                         </div>
                     </div>
                     <div className="profileDetails w-[300px] sm:w-[70%] h-full ">

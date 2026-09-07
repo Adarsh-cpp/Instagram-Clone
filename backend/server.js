@@ -32,6 +32,7 @@ import commentRoutes from "./routes/commentRoutes.js";
 import reelRoutes from "./routes/reelRoutes.js";
 import storyRoutes from "./routes/storyRoutes.js";
 import highlightRoutes from "./routes/highlightRoutes.js";
+import songRoutes from "./routes/songRoutes.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -62,6 +63,7 @@ app.use("/:postId/comment", commentRoutes)
 app.use("/reels", reelRoutes);
 app.use("/story", storyRoutes);
 app.use("/highlight", highlightRoutes);
+app.use("/song", songRoutes);
 
 const port = process.env.PORT || 4000;
 connectDB();

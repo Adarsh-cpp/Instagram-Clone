@@ -236,7 +236,7 @@ const CaptionSharePage = ({
             <div className="right relative w-full md:w-[50%] h-[60%] md:h-full">
               <div className="accountDetails w-full h-[60px] flex justify-start items-center px-4">
                 <div className="profilePicSection w-[40px] h-[40px] rounded-full overflow-hidden">
-                  <img src={user?.profilePic} alt="" />
+                  <img src={user?.profilePic ? user.profilePic : "/images/default-profile-pic.jpg"} alt="" />
                 </div>
                 <div className="usernameSection h-full flex items-center px-2 text-white font-semibold text-sm sm:text-base">
                   {user?.username}

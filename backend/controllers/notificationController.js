@@ -14,6 +14,7 @@ export const getNotifications = async (req, res) => {
         .limit(limit)
         .populate("sender", "username fullName profilePic")
         .populate("post", "media")
+        .populate("reel", "media")
         .lean(),
       notificationModel.countDocuments({ recipient: userId }),
       userModel.findById(userId).select("following").lean(),

@@ -7,19 +7,20 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import {
   X, Type, Pencil, Palette, Music, Check, Undo2, SlidersHorizontal,
-  CaseSensitive, Baseline,
+  CaseSensitive, Baseline, ChevronLeft,
 } from "lucide-react";
 import { getImageFilterPreset, VIDEO_FILTER_CSS, FILTER_NAMES } from "../utils/storyFilters";
+import SongTrimClipper from "../components/SongTrimClipper";
 
 const EXPORT_W = 1080;
 const EXPORT_H = 1920;
 const STORY_RATIO = 9 / 16;
+const CLIP_SECONDS = 15;
 
 const BG_SWATCHES = ["#000000", "#1a1a2e", "#4a5df9", "#ff6b0d", "#eb0089", "#0f9d58", "#ffffff"];
 const PEN_SWATCHES = ["#ffffff", "#000000", "#ffc600", "#ff6b0d", "#eb0089", "#4a5df9", "#0f9d58"];
 const TEXT_SWATCHES = ["#ffffff", "#000000", "#ffc600", "#ff6b0d", "#eb0089", "#4a5df9", "#0f9d58"];
 
-// free Google Fonts — loaded via stylesheet link, no API key needed
 const FONT_OPTIONS = [
   "Poppins", "Roboto", "Montserrat", "Playfair Display",
   "Oswald", "Pacifico", "Dancing Script", "Bebas Neue", "Caveat", "Anton",
@@ -79,6 +80,7 @@ const UserStoryPage = () => {
   const fabricRef = useRef(null);
   const videoElRef = useRef(null);
   const bgImageRef = useRef(null);
+  const audioRef = useRef(null);
 
   const [dims, setDims] = useState({ width: 0, height: 0 });
   const [mode, setMode] = useState("select");
@@ -87,13 +89,13 @@ const UserStoryPage = () => {
   const [textFont, setTextFont] = useState("Poppins");
   const [bgColor, setBgColor] = useState("#000000");
   const [activeFilter, setActiveFilter] = useState("none");
-  const [panel, setPanel] = useState(null); // filters | pen-color | bg-color | text-color | font | songs | null
+  const [panel, setPanel] = useState(null);
   const [songs, setSongs] = useState([]);
   const [selectedSong, setSelectedSong] = useState(null);
+  const [songStartTime, setSongStartTime] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [isTextSelected, setIsTextSelected] = useState(false);
 
-  // video position/size — drives BOTH the on-screen Rnd box and the final export crop
   const [videoBox, setVideoBox] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
   useEffect(() => {
@@ -103,7 +105,6 @@ const UserStoryPage = () => {
     }
   }, [file, navigate]);
 
-  // inject Google Fonts stylesheet once — free, no key required
   useEffect(() => {
     const families = FONT_OPTIONS.map((f) => f.replace(/ /g, "+")).join("&family=");
     const link = document.createElement("link");
@@ -133,7 +134,7 @@ const UserStoryPage = () => {
     const w = Math.round(width);
     const h = Math.round(height);
     setDims({ width: w, height: h });
-    setVideoBox({ x: 0, y: 0, width: w, height: h }); // default: video covers full frame
+    setVideoBox({ x: 0, y: 0, width: w, height: h });
   }, []);
 
   useEffect(() => {
@@ -147,7 +148,6 @@ const UserStoryPage = () => {
     });
     fabricRef.current = canvas;
 
-    // track selection so the toolbar can show text-only controls (color/font)
     const updateSelection = () => {
       const obj = canvas.getActiveObject();
       setIsTextSelected(!!obj && obj.type === "textbox");
@@ -193,11 +193,47 @@ const UserStoryPage = () => {
         });
         setSongs(res.data.songs || []);
       } catch (err) {
-        console.error("Failed to load songs:", err);
+        // Non-fatal: music is optional. Log the real backend message if present.
+        console.error("Failed to load songs:", err.response?.data || err.message);
       }
     };
     fetchSongs();
   }, []);
+
+  // pause + fully unload audio on unmount, regardless of how the page is exited
+  useEffect(() => {
+    return () => {
+      audioRef.current?.pause();
+    };
+  }, []);
+
+  // play the selected song's 15s clip on loop — same "loops until added"
+  // behavior as Instagram's music sticker preview
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !selectedSong) {
+      audio?.pause();
+      return;
+    }
+    audio.currentTime = songStartTime;
+    audio.play().catch(() => {
+      // autoplay can be blocked before any user gesture — harmless, the
+      // trimmer drag itself counts as a gesture and playback resumes then
+    });
+  }, [selectedSong, songStartTime]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !selectedSong) return;
+    const handleTimeUpdate = () => {
+      if (audio.currentTime >= songStartTime + CLIP_SECONDS) {
+        audio.currentTime = songStartTime;
+        audio.play().catch(() => {});
+      }
+    };
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    return () => audio.removeEventListener("timeupdate", handleTimeUpdate);
+  }, [selectedSong, songStartTime]);
 
   useEffect(() => {
     const canvas = fabricRef.current;
@@ -244,8 +280,6 @@ const UserStoryPage = () => {
     setMode("select");
   };
 
-  // applies a color to whichever textbox is currently selected — this is
-  // the fix for "text color can also be changed [after creation]"
   const applyTextColor = (color) => {
     setTextColor(color);
     const canvas = fabricRef.current;
@@ -256,14 +290,11 @@ const UserStoryPage = () => {
     }
   };
 
-  // applies a font to the selected textbox, loading the webfont first so it
-  // doesn't silently fall back to a system font on first use
   const applyFont = (fontName) => {
     setTextFont(fontName);
     const canvas = fabricRef.current;
     const obj = canvas?.getActiveObject();
     if (!obj || obj.type !== "textbox") return;
-
     document.fonts.load(`16px "${fontName}"`).finally(() => {
       obj.set("fontFamily", fontName);
       canvas.renderAll();
@@ -278,9 +309,18 @@ const UserStoryPage = () => {
     if (last && last !== bgImageRef.current) canvas.remove(last);
   };
 
-  const handleDiscard = () => navigate(-1);
+  const handleDiscard = () => {
+    audioRef.current?.pause();
+    navigate(-1);
+  };
 
   const togglePanel = (name) => setPanel((p) => (p === name ? null : name));
+
+  const removeSong = () => {
+    audioRef.current?.pause();
+    setSelectedSong(null);
+    setSongStartTime(0);
+  };
 
   const exportImage = () => {
     const canvas = fabricRef.current;
@@ -298,6 +338,15 @@ const UserStoryPage = () => {
       const overlayCanvas = fabricRef.current.getElement();
       const multiplier = EXPORT_W / dims.width;
 
+      // A looping <video> never fires "ended", so MediaRecorder.stop()
+      // would never be called and this promise would hang forever.
+      // Disable looping just for the export pass, restore it after.
+      const wasLooping = video.loop;
+      video.loop = false;
+      const restoreLoop = () => {
+        video.loop = wasLooping;
+      };
+
       const outputCanvas = document.createElement("canvas");
       outputCanvas.width = EXPORT_W;
       outputCanvas.height = EXPORT_H;
@@ -314,22 +363,23 @@ const UserStoryPage = () => {
       const recorder = new MediaRecorder(stream, { mimeType: "video/webm;codecs=vp9,opus" });
       const chunks = [];
       recorder.ondataavailable = (e) => e.data.size > 0 && chunks.push(e.data);
-      recorder.onstop = () => resolve(new Blob(chunks, { type: "video/webm" }));
-      recorder.onerror = reject;
+      recorder.onstop = () => {
+        restoreLoop();
+        resolve(new Blob(chunks, { type: "video/webm" }));
+      };
+      recorder.onerror = (e) => {
+        restoreLoop();
+        reject(e);
+      };
 
       video.currentTime = 0;
       let rafId;
       const drawFrame = () => {
         if (video.paused || video.ended) return;
-
-        // fill any area the (possibly resized/moved) video doesn't cover
         ctx.fillStyle = "#000000";
         ctx.fillRect(0, 0, EXPORT_W, EXPORT_H);
-
         ctx.save();
         ctx.filter = VIDEO_FILTER_CSS[activeFilter] || "none";
-        // draw the video at whatever position/size the user dragged it to via
-        // react-rnd, scaled up from on-screen pixels to the export resolution
         ctx.drawImage(
           video,
           videoBox.x * multiplier,
@@ -338,7 +388,6 @@ const UserStoryPage = () => {
           videoBox.height * multiplier
         );
         ctx.restore();
-
         ctx.drawImage(overlayCanvas, 0, 0, EXPORT_W, EXPORT_H);
         rafId = requestAnimationFrame(drawFrame);
       };
@@ -354,16 +403,21 @@ const UserStoryPage = () => {
 
   const handleAddToStory = async () => {
     try {
+      audioRef.current?.pause();
       setExporting(true);
       const blob = mediaType === "image" ? await exportImage() : await exportVideo();
 
       const formData = new FormData();
       formData.append("media", blob, mediaType === "image" ? "story.png" : "story.webm");
+      // Not sending mediaType here on purpose — the backend's
+      // validateVideoDuration middleware sets req.mediaType itself from the
+      // uploaded file's real mimetype, which is more trustworthy than
+      // anything the client claims.
       formData.append("filterUsed", activeFilter);
       formData.append("bgColor", bgColor);
       if (selectedSong) {
         formData.append("songId", selectedSong._id);
-        formData.append("songStartTime", 0);
+        formData.append("songStartTime", songStartTime);
       }
 
       const token = localStorage.getItem("authToken");
@@ -374,7 +428,9 @@ const UserStoryPage = () => {
       toast.success("Story posted!");
       navigate("/home");
     } catch (err) {
-      console.error(err);
+      // Surface the REAL backend error message (from error.message in the
+      // controller's catch block), not just the generic Axios wrapper.
+      console.error("Story upload failed:", err.response?.data || err.message);
       toast.error(err.response?.data?.message || "Failed to post story");
     } finally {
       setExporting(false);
@@ -385,6 +441,10 @@ const UserStoryPage = () => {
 
   return (
     <div className="userStoryPage fixed inset-0 bg-[#0c1014] z-50 flex items-center justify-center">
+      {selectedSong && (
+        <audio ref={audioRef} src={selectedSong.audioUrl} className="hidden" />
+      )}
+
       {dims.width > 0 && (
         <div className="relative flex items-center gap-3">
           <div
@@ -419,7 +479,7 @@ const UserStoryPage = () => {
                     height: "100%",
                     objectFit: "cover",
                     filter: VIDEO_FILTER_CSS[activeFilter],
-                    pointerEvents: "none", // drag/resize handled by Rnd's own handles, not the video itself
+                    pointerEvents: "none",
                   }}
                 />
               </Rnd>
@@ -428,6 +488,18 @@ const UserStoryPage = () => {
             <div className="absolute inset-0" style={{ zIndex: 20 }}>
               <canvas ref={canvasElRef} />
             </div>
+
+            {selectedSong && (
+              <div className="absolute top-14 left-4 right-4 z-30 flex items-center gap-2 bg-black/50 rounded-full px-3 py-2 backdrop-blur-sm">
+                <div
+                  className="w-6 h-6 rounded-full shrink-0"
+                  style={{ background: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)" }}
+                />
+                <div className="text-white text-xs truncate flex-1">
+                  {selectedSong.title} · {selectedSong.artist}
+                </div>
+              </div>
+            )}
 
             <div className="absolute top-0 left-0 right-0 flex justify-between items-center px-4 py-3 z-30 bg-gradient-to-b from-black/50 to-transparent">
               <button onClick={handleDiscard} className="text-white" aria-label="Discard">
@@ -461,7 +533,6 @@ const UserStoryPage = () => {
               <Type size={20} />
             </button>
 
-            {/* text-only controls — appear only while a textbox is selected */}
             {isTextSelected && (
               <>
                 <button
@@ -489,24 +560,22 @@ const UserStoryPage = () => {
               </>
             )}
 
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setMode((m) => (m === "draw" ? "select" : "draw"));
-                  setPanel(mode === "draw" ? null : "pen-color");
-                }}
-                className={`w-10 h-10 rounded-full flex items-center justify-center text-white relative ${
-                  mode === "draw" ? "bg-[#4a5df9]" : "bg-black/50"
-                }`}
-                aria-label="Doodle"
-              >
-                <Pencil size={20} />
-                <span
-                  className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border border-white"
-                  style={{ backgroundColor: penColor }}
-                />
-              </button>
-            </div>
+            <button
+              onClick={() => {
+                setMode((m) => (m === "draw" ? "select" : "draw"));
+                setPanel(mode === "draw" ? null : "pen-color");
+              }}
+              className={`w-10 h-10 rounded-full flex items-center justify-center text-white relative ${
+                mode === "draw" ? "bg-[#4a5df9]" : "bg-black/50"
+              }`}
+              aria-label="Doodle"
+            >
+              <Pencil size={20} />
+              <span
+                className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border border-white"
+                style={{ backgroundColor: penColor }}
+              />
+            </button>
 
             {mediaType === "image" && (
               <button
@@ -533,8 +602,13 @@ const UserStoryPage = () => {
             <button
               onClick={() => togglePanel("songs")}
               className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${
-                selectedSong ? "bg-[#4a5df9]" : "bg-black/50"
+                selectedSong ? "" : "bg-black/50"
               }`}
+              style={
+                selectedSong
+                  ? { background: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)" }
+                  : undefined
+              }
               aria-label="Add music"
             >
               <Music size={20} />
@@ -596,36 +670,67 @@ const UserStoryPage = () => {
               )}
 
               {panel === "songs" && (
-                <div className="w-[240px] p-3">
-                  <div className="text-white text-xs font-semibold mb-2">Choose a song</div>
-                  {songs.length === 0 && (
-                    <div className="text-[#888] text-xs py-2">No songs available yet.</div>
-                  )}
-                  {songs.map((song) => (
-                    <div
-                      key={song._id}
-                      onClick={() => {
-                        setSelectedSong(song);
-                        setPanel(null);
-                      }}
-                      className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer ${
-                        selectedSong?._id === song._id ? "bg-[#4a5df9]/30" : "hover:bg-white/5"
-                      }`}
-                    >
-                      <img
-                        src={song.thumbnail || "/images/song-placeholder.png"}
-                        alt=""
-                        className="w-9 h-9 rounded object-cover shrink-0"
-                      />
-                      <div className="text-white text-xs min-w-0">
-                        <div className="truncate">{song.title}</div>
-                        <div className="text-[#888] truncate">{song.artist}</div>
-                      </div>
-                      {selectedSong?._id === song._id && (
-                        <Check size={14} className="text-[#4a5df9] ml-auto shrink-0" />
+                <div className="w-[260px] p-3">
+                  {!selectedSong ? (
+                    <>
+                      <div className="text-white text-xs font-semibold mb-2">Choose a song</div>
+                      {songs.length === 0 && (
+                        <div className="text-[#888] text-xs py-2">No songs available yet.</div>
                       )}
-                    </div>
-                  ))}
+                      {songs.map((song) => (
+                        <div
+                          key={song._id}
+                          onClick={() => {
+                            setSelectedSong(song);
+                            setSongStartTime(0);
+                          }}
+                          className="flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:bg-white/5"
+                        >
+                          <img
+                            src={song.thumbnail || "/images/song-placeholder.png"}
+                            alt=""
+                            className="w-9 h-9 rounded object-cover shrink-0"
+                          />
+                          <div className="text-white text-xs min-w-0">
+                            <div className="truncate">{song.title}</div>
+                            <div className="text-[#888] truncate">{song.artist}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between mb-3">
+                        <button
+                          onClick={removeSong}
+                          className="text-white text-xs flex items-center gap-1"
+                        >
+                          <ChevronLeft size={14} /> Back
+                        </button>
+                        <button
+                          onClick={() => setPanel(null)}
+                          className="text-[#4a5df9] text-xs font-semibold"
+                        >
+                          Done
+                        </button>
+                      </div>
+                      <div className="text-white text-xs font-semibold truncate mb-1">
+                        {selectedSong.title}
+                      </div>
+                      <div className="text-[#888] text-[11px] mb-3 truncate">
+                        {selectedSong.artist}
+                      </div>
+                      <SongTrimClipper
+                        duration={selectedSong.duration}
+                        startTime={songStartTime}
+                        onChange={setSongStartTime}
+                        trackWidth={220}
+                      />
+                      <div className="text-[#888] text-[10px] mt-2 text-center">
+                        Drag to choose your 15s clip
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>

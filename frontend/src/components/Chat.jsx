@@ -363,7 +363,7 @@ const Chat = () => {
 
           <div className="profilePicSection w-[20%] h-full flex justify-center items-center">
             <div className="profilePic w-[50px] h-[50px] lg:w-[70px] lg:h-[70px] rounded-full overflow-hidden">
-              <img src={friend?.profilePic} alt="" className="w-full h-full object-cover" />
+              <img src={friend?.profilePic ? friend.profilePic : "/images/default-profile-pic.jpg" } alt="" className="w-full h-full object-cover" />
             </div>
           </div>
 
@@ -394,7 +394,7 @@ const Chat = () => {
 
           <div className="profilePicSection w-full h-[120px] flex justify-center items-center">
             <div className="profilePic w-[80px] h-[80px] lg:w-[100px] lg:h-[100px] rounded-full overflow-hidden">
-              <img src={friend?.profilePic} alt="" className="w-full h-full object-cover" />
+              <img src={friend?.profilePic ? friend.profilePic : "/images/default-profile-pic.jpg"} alt="" className="w-full h-full object-cover" />
             </div>
           </div>
 

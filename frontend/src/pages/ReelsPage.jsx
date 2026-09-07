@@ -415,7 +415,7 @@ const ReelsPage = () => {
                 <div className="flex items-center gap-2 flex-wrap">
                   <NavLink to={`/user/get-profile/${currentReel?.author?._id}`}>
                   <img
-                    src={currentReel.author?.profilePic || "/images/default-avatar.png"}
+                    src={currentReel.author?.profilePic || "/images/default-profile-pic.jpg"}
                     alt={currentReel.author?.username}
                     className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-yellow-400 object-cover"
                   />

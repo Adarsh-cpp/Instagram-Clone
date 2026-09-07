@@ -35,7 +35,7 @@ const HomepagePostCard = ({ ...props }) => {
   const isOwnPost = user?._id === props?.authorId;
 
   const isFollowing = user?.following?.some(
-    (id) => id.toString() === props?.authorId.toString()
+    (id) => id?.toString() === props?.authorId?.toString()
   );
 
   const followDisplay = !isOwnPost && !isFollowing;
@@ -160,7 +160,7 @@ const HomepagePostCard = ({ ...props }) => {
       {/* Header */}
       <div className="header w-full h-[50px] flex items-center px-2 bg-[#0c1014]">
         <div className="profilePic w-[45px] h-[45px] rounded-full overflow-hidden cursor-pointer">
-          <img src={props.profileImgSrc} alt="" />
+          <img src={props.profileImgSrc ? props.profileImgSrc : "/images/default-profile-pic.jpg"} alt="" />
         </div>
         <div className="profileInfo min-w-[70%] h-full px-2 ">
           <div className="info w-full h-[50%] flex justify-start items-center">
@@ -182,7 +182,7 @@ const HomepagePostCard = ({ ...props }) => {
 
       {/* Post media (carousel) */}
       <div
-        className={`postImg relative w-full  ${
+        className={`postImg relative w-full select-none ${
           props.aspectRatio === "1:1"
             ? "aspect-square"
             : props.aspectRatio === "16:9"
@@ -216,6 +216,7 @@ const HomepagePostCard = ({ ...props }) => {
         {isCarousel && activeSlide > 0 && (
           <div
             onClick={goPrev}
+            onDoubleClick={(e) => e.stopPropagation()}
             className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10"
           >
             <ChevronLeft size={18} color="white" />
@@ -224,6 +225,7 @@ const HomepagePostCard = ({ ...props }) => {
         {isCarousel && activeSlide < mediaList.length - 1 && (
           <div
             onClick={goNext}
+            onDoubleClick={(e) => e.stopPropagation()}
             className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10"
           >
             <ChevronRight size={18} color="white" />

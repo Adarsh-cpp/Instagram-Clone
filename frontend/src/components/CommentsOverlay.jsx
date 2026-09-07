@@ -288,7 +288,7 @@ const CommentsOverlay = ({
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-5 sm:py-4">
             <div className="flex items-center gap-3 min-w-0">
               <img
-                src={item.author.profilePic}
+                src={item.author.profilePic ? item.author.profilePic :"/images/default-profile-pic.jpg"}
                 alt="author"
                 className="h-10 w-10 sm:h-11 sm:w-11 rounded-full object-cover"
               />

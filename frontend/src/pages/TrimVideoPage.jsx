@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { trimVideoClientSide } from "../utils/trimVideoClient";
+import { Play } from "lucide-react";
 
 const MAX_DURATION = 30;
 const ASPECT_OPTIONS = [
@@ -165,11 +166,7 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
                     className="absolute inset-0 flex items-center justify-center"
                   >
                     <div className="w-14 h-14 rounded-full bg-black/50 flex items-center justify-center">
-                      <img
-                        src="/images/play-icon.png"
-                        className="w-6 h-6 ml-0.5"
-                        alt="play"
-                      />
+                      <Play size={22} fill="white" className="ml-0" />
                     </div>
                   </button>
                 )}

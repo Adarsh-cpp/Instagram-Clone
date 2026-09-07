@@ -13,13 +13,16 @@ const authConfig = () => ({
 const LIMIT = 12;
 const SEARCH_DEBOUNCE_MS = 400;
 
-// Pass EITHER `post` ({ _id, media: [{url, mediaType}], author, caption })
-// OR `reel` ({ _id, media: {url, thumbnailUrl}, author, caption }) — never both.
+// Pass EXACTLY ONE of:
+// `post`  ({ _id, media: [{url, mediaType}], author, caption })
+// `reel`  ({ _id, media: {url, thumbnailUrl}, author, caption })
+// `story` ({ _id, mediaType, mediaUrl, bgColor, author })
 // onShared(optional) fires once after a successful send, useful for the caller
-// to bump a local sharesCount (e.g. ReelsPage's Repeat2 counter).
-const ShareOverlay = ({ onClose, post, reel, onShared }) => {
-  const isReelShare = Boolean(reel);
-  const item = isReelShare ? reel : post;
+// to bump a local sharesCount (e.g. ReelsPage's Repeat2 counter). Reel-only.
+const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
+  const shareType = story ? 'story' : reel ? 'reel' : 'post';
+  const item = story || reel || post;
+  const shareLabel = shareType === 'story' ? 'Story' : shareType === 'reel' ? 'Reel' : 'Post';
 
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedUsers, setSelectedUsers] = useState(new Set())
@@ -121,6 +124,9 @@ const ShareOverlay = ({ onClose, post, reel, onShared }) => {
     setIsSending(true)
     const receiverIds = Array.from(selectedUsers)
 
+    const sharedPayloadKey =
+      shareType === 'story' ? 'sharedStoryId' : shareType === 'reel' ? 'sharedReel' : 'sharedPost'
+
     try {
       await Promise.all(
         receiverIds.map(async (receiverId) => {
@@ -132,17 +138,17 @@ const ShareOverlay = ({ onClose, post, reel, onShared }) => {
           )
           const conversationId = convRes.data.conversation._id
 
-          // 2. send the shared post/reel as a message in that conversation
+          // 2. send the shared post/reel/story as a message in that conversation
           await axios.post(
             `${BASE_URL}/message/${conversationId}`,
-            isReelShare ? { sharedReel: item._id } : { sharedPost: item._id },
+            { [sharedPayloadKey]: item._id },
             authConfig()
           )
         })
       )
 
       // register the share on the reel itself (bumps sharesCount), once per share action
-      if (isReelShare) {
+      if (shareType === 'reel') {
         try {
           const shareRes = await axios.post(
             `${BASE_URL}/reels/${item._id}/share`,
@@ -157,24 +163,31 @@ const ShareOverlay = ({ onClose, post, reel, onShared }) => {
 
       toast.success(
         receiverIds.length > 1
-          ? `${isReelShare ? 'Reel' : 'Post'} shared with selected people`
-          : `${isReelShare ? 'Reel' : 'Post'} shared`
+          ? `${shareLabel} shared with selected people`
+          : `${shareLabel} shared`
       )
       onClose()
     } catch (err) {
       console.log(err)
-      toast.error(`Failed to share ${isReelShare ? 'reel' : 'post'}`)
+      toast.error(`Failed to share ${shareLabel.toLowerCase()}`)
     } finally {
       setIsSending(false)
     }
   }
 
-  const previewThumbUrl = isReelShare
-    ? item?.media?.thumbnailUrl || item?.media?.url
-    : item?.media?.[0]?.url
-  const previewIsVideo = isReelShare
-    ? !item?.media?.thumbnailUrl // no thumbnail generated — fall back to rendering the raw video
-    : item?.media?.[0]?.mediaType === 'video'
+  const previewThumbUrl =
+    shareType === 'story'
+      ? item?.mediaUrl
+      : shareType === 'reel'
+      ? item?.media?.thumbnailUrl || item?.media?.url
+      : item?.media?.[0]?.url
+
+  const previewIsVideo =
+    shareType === 'story'
+      ? item?.mediaType === 'video'
+      : shareType === 'reel'
+      ? !item?.media?.thumbnailUrl // no thumbnail generated — fall back to rendering the raw video
+      : item?.media?.[0]?.mediaType === 'video'
 
   return (
     <div
@@ -199,7 +212,10 @@ const ShareOverlay = ({ onClose, post, reel, onShared }) => {
         {/* Preview of item being shared */}
         {previewThumbUrl && (
           <div className="postPreview w-full h-[60px] shrink-0 flex items-center gap-3 px-4 border-b border-[#363636]">
-            <div className="w-[42px] h-[42px] rounded-md overflow-hidden shrink-0">
+            <div
+              className="w-[42px] h-[42px] rounded-md overflow-hidden shrink-0"
+              style={shareType === 'story' ? { backgroundColor: item.bgColor || undefined } : undefined}
+            >
               {previewIsVideo ? (
                 <video src={previewThumbUrl} className="w-full h-full object-cover" muted />
               ) : (
@@ -207,7 +223,9 @@ const ShareOverlay = ({ onClose, post, reel, onShared }) => {
               )}
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-white text-[13px] font-medium">{item.author?.username}</span>
+              <span className="text-white text-[13px] font-medium">
+                {shareType === 'story' ? `${item.author?.username}'s story` : item.author?.username}
+              </span>
               {item.caption && (
                 <span className="text-[#AEB0B2] text-[12px] truncate max-w-[380px]">
                   {item.caption}

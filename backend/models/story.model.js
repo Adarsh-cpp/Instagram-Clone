@@ -84,6 +84,13 @@ const storySchema = new mongoose.Schema(
       },
     ],
 
+     likes: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        likedAt: { type: Date, default: Date.now },
+      },
+    ],
+
     // set to a Highlight's _id once saved into one; a story can belong to
     // AT MOST one highlight (enforced in controller logic, not schema)
     highlight: {

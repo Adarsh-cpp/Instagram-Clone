@@ -20,22 +20,31 @@ const uploadBufferToCloudinary = (buffer, resourceType) => {
 // POST /story/create
 export const createStory = async (req, res) => {
   try {
-    const userId = req.user._id; // assumes your authUser middleware attaches req.user
+    const userId = req.user?._id;
+    if (!userId) {
+      // If auth middleware didn't run / didn't attach req.user, fail loud
+      // and clear instead of throwing "Cannot read properties of undefined".
+      return res.status(401).json({ success: false, message: "Not authenticated" });
+    }
+
     const { filterUsed, bgColor, songId, songStartTime } = req.body;
 
     if (!req.file) {
       return res.status(400).json({ success: false, message: "Media file is required" });
     }
 
-    const resourceType = req.mediaType === "video" ? "video" : "image";
-    const uploadResult = await uploadBufferToCloudinary(req.file.buffer, resourceType);
+    // req.mediaType is set server-side by validateVideoDuration based on the
+    // real uploaded file's mimetype — trust that over anything the client claims.
+    const mediaType = req.mediaType === "video" ? "video" : "image";
+
+    const uploadResult = await uploadBufferToCloudinary(req.file.buffer, mediaType);
 
     const story = await storyModel.create({
       author: userId,
-      mediaType: req.mediaType,
+      mediaType,
       mediaUrl: uploadResult.secure_url,
       mediaPublicId: uploadResult.public_id,
-      duration: req.mediaType === "video" ? req.mediaDuration : 5,
+      duration: mediaType === "video" ? (req.mediaDuration || 5) : 5,
       filterUsed: filterUsed || "none",
       bgColor: bgColor || "#000000",
       song: songId ? { songId, startTime: songStartTime || 0 } : undefined,
@@ -43,6 +52,7 @@ export const createStory = async (req, res) => {
 
     res.status(201).json({ success: true, story });
   } catch (error) {
+    console.error("createStory error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -175,6 +185,57 @@ export const deleteStory = async (req, res) => {
     await storyModel.findByIdAndDelete(storyId);
 
     res.status(200).json({ success: true, message: "Story deleted" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// POST /story/:storyId/like — toggle like/unlike
+export const toggleLikeStory = async (req, res) => {
+  try {
+    const { storyId } = req.params;
+    const userId = req.user._id;
+
+    const story = await storyModel.findById(storyId);
+    if (!story) {
+      return res.status(404).json({ success: false, message: "Story not found" });
+    }
+
+    const idx = story.likes.findIndex((l) => l.user.toString() === userId.toString());
+    let liked;
+    if (idx === -1) {
+      story.likes.push({ user: userId });
+      liked = true;
+    } else {
+      story.likes.splice(idx, 1);
+      liked = false;
+    }
+    await story.save();
+
+    res.status(200).json({ success: true, liked, likesCount: story.likes.length });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// GET /story/:storyId/likes — owner-only list of who liked it
+export const getStoryLikes = async (req, res) => {
+  try {
+    const { storyId } = req.params;
+    const userId = req.user._id;
+
+    const story = await storyModel
+      .findById(storyId)
+      .populate("likes.user", "username profilePic");
+
+    if (!story) {
+      return res.status(404).json({ success: false, message: "Story not found" });
+    }
+    if (story.author.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: "Not authorized" });
+    }
+
+    res.status(200).json({ success: true, likes: story.likes });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

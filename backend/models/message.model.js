@@ -47,6 +47,30 @@ const messageSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Snapshot, NOT a live ref. Stories get TTL-deleted from Mongo 24h after
+    // creation (see story.model.js), so a ref would go stale/null the moment
+    // the original expires. We capture what's needed to render the card at
+    // share-time; "is this expired" is judged purely from `createdAt` below,
+    // independent of whether the source document still exists.
+    sharedStory: {
+      type: new mongoose.Schema(
+        {
+          storyId: { type: mongoose.Schema.Types.ObjectId, ref: "Story" },
+          mediaType: { type: String, enum: ["image", "video"] },
+          mediaUrl: String,
+          bgColor: String,
+          createdAt: Date, // original story's createdAt — used for the 24h expiry check
+          author: {
+            _id: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+            username: String,
+            profilePic: String,
+          },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
+
     seen: {
       type: Boolean,
       default: false,

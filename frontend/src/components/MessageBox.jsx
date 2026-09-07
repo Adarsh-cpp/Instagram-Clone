@@ -7,6 +7,7 @@ import CommentsOverlay from './CommentsOverlay';
 
 const TILT_ANGLES = [-8, 5, -4, 7];
 const CAPTION_TRIM_LENGTH = 60;
+const STORY_TTL_MS = 24 * 60 * 60 * 1000; // matches story.model.js expiresAt window
 
 const trimCaption = (text) => {
   if (!text) return "";
@@ -37,19 +38,39 @@ const MessageBox = ({ message, showSeen }) => {
 
   const sharedPost = message?.sharedPost;
   const sharedReel = message?.sharedReel;
-  const sharedItem = sharedPost || sharedReel; // only one is ever set on a given message
+  const sharedStory = message?.sharedStory;
+  // only one of these is ever set on a given message
+  const shareKind = sharedPost ? 'post' : sharedReel ? 'reel' : sharedStory ? 'story' : null;
+  const sharedItem = sharedPost || sharedReel || sharedStory;
+
+  const isStoryExpired =
+    shareKind === 'story' &&
+    (!sharedStory?.createdAt ||
+      Date.now() - new Date(sharedStory.createdAt).getTime() > STORY_TTL_MS);
 
   // thumbnail to show in the compact chat card
-  const sharedThumbUrl = sharedPost
-    ? sharedPost.media?.[0]?.url
-    : sharedReel?.media?.thumbnailUrl || sharedReel?.media?.url;
-  const sharedThumbIsVideo = sharedPost
-    ? sharedPost.media?.[0]?.mediaType === "video"
-    : !sharedReel?.media?.thumbnailUrl; // no thumbnail generated — render the raw video
+  const sharedThumbUrl =
+    shareKind === 'post'
+      ? sharedPost.media?.[0]?.url
+      : shareKind === 'reel'
+      ? sharedReel.media?.thumbnailUrl || sharedReel.media?.url
+      : shareKind === 'story'
+      ? sharedStory.mediaUrl
+      : null;
+
+  const sharedThumbIsVideo =
+    shareKind === 'post'
+      ? sharedPost.media?.[0]?.mediaType === 'video'
+      : shareKind === 'reel'
+      ? !sharedReel.media?.thumbnailUrl // no thumbnail generated — render the raw video
+      : shareKind === 'story'
+      ? sharedStory.mediaType === 'video'
+      : false;
 
   // Reshape sharedPost/sharedReel into the exact `post`/`reel` shape
   // CommentsOverlay expects. Posts use a `media` array; reels use a single
   // `media` object with width/height (needed for aspect-ratio rendering).
+  // Stories never open CommentsOverlay — they have no comments/likes surface here.
   const sharedPostAsItem = useMemo(() => {
     if (!sharedPost) return null;
     return {
@@ -178,12 +199,48 @@ const MessageBox = ({ message, showSeen }) => {
 
         {sharedItem && (
           <div
-            onClick={() => setIsCommentsOpen(true)}
-            className={`sharedPostCard rounded-xl overflow-hidden bg-[#1a1e23] border border-white/10 cursor-pointer ${
-              sharedReel ? "w-[160px]" : "w-[220px]"
-            }`}
+            onClick={() => { if (shareKind !== 'story') setIsCommentsOpen(true); }}
+            className={`sharedPostCard rounded-xl overflow-hidden bg-[#1a1e23] border border-white/10 ${
+              shareKind === 'post' ? 'w-[220px] cursor-pointer' : 'w-[160px]'
+            } ${shareKind === 'reel' ? 'cursor-pointer' : ''}`}
           >
-            {sharedReel ? (
+            {shareKind === 'story' ? (
+              // Story: portrait card, transparent header, no caption, expiry-aware
+              <div className="relative w-full h-[280px]">
+                {isStoryExpired ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-[#0f1114] text-center px-3">
+                    <Clapperboard size={26} className="text-white/30" />
+                    <span className="text-white/50 text-[12px]">Story no longer available</span>
+                  </div>
+                ) : sharedThumbIsVideo ? (
+                  <video src={sharedThumbUrl} className="w-full h-full object-cover" muted loop playsInline />
+                ) : (
+                  <img
+                    src={sharedThumbUrl}
+                    alt="shared story"
+                    className="w-full h-full object-cover"
+                    style={{ backgroundColor: sharedStory.bgColor || undefined }}
+                  />
+                )}
+
+                <div className="absolute top-0 left-0 right-0 flex items-center gap-2 px-2.5 py-2 bg-gradient-to-b from-black/60 to-transparent">
+                  <Link
+                    to={`/user/get-profile/${sharedStory.author?._id}`}
+                    className="flex items-center gap-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <img
+                      src={sharedStory.author?.profilePic ? sharedStory.author.profilePic : "/images/default-profile-pic.jpg" }
+                      alt=""
+                      className="w-[22px] h-[22px] rounded-full object-cover"
+                    />
+                    <span className="text-white text-[12px] font-medium">
+                      {sharedStory.author?.username}'s story
+                    </span>
+                  </Link>
+                </div>
+              </div>
+            ) : shareKind === 'reel' ? (
               // Reel: portrait card, transparent header overlay, no caption
               <div className="relative w-full h-[280px]">
                 {sharedThumbIsVideo ? (
@@ -217,11 +274,11 @@ const MessageBox = ({ message, showSeen }) => {
                       {sharedItem.author?.username}
                     </span>
                   </Link>
-                 
+
                 </div>
                 <div className="videoIcon absolute bottom-2 left-2">
                   <Clapperboard size={24} className="text-white ml-auto shrink-0" />
-                  </div>
+                </div>
               </div>
             ) : (
               // Post: square card, solid header, caption shown
