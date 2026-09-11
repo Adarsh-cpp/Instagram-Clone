@@ -10,8 +10,8 @@ const ASPECT_OPTIONS = [
 ];
 
 const CropImagePage = ({
-  images,          // File[] — always an array, length 1-5
-  setEditedImages, // (Blob/File[]) => void
+  images,
+  setEditedImages,
   setAspectRatio,
   next,
   back,
@@ -26,8 +26,6 @@ const CropImagePage = ({
   const [showZoomSlider, setShowZoomSlider] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Build every object URL up front (filmstrip needs all of them),
-  // revoke them all on unmount
   useEffect(() => {
     const urls = images.map((file) => URL.createObjectURL(file));
     setImageUrls(urls);
@@ -79,11 +77,11 @@ const CropImagePage = ({
   const menuBottom = hasMultiple ? "bottom-[111px]" : "bottom-[55px]";
 
   return (
-    <div className="w-[100vw] h-[100vh] flex justify-center items-center bg-[#0c1014]">
+    <div className="w-[100vw] h-[100vh] flex justify-center items-center bg-[var(--bg-app)]">
       <div className="cropContainerOverlay w-full h-full flex justify-center items-center bg-[rgba(0,0,0,0)] px-2 sm:px-4">
-        <div className="cropContainer relative w-full max-w-[500px] md:w-[70%] lg:w-[50%] xl:w-[30%] h-[70%] rounded-2xl bg-[#212328] overflow-hidden">
+        <div className="cropContainer relative w-full max-w-[500px] md:w-[70%] lg:w-[50%] xl:w-[30%] h-[70%] rounded-2xl bg-[var(--bg-surface)] overflow-hidden">
           {/* Header */}
-          <div className="header w-full h-[40px] px-3 sm:px-4 flex justify-between items-center bg-[rgb(12,16,20)]">
+          <div className="header w-full h-[40px] px-3 sm:px-4 flex justify-between items-center bg-[var(--bg-app)]">
             <div onClick={back} className="back cursor-pointer">
               <img
                 src="/images/arrow-back-icon.png"
@@ -92,13 +90,13 @@ const CropImagePage = ({
               />
             </div>
 
-            <div className="heading text-white text-[16px] sm:text-[18px] font-semibold">
+            <div className="heading text-[var(--text-primary)] text-[16px] sm:text-[18px] font-semibold">
               {hasMultiple ? `Crop  ${activeIndex + 1}/${images?.length}` : "Crop"}
             </div>
 
             <div
               onClick={isSaving ? undefined : handleNext}
-              className={`next text-[rgb(53,121,234)] hover:text-[rgb(20,100,255)] hover:underline cursor-pointer text-sm sm:text-base ${
+              className={`next text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] hover:underline cursor-pointer text-sm sm:text-base ${
                 isSaving ? "opacity-50 pointer-events-none" : ""
               }`}
             >
@@ -109,7 +107,7 @@ const CropImagePage = ({
           <hr />
 
           {/* Crop Area */}
-          <div className="relative w-full h-[calc(100%-40px)] overflow-hidden bg-[#25292e]">
+          <div className="relative w-full h-[calc(100%-40px)] overflow-hidden bg-[var(--bg-elevated)]">
             {imageUrls[activeIndex] && (
               <Cropper
                 image={imageUrls[activeIndex]}
@@ -139,14 +137,14 @@ const CropImagePage = ({
               </div>
             )}
 
-            {/* Aspect Ratio Menu — applies globally to every slide */}
+            {/* Aspect Ratio Menu */}
             {showAspectMenu && (
-              <div className={`absolute ${menuBottom} left-3 bg-[#2a2d32] rounded-lg overflow-hidden z-50 min-w-[100px]`}>
+              <div className={`absolute ${menuBottom} left-3 bg-[var(--bg-menu)] rounded-lg overflow-hidden z-50 min-w-[100px]`}>
                 {ASPECT_OPTIONS.map((opt) => (
                   <div
                     key={opt.key}
                     onClick={() => selectAspect(opt)}
-                    className="px-4 py-2 text-white hover:bg-[#3a3d42] cursor-pointer text-sm"
+                    className="px-4 py-2 text-[var(--text-primary)] hover:bg-[var(--bg-menu-hover)] cursor-pointer text-sm"
                   >
                     {opt?.label}
                   </div>
@@ -154,10 +152,10 @@ const CropImagePage = ({
               </div>
             )}
 
-            {/* Zoom Slider — per slide */}
+            {/* Zoom Slider */}
             {showZoomSlider && (
               <div
-                className={`instagram-slider absolute ${menuBottom} left-[60px] sm:left-[70px] bg-[#2a2d32] rounded-lg p-3 z-50 max-w-[calc(100%-80px)]`}
+                className={`instagram-slider absolute ${menuBottom} left-[60px] sm:left-[70px] bg-[var(--bg-menu)] rounded-lg p-3 z-50 max-w-[calc(100%-80px)]`}
               >
                 <input
                   type="range"
@@ -171,15 +169,15 @@ const CropImagePage = ({
             )}
           </div>
 
-          {/* Filmstrip — only for multi-image */}
+          {/* Filmstrip */}
           {hasMultiple && (
-            <div className="absolute bottom-[40px] w-full h-[56px] bg-[rgb(12,16,20)] flex items-center gap-2 px-2 overflow-x-auto z-20">
+            <div className="absolute bottom-[40px] w-full h-[56px] bg-[var(--bg-app)] flex items-center gap-2 px-2 overflow-x-auto z-20">
               {imageUrls.map((url, i) => (
                 <div
                   key={i}
                   onClick={() => setActiveIndex(i)}
                   className={`flex-shrink-0 w-[40px] h-[40px] rounded-md overflow-hidden cursor-pointer border-2 ${
-                    i === activeIndex ? "border-[rgb(53,121,234)]" : "border-transparent"
+                    i === activeIndex ? "border-[var(--accent-blue)]" : "border-transparent"
                   }`}
                 >
                   <img src={url} className="w-full h-full object-cover" alt="" />

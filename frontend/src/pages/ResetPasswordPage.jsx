@@ -17,8 +17,6 @@ const ResetPasswordPage = () => {
 
     const otpRefs = useRef([]);
 
-    // Manually register the "otp" field since its value is assembled from
-    // 6 separate boxes rather than a single input
     useEffect(() => {
       register("otp", {
         required: "This field is required",
@@ -87,14 +85,14 @@ const ResetPasswordPage = () => {
   };
 
   return (
-    <div className="resetPasswordPage w-[100vw] h-[100vh] flex justify-center items-center bg-[#0c1014]">
-      <div className="resetPasswordcontainer w-[350px] h-[520px] border border-[#363636] ">
+    <div className="resetPasswordPage w-[100vw] h-[100vh] flex justify-center items-center bg-[var(--bg-app)]">
+      <div className="resetPasswordcontainer w-[350px] h-[520px] border border-[var(--border-container)] ">
 
     <div className="lockPic w-full h-[120px] flex justify-center items-center ">
             <img src="/images/pw-forget-logo.png" alt="" className="w-[14p0px] h-[100px] " />
     </div>
 
-    <div className="text w-full h-[60px] px-2 text-white text-center ">Reset your account's password by filling the OTP sent to your email. </div>
+    <div className="text w-full h-[60px] px-2 text-[var(--text-primary)] text-center ">Reset your account's password by filling the OTP sent to your email. </div>
 
     <div className="resetForm w-full h-[340px]">
            <form onSubmit={handleSubmit(onSubmit)} className="w-full h-full flex flex-col  items-center">
@@ -113,8 +111,8 @@ const ResetPasswordPage = () => {
                        onChange={(e) => handleOtpChange(i, e.target.value)}
                        onKeyDown={(e) => handleOtpKeyDown(i, e)}
                        onPaste={handleOtpPaste}
-                       className={`h-[36px] w-[40px] bg-[#121212] text-[16px] text-center outline-none text-[#F5F5F5] rounded-[5px] border ${
-                         errors.otp ? "border-[#FF3040]" : "border-[#555555]"
+                       className={`h-[36px] w-[40px] bg-[var(--bg-input)] text-[16px] text-center outline-none text-[var(--text-input)] rounded-[5px] border ${
+                         errors.otp ? "border-[var(--color-error)]" : "border-[var(--border-input)]"
                        }`}
                      />
                    ))}
@@ -145,7 +143,7 @@ const ResetPasswordPage = () => {
                 message: "Password must be at least 6 characters",
               },
             })}
-            className={`h-[36px] w-[270px] bg-[#121212] text-[12px] outline-none placeholder-[#A8A8A8] text-[#F5F5F5] rounded-[5px]  px-[10px] my-[3px] ${errors.resetPassword ? " border border-[#FF3040]" : "border border-[#555555]" }`}
+            className={`h-[36px] w-[270px] bg-[var(--bg-input)] text-[12px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px]  px-[10px] my-[3px] ${errors.resetPassword ? " border border-[var(--color-error)]" : "border border-[var(--border-input)]" }`}
             placeholder="New Password"
           />
           {errors.resetPassword && (
@@ -173,7 +171,7 @@ const ResetPasswordPage = () => {
                 message: "Password must be at least 6 characters",
               },
             })}
-            className={`h-[36px] w-[270px] bg-[#121212] text-[12px] outline-none placeholder-[#A8A8A8] text-[#F5F5F5] rounded-[5px]  px-[10px] my-[3px] ${errors.confirmPassword ? " border border-[#FF3040]" : "border border-[#555555]" }`}
+            className={`h-[36px] w-[270px] bg-[var(--bg-input)] text-[12px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px]  px-[10px] my-[3px] ${errors.confirmPassword ? " border border-[var(--color-error)]" : "border border-[var(--border-input)]" }`}
             placeholder="Confirm Password"
           />
           {errors.confirmPassword && (
@@ -184,7 +182,7 @@ const ResetPasswordPage = () => {
         </div>
 
 
-              <button type="submit" className="confirmBtn w-[270px] h-[32px] my-[25px] rounded-[8px] bg-[#0095f6] hover:bg-[#1877f2] text-[#afb2b3] text-[14px] font-bold cursor-pointer">Reset Password</button>
+              <button type="submit" className="confirmBtn w-[270px] h-[32px] my-[25px] rounded-[8px] bg-[var(--brand-blue)] hover:bg-[var(--brand-blue-hover)] text-[var(--button-text-on-accent)] text-[14px] font-bold cursor-pointer">Reset Password</button>
 
            </form>
         </div>

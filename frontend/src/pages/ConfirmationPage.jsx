@@ -1,5 +1,5 @@
 import axios from 'axios';
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -9,7 +9,9 @@ const ConfirmationPage = () => {
 
   const { register, handleSubmit, formState: { errors } } = useForm();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+
+  const [email, setEmail] = useState(user?.email || "");
 
   const showError = (error) => {
     toast.error(error.response?.data?.message || "Something went wrong");
@@ -30,6 +32,34 @@ const ConfirmationPage = () => {
   };
 
   useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const fetchUserEmail = async () => {
+      if (user?.email) return;
+
+      const token = localStorage.getItem("authToken");
+      if (!token) return;
+
+      try {
+        const { data } = await axios.get("http://localhost:4000/auth/me", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (data?.email) {
+          setEmail(data.email);
+        }
+      } catch (error) {
+        console.error("Failed to fetch user email:", error);
+      }
+    };
+
+    fetchUserEmail();
+  }, [user]);
+
+  useEffect(() => {
     sendOTP();
   }, []);
 
@@ -42,6 +72,7 @@ const ConfirmationPage = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
 
+      await refreshUser();
       navigate("/home", {
         state: { message: "Signup Successful!" }
       });
@@ -51,20 +82,20 @@ const ConfirmationPage = () => {
   };
 
   return (
-    <div className="confirmationPage h-[100vh] w-[100vw] flex justify-center items-center bg-[#0c1014]">
+    <div className="confirmationPage h-[100vh] w-[100vw] flex justify-center items-center bg-[var(--bg-app)]">
       <div className="confirmationContainer w-[350px] h-[460px] flex flex-col items-center justify-between ">
-        <div className="topPart h-[84%] w-full border border-[#363636]">
+        <div className="topPart h-[84%] w-full border border-[var(--border-container)]">
 
           <div className="messagePic w-full h-[120px] flex justify-center items-center">
             <img src="/images/message-logo.png" alt="" className="h-[100px] w-[140px]" />
           </div>
 
           <div className="text w-full h-[90px]">
-            <p className="upperText text-center text-[#ddd4d4] text-[14px] font-bold">Enter confirmation code</p>
-            <p className="lowerText text-center text-[#ddd4d4] text-[14px] mt-3">
+            <p className="upperText text-center text-[var(--text-secondary)] text-[14px] font-bold">Enter confirmation code</p>
+            <p className="lowerText text-center text-[var(--text-secondary)] text-[14px] mt-3">
               Enter the confirmation code that we sent to{" "}
-              <span className="gmail italic">{user?.email}</span>.
-              <span onClick={sendOTP} className="resendCode text-[#0095f6] hover:text-[#1877f2] font-bold cursor-pointer">Resend code.</span>
+              <span className="gmail italic">{email}</span>.
+              <span onClick={sendOTP} className="resendCode text-[var(--brand-blue)] hover:text-[var(--brand-blue-hover)] font-bold cursor-pointer">Resend code.</span>
             </p>
           </div>
 
@@ -82,7 +113,7 @@ const ConfirmationPage = () => {
                       message: "Enter the 6-digit numeric code",
                     },
                   })}
-                  className={`h-[36px] w-[270px] bg-[#121212] text-[12px] outline-none placeholder-[#A8A8A8] text-[#F5F5F5] rounded-[5px] px-[10px] my-[3px] ${errors.otp ? " border border-[#FF3040]" : "border border-[#555555]"}`}
+                  className={`h-[36px] w-[270px] bg-[var(--bg-input)] text-[12px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px] px-[10px] my-[3px] ${errors.otp ? " border border-[var(--color-error)]" : "border border-[var(--border-input)]"}`}
                   placeholder="Confirmation Code"
                 />
                 {errors.otp && (
@@ -92,10 +123,10 @@ const ConfirmationPage = () => {
                 )}
               </div>
 
-              <button type="submit" className="confirmBtn w-[270px] h-[32px] my-[10px] rounded-[8px] bg-[#0095f6] hover:bg-[#1877f2] text-[#afb2b3] text-[14px] font-bold cursor-pointer">Next</button>
+              <button type="submit" className="confirmBtn w-[270px] h-[32px] my-[10px] rounded-[8px] bg-[var(--brand-blue)] hover:bg-[var(--brand-blue-hover)] text-[var(--button-text-on-accent)] text-[14px] font-bold cursor-pointer">Next</button>
 
               <div className="backBtn w-[75%] h-[35px] flex justify-center items-center rounded-[10px] font-bold ">
-                <span onClick={() => navigate(-1)} className="text-[#0095f6] hover:text-[#1877f2] cursor-pointer">Go back</span>
+                <span onClick={() => navigate(-1)} className="text-[var(--brand-blue)] hover:text-[var(--brand-blue-hover)] cursor-pointer">Go back</span>
               </div>
 
             </form>
@@ -103,8 +134,8 @@ const ConfirmationPage = () => {
 
         </div>
 
-        <div className="bottomPart h-[15%] w-full flex justify-center items-center border border-[#363636] ">
-          <p className="text-[#ffffff] text-[14px] text-center">Have an account? <br /> <span className="text-[#0095f6] hover:text-[#1877f2] font-bold cursor-pointer"><Link to="/">Log in</Link></span></p>
+        <div className="bottomPart h-[15%] w-full flex justify-center items-center border border-[var(--border-container)] ">
+          <p className="text-[var(--text-primary)] text-[14px] text-center">Have an account? <br /> <span className="text-[var(--brand-blue)] hover:text-[var(--brand-blue-hover)] font-bold cursor-pointer"><Link to="/">Log in</Link></span></p>
         </div>
 
       </div>

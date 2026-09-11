@@ -1,6 +1,6 @@
 import express from "express";
 import { authUser } from "../middlewares/authMiddleware.js";
-import { createPost, getAllPosts, getComments, getFeedPosts, getSavedPosts, postComment, toggleLikes, toggleSavePosts } from "../controllers/postController.js";
+import { createPost, deletePost, getAllPosts, getComments, getFeedPosts, getSavedPosts, postComment, toggleLikes, toggleSavePosts } from "../controllers/postController.js";
 import { upload } from "../config/multer.js"
 
 
@@ -15,6 +15,7 @@ router.post("/:id/post-comment", authUser, postComment)
 router.get("/:id/get-comments", getComments)
 router.post("/:id/toggle-save", authUser, toggleSavePosts )
 router.get("/get-saved-posts", authUser, getSavedPosts)
+router.delete("/:id/delete", authUser, deletePost);
 
 
 export default router;

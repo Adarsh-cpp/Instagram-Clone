@@ -151,19 +151,22 @@ export const toggleSaveReel = async (req, res) => {
     reel.saves = alreadySaved
       ? reel.saves.filter((id) => id.toString() !== userId)
       : [...reel.saves, req.user._id];
-
     reel.savesCount = reel.saves.length;
     await reel.save();
 
-    await userModel.findByIdAndUpdate(req.user._id, {
-      [alreadySaved ? "$pull" : "$addToSet"]: { savedReels: reel._id },
-    });
+    const user = await userModel.findById(req.user._id);
+    if (alreadySaved) {
+      user.savedItems = user.savedItems.filter(
+        (item) => !(item.itemType === "Reel" && item.itemId.toString() === reel._id.toString())
+      );
+      user.savedReels.pull(reel._id);
+    } else {
+      user.savedItems.push({ itemType: "Reel", itemId: reel._id, savedAt: new Date() });
+      user.savedReels.addToSet(reel._id);
+    }
+    await user.save();
 
-    return res.status(200).json({
-      success: true,
-      saved: !alreadySaved,
-      savesCount: reel.savesCount,
-    });
+    return res.status(200).json({ success: true, saved: !alreadySaved, savesCount: reel.savesCount });
   } catch (err) {
     return res.status(500).json({ message: "Failed to update save" });
   }

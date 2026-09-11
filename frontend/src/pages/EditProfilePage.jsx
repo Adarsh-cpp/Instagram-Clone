@@ -24,17 +24,6 @@ const navigate = useNavigate()
    const [bio, setBio] = useState("");
   const [gender, setGender] = useState();
 
-  // Fetch the latest profile directly on mount instead of relying solely on
-  // whatever is already sitting in AuthContext. This is what fixes the
-  // "blank until refresh" bug: when navigating here from the Profile page
-  // via client-side routing, the `user` object in context can still be
-  // stale/incomplete (e.g. missing bio/gender) because the context's own
-  // fetch hasn't resolved yet. A hard refresh "worked" only because it gave
-  // that fetch enough time to finish before you reached this page. Fetching
-  // here guarantees fresh data every time, regardless of timing.
-  //
-  // Note: bio/gender don't need to be set here directly — updating `user`
-  // via setUser triggers the [user] effect below, which syncs them.
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -69,9 +58,6 @@ const navigate = useNavigate()
 
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
-  // Kept as a fallback sync: if `user` updates elsewhere in the app while
-  // this page is open (e.g. another tab, or a parent re-fetch), local
-  // bio/gender stay in sync with it too.
   useEffect(() => {
   if(user){
     setBio(user.bio || "");
@@ -132,7 +118,7 @@ const navigate = useNavigate()
 };
 
   return (
-    <div className="editProfilePage w-[100vw] h-[100vh] flex justify-center items-center bg-[#0c1014]">
+    <div className="editProfilePage w-[100vw] h-[100vh] flex justify-center items-center bg-[var(--bg-app)]">
       <IconSidebar />
 
       <div className="profileSection w-full md:w-[88%] 2xl:w-[80%] h-full flex justify-center items-center overflow-x-hidden ">
@@ -143,9 +129,9 @@ const navigate = useNavigate()
 
         {/* Navbar for Mobile */}
 
-        <div className="mobileNav w-full h-[50px] flex justify-center items-center md:hidden border border-b-[#2b3036] ">
+        <div className="mobileNav w-full h-[50px] flex justify-center items-center md:hidden border border-b-[var(--border-soft)] ">
 
-         <div className="heading w-[50%] h-full px-4 flex justify-start items-center text-[18px] text-white font-bold ">
+         <div className="heading w-[50%] h-full px-4 flex justify-start items-center text-[18px] text-[var(--text-primary)] font-bold ">
           Edit Profile
          </div>
 
@@ -164,7 +150,7 @@ const navigate = useNavigate()
 
          {isMenuOpen && <HamburgerMenu /> }
 
-          <div className="heading w-[80%] h-[15%] flex justify-start items-center text-[20px] text-white font-bold">
+          <div className="heading w-[80%] h-[15%] flex justify-start items-center text-[20px] text-[var(--text-primary)] font-bold">
             Edit Profile
           </div>
 
@@ -178,7 +164,7 @@ const navigate = useNavigate()
           >
             {/* --- Edit Bio --- */}
             <div className="editBio relative w-full h-[40%] mt-4 flex flex-col justify-start items-center rounded-[20px]">
-              <div className="heading w-full text-[18px] text-white font-bold mb-2">
+              <div className="heading w-full text-[18px] text-[var(--text-primary)] font-bold mb-2">
                 Bio
               </div>
 
@@ -193,21 +179,21 @@ const navigate = useNavigate()
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 rows={3}
-                className={`w-full h-full  text-[16px] resize-none outline-none placeholder-[#A8A8A8] text-[#F5F5F5] rounded-[20px] p-2 ${
+                className={`w-full h-full  text-[16px] resize-none outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[20px] p-2 ${
                   errors.bio
-                    ? "border border-[#FF3040]"
-                    : "border border-[#555555]"
+                    ? "border border-[var(--color-error)]"
+                    : "border border-[var(--border-input)]"
                 }`}
                 placeholder="Write something about yourself..."
               />
 
               {/* Character Counter */}
-              <div className="absolute bottom-[8px] right-[12px] z-10 flex justify-end text-white text-[11px]">
+              <div className="absolute bottom-[8px] right-[12px] z-10 flex justify-end text-[var(--text-primary)] text-[11px]">
                 <span
                   className={`${
                     bio.length > maxLength - 10
-                      ? "text-[#FF3040]"
-                      : "text-[#A8A8A8]"
+                      ? "text-[var(--color-error)]"
+                      : "text-[var(--text-muted)]"
                   }`}
                 >
                   {bio.length}/{maxLength}
@@ -215,7 +201,7 @@ const navigate = useNavigate()
               </div>
 
               {errors.bio && (
-                <p className="text-[#FF3040] text-sm mt-1">
+                <p className="text-[var(--color-error)] text-sm mt-1">
                   {errors.bio.message}
                 </p>
               )}
@@ -223,23 +209,23 @@ const navigate = useNavigate()
 
             {/* --- Edit Gender --- */}
             <div className="editGender w-full h-[30%] mt-4 flex flex-col justify-start items-center rounded-[20px]">
-              <div className="heading w-full text-[18px] text-white font-bold mb-2">
+              <div className="heading w-full text-[18px] text-[var(--text-primary)] font-bold mb-2">
                 Gender
               </div>
 
               <input
                 {...register("gender")}
                 onClick={() => setIsModalOpen(true)}
-                className={`w-full h-full  text-[16px] outline-none placeholder-[#A8A8A8] text-[#F5F5F5] rounded-[20px] px-[10px] my-[3px] cursor-pointer hover:bg-[#25282c] ${
+                className={`w-full h-full  text-[16px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[20px] px-[10px] my-[3px] cursor-pointer hover:bg-[var(--bg-row-hover)] ${
                   errors.gender
-                    ? "border border-[#FF3040]"
-                    : "border border-[#555555]"
+                    ? "border border-[var(--color-error)]"
+                    : "border border-[var(--border-input)]"
                 }`}
                 value={gender === "custom" ? customGender || "Custom" : gender}
                 readOnly
               />
               {errors.gender && (
-                <p className="text-[#FF3040] text-sm mt-1">
+                <p className="text-[var(--color-error)] text-sm mt-1">
                   {errors.gender.message}
                 </p>
               )}
@@ -247,19 +233,19 @@ const navigate = useNavigate()
               {/* --- Gender Modal --- */}
               {isModalOpen && (
                 <div
-                  className="absolute top-0 left-0 h-[600px] inset-0 flex justify-center items-center bg-[rgba(12,16,20,0.8)] bg-opacity-70 z-10"
+                  className="absolute top-0 left-0 h-[600px] inset-0 flex justify-center items-center bg-black/70 z-10"
                   onClick={() => setIsModalOpen(false)}
                 >
                   <div
-                    className="modal bg-[#0c1014] w-[90%] sm:w-[350px] rounded-2xl overflow-hidden text-center text-white shadow-lg"
+                    className="modal bg-[var(--bg-menu)] w-[90%] sm:w-[350px] rounded-2xl overflow-hidden text-center text-[var(--text-primary)] shadow-lg"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="py-4 border-b border-gray-600 text-[18px] font-semibold">
+                    <div className="py-4 border-b border-[var(--border-popup)] text-[18px] font-semibold">
                       Select Your Gender
                     </div>
 
            {/* Male */}
-<div className="w-full py-3 px-10 hover:bg-[#25282c] flex justify-between items-center cursor-pointer">
+<div className="w-full py-3 px-10 hover:bg-[var(--bg-row-hover)] flex justify-between items-center cursor-pointer">
   Male
   <input
     type="radio"
@@ -273,7 +259,7 @@ const navigate = useNavigate()
 </div>
 
 {/* Female */}
-<div className="w-full py-3 px-10 hover:bg-[#25282c] flex justify-between items-center cursor-pointer">
+<div className="w-full py-3 px-10 hover:bg-[var(--bg-row-hover)] flex justify-between items-center cursor-pointer">
   Female
   <input
     type="radio"
@@ -287,7 +273,7 @@ const navigate = useNavigate()
 </div>
 
 {/* Prefer not to say */}
-<div className="w-full py-3 px-10 hover:bg-[#25282c] flex justify-between items-center cursor-pointer">
+<div className="w-full py-3 px-10 hover:bg-[var(--bg-row-hover)] flex justify-between items-center cursor-pointer">
   Prefer not to say
   <input
     type="radio"
@@ -302,7 +288,7 @@ const navigate = useNavigate()
 
 {/* Custom */}
 <div className="w-full">
-  <div className="w-full py-3 px-10 hover:bg-[#25282c] flex justify-between items-center cursor-pointer">
+  <div className="w-full py-3 px-10 hover:bg-[var(--bg-row-hover)] flex justify-between items-center cursor-pointer">
     Custom
     <input
       type="radio"
@@ -323,7 +309,7 @@ const navigate = useNavigate()
       placeholder="Enter custom gender"
       value={customGender}
       onChange={(e) => setCustomGender(e.target.value)}
-      className="w-[80%] h-[60px] px-2 text-[16px] text-white rounded-lg bg-[#0c1014]"
+      className="w-[80%] h-[60px] px-2 text-[16px] text-[var(--text-primary)] rounded-lg bg-[var(--bg-input)]"
     />
   )}
 </div>
@@ -331,7 +317,7 @@ const navigate = useNavigate()
 
                     <button
                       onClick={() => setIsModalOpen(false)}
-                      className="block w-full py-3 hover:bg-[#25282c] cursor-pointer"
+                      className="block w-full py-3 hover:bg-[var(--bg-row-hover)] cursor-pointer"
                     >
                       Cancel
                     </button>
@@ -344,7 +330,7 @@ const navigate = useNavigate()
             <div className="submitSection w-full h-[10%] mt-8 flex justify-center items-center">
               <button
                 type="submit"
-                className="w-[100px] sm:w-[150px] h-[40px] bg-[#4a5df9] hover:bg-[#4150f7] cursor-pointer text-white text-[14px] sm:text-[16px] font-bold rounded-xl"
+                className="w-[100px] sm:w-[150px] h-[40px] bg-[var(--accent-indigo)] hover:bg-[var(--accent-indigo-hover)] cursor-pointer text-white text-[14px] sm:text-[16px] font-bold rounded-xl"
               >
                 Submit
               </button>

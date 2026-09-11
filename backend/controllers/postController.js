@@ -262,34 +262,32 @@ export const getAllPosts = async (req, res) => {
 }
 
 export const toggleSavePosts = async (req, res) => {
-
   try {
-      const postId = req.params.id;
-      const userId = req.user._id;
+    const postId = req.params.id;
+    const post = await postModel.findById(postId);
+    if (!post) return res.status(404).json({ success: false, message: "No posts found" });
 
-      const post = await postModel.findById(postId)
-      const user = await userModel.findById(userId)
-      
-      const alreadySaved = user.savedPosts.some( id => id.toString() === postId );
-      // console.log(alreadySaved)
-      // console.log(post)
+    const user = await userModel.findById(req.user._id);
+    const alreadySaved = user.savedItems.some(
+      (item) => item.itemType === "Post" && item.itemId.toString() === postId
+    );
 
-    if(!post) return res.status(404).json({success: false, message:"No posts found"})
-
-    if(alreadySaved) {
-          user.savedPosts.pull(postId);
-        } else {
-          user.savedPosts.push(postId);
+    if (alreadySaved) {
+      user.savedItems = user.savedItems.filter(
+        (item) => !(item.itemType === "Post" && item.itemId.toString() === postId)
+      );
+      user.savedPosts.pull(postId);
+    } else {
+      user.savedItems.push({ itemType: "Post", itemId: postId, savedAt: new Date() });
+      user.savedPosts.addToSet(postId);
     }
 
-    await user.save()
-    return res.status(200).json({ success:true, alreadySaved:alreadySaved, message:"Saved posts toggled successfully" })
-        
-
+    await user.save();
+    return res.status(200).json({ success: true, alreadySaved, message: "Saved posts toggled successfully" });
   } catch (error) {
-   return res.status(500).json({success:false, message:"Internal server error"})
+    return res.status(500).json({ success: false, message: "Internal server error" });
   }
-}
+};
 
 export const getSavedPosts = async (req, res) => {
     try {
@@ -327,3 +325,55 @@ export const getSavedPosts = async (req, res) => {
     }
 };
 
+export const deletePost = async (req, res) => {
+  try {
+    const post = await postModel.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ success: false, message: "Post not found" });
+    }
+
+    if (post.author.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: "Not authorized to delete this post" });
+    }
+
+    // remove each media file from Cloudinary
+    await Promise.all(
+      post.media.map((m) =>
+        cloudinary.uploader.destroy(m.publicId, {
+          resource_type: m.mediaType === "video" ? "video" : "image",
+        })
+      )
+    );
+
+    await commentModel.deleteMany({ post: post._id });
+
+    // scrub this post out of every user's savedPosts/savedItems — otherwise
+    // anyone who saved it keeps a dangling reference forever
+    await userModel.updateMany(
+      {},
+      {
+        $pull: {
+          savedPosts: post._id,
+          savedItems: { itemType: "Post", itemId: post._id },
+        },
+      }
+    );
+
+    // messages that shared this post via DM lose the live reference too —
+    // clear sharedPost so the message renders as "post unavailable"
+    // instead of pointing at a null/deleted document
+    await messageModel.updateMany(
+      { sharedPost: post._id },
+      { $set: { sharedPost: null } }
+    );
+
+    await userModel.findByIdAndUpdate(post.author, { $inc: { postsCount: -1 } });
+
+    await post.deleteOne();
+
+    return res.status(200).json({ success: true, message: "Post deleted" });
+  } catch (error) {
+    console.error("Delete Post Error:", error);
+    return res.status(500).json({ success: false, message: "Failed to delete post" });
+  }
+};

@@ -30,8 +30,8 @@ const UserProfilePage = () => {
   const [isFollowing, setIsFollowing] = useState(false)
   const [conversation, setConversation] = useState()
   const [followers, setFollowers] = useState(user.followers?.length)
-  const [savedPosts, setSavedPosts] = useState([])
   const [reels, setReels] = useState([])
+  const [savedItems, setSavedItems] = useState([])
 
    //for switching between post types
    const [activeTab, setActiveTab] = useState("Posts");
@@ -189,26 +189,23 @@ const UserProfilePage = () => {
     }
   }
 
+  // Fetch merged saved posts + reels, sorted by save date (only needed on own profile)
   useEffect(() => {
-    const getSavedPosts = async () => {
+    if (!isOwnProfile) return
+
+    const getSavedItems = async () => {
       try {
         const token = localStorage.getItem("authToken")
-        const url = "http://localhost:4000/post/get-saved-posts"
-
-        const response = await axios.get(url,{
-          headers:{
-            Authorization:`Bearer ${token}`
-          }
+        const res = await axios.get("http://localhost:4000/user/profile/saved-items", {
+          headers: { Authorization: `Bearer ${token}` },
         })
-
-        setSavedPosts(response.data.savedPosts)
-
+        setSavedItems(res.data.savedItems)
       } catch (error) {
         toast.error("Something went wrong")
       }
     }
-    getSavedPosts()
-  }, [])
+    getSavedItems()
+  }, [isOwnProfile])
 
   // fetch this profile's highlights (works for own profile and others' —
   // getUserHighlights isn't owner-gated on the backend)
@@ -392,7 +389,9 @@ const UserProfilePage = () => {
 
              <PostType type={"Posts"} imgSrc={"/images/grid-icon.png"} activeTab={activeTab} setActiveTab={setActiveTab} />
              <PostType type={"Reels"} imgSrc={"/images/reel-icon.png"} activeTab={activeTab} setActiveTab={setActiveTab} />
-             <PostType type={"Saved"} imgSrc={"/images/bookmark-icon.png"} activeTab={activeTab} setActiveTab={setActiveTab} />
+             {isOwnProfile && (
+               <PostType type={"Saved"} imgSrc={"/images/bookmark-icon.png"} activeTab={activeTab} setActiveTab={setActiveTab} />
+             )}
              <PostType type={"Tagged"} imgSrc={"/images/tag-icon.png"} activeTab={activeTab} setActiveTab={setActiveTab} />
 
             </div>
@@ -455,33 +454,35 @@ const UserProfilePage = () => {
           <TagCard imgSrc={"/images/profile-pic.JPG"} />
         </div>}
         
-        {activeTab === "Saved" && <>
-         <div className="savedSectionHeader w-full h-[50px] flex justify-between items-center p-4">
-          <div className="msg text-[12px] text-[#A3A3A3]">Only you can see what you've saved</div>
-          {/* <button className="newCollection text-[14px] text-[#85a1ff] hover:text-[#a3bcff] cursor-pointer ">+ New collection</button> */}
-         </div>
+        {activeTab === "Saved" && isOwnProfile && (
+          <>
+            <div className="savedSectionHeader w-full h-[50px] flex justify-between items-center p-4">
+              <div className="msg text-[12px] text-[#A3A3A3]">Only you can see what you've saved</div>
+              {/* <button className="newCollection text-[14px] text-[#85a1ff] hover:text-[#a3bcff] cursor-pointer ">+ New collection</button> */}
+            </div>
 
-        {savedPosts.length > 0 ? (
-        <div className="SavedSection w-full min-h-[44%] grid grid-cols-5">
-           {savedPosts.map((post) => (
-                    <SavedCard
-                      key={post._id}
-                      imgSrc={post.media?.[0]?.url}
-                      likesCount={post.likes.length}
-                      commentsCount={post.commentsCount}
-                    />
-                  ))}
-        </div>
-        ) : (
-          <div className="w-full min-h-[44%] flex flex-col justify-center items-center gap-3">
-                 
-                  <h2 className="text-white text-2xl font-bold">No Saved Posts Yet</h2>
-                  <p className="text-[#A8A8A8] text-sm">
-                    When posts are saved, they'll appear here.
-                  </p>
-                </div>
+            {savedItems.length > 0 ? (
+              <div className="SavedSection w-full min-h-[44%] grid grid-cols-5">
+                {savedItems.map((item) => (
+                  <SavedCard
+                    key={`${item.type}-${item._id}`}
+                    item={item}
+                    onUnsave={() =>
+                      setSavedItems((prev) => prev.filter((i) => i._id !== item._id))
+                    }
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="w-full min-h-[44%] flex flex-col justify-center items-center gap-3">
+                <h2 className="text-white text-2xl font-bold">No Saved Posts Yet</h2>
+                <p className="text-[#A8A8A8] text-sm">
+                  When posts are saved, they'll appear here.
+                </p>
+              </div>
+            )}
+          </>
         )}
-      </>}
 
       <MobileFooter />
        

@@ -39,19 +39,19 @@ const MessagesPage = () => {
   
 
   return (
-    <div className="messagePage w-screen h-screen flex bg-[#0c1014] overflow-hidden">
+    <div className="messagePage w-screen h-screen flex bg-[var(--bg-app)] overflow-hidden">
 
-      <div className="messagesList w-full md:w-[35%] lg:w-[30%] h-full border-r border-[#2C2C2C] bg-[#0c1014] ">
+      <div className="messagesList w-full md:w-[35%] lg:w-[30%] h-full border-r border-[var(--border-soft)] bg-[var(--bg-app)] ">
 
         <div className="upperPart w-full h-[20%]">
 
-          <div className="accName w-full h-[40%] text-white text-[18px] sm:text-[20px] font-semibold px-4 sm:px-8 flex justify-start items-center">
+          <div className="accName w-full h-[40%] text-[var(--text-primary)] text-[18px] sm:text-[20px] font-semibold px-4 sm:px-8 flex justify-start items-center">
             {user?.username}
           </div>
 
-          <div className="searchSection w-full h-[60%] flex justify-center items-center border-b border-gray-700">
+          <div className="searchSection w-full h-[60%] flex justify-center items-center border-b border-[var(--border-soft)]">
 
-            <div className="searchbar w-[90%] h-[60%] flex justify-center items-center bg-[#25292e] rounded-3xl overflow-hidden">
+            <div className="searchbar w-[90%] h-[60%] flex justify-center items-center bg-[var(--bg-elevated)] rounded-3xl overflow-hidden">
 
               <div className="searchIcon w-[15%] sm:w-[10%] h-full flex justify-center items-center">
                 <img
@@ -66,7 +66,7 @@ const MessagesPage = () => {
                   type="text"
                   name="search"
                   id="search"
-                  className="w-full h-full outline-none text-white px-4 bg-transparent"
+                  className="w-full h-full outline-none text-[var(--text-primary)] px-4 bg-transparent"
                   placeholder="Search"
                 />
               </div>
@@ -94,15 +94,15 @@ const MessagesPage = () => {
       {conversationId ? (
         <Chat conversationId={conversationId} />
       ) : (
-        <div className="messageDisplay hidden md:flex md:flex-col relative md:w-[65%] lg:w-[70%] h-full bg-[#0c1014] text-white text-[20px]  justify-center items-center ">
+        <div className="messageDisplay hidden md:flex md:flex-col relative md:w-[65%] lg:w-[70%] h-full bg-[var(--bg-app)] text-[var(--text-primary)] text-[20px]  justify-center items-center ">
           <div className="messageIcon w-full h-[120px] flex justify-center items-center ">
             <img src="/images/dm-icon.png" alt="" className="h-full" />
           </div>
           <div className="text w-full h-[60px] ">
-            <div className="upperText w-full h-[50%] flex justify-center items-center text-white text-[24px] ">
+            <div className="upperText w-full h-[50%] flex justify-center items-center text-[var(--text-primary)] text-[24px] ">
               <span>Your messages</span>
             </div>
-            <div className="lowerText w-full h-[50%] flex justify-center items-end text-[#A8A8A8] text-[18px] ">
+            <div className="lowerText w-full h-[50%] flex justify-center items-end text-[var(--text-muted)] text-[18px] ">
               <span>Send private photos and messages to a friend or group.</span>
             </div>
           </div>

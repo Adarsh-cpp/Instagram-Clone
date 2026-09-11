@@ -1,5 +1,103 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ============================
+   Theme variables
+   ============================ */
+
+:root {
+  /* Fixed brand/functional colors — identical in both themes */
+  --brand-blue: #0095f6;
+  --brand-blue-hover: #1877f2;
+  --accent-blue: rgb(53, 121, 234);
+  --accent-blue-hover: rgb(20, 100, 255);
+  --accent-indigo: #4a5df9;
+  --accent-indigo-hover: #4150f7;
+  --color-error: #FF3040;
+  --color-danger: #ed4956;
+  --color-danger-hover: #d63d49;
+  --text-on-brand: #ffffff;
+  --button-text-on-accent: #afb2b3;
+  --icon-on-toggle: #0c1014; /* icon glyph sitting on the always-white toggle knob */
+}
+
+:root[data-theme="dark"] {
+  /* Backgrounds */
+  --bg-app: #0c1014;
+  --bg-panel: #1f2226;
+  --bg-surface: #212328;
+  --bg-elevated: #25292e;
+  --bg-menu: #2a2d32;
+  --bg-menu-hover: #3a3d42;
+  --bg-input: #121212;
+  --bg-loading: #141518;
+  --bg-row-hover: #25282c;
+  --bg-popup-hover: #2b2f34;
+  --bg-danger-hover: #2b2225;
+  --bg-secondary-btn: #363636;
+  --bg-secondary-btn-hover: #4a4a4a;
+  --bg-unread: #0d1b2a;
+
+  /* Borders */
+  --border-soft: #2b3036;
+  --border-popup: #34383e;
+  --border-container: #363636;
+  --border-select: #262626;
+  --border-input: #555555;
+
+  /* Text */
+  --text-primary: #ffffff;
+  --text-secondary: #ddd4d4;
+  --text-muted: #A8A8A8;
+  --text-input: #F5F5F5;
+
+  /* Toggle / misc */
+  --toggle-track-off: #4a4f57;
+  --link-muted: #85a1ff;
+  --link-muted-hover: #a3bcff;
+}
+
+:root[data-theme="light"] {
+  /* Backgrounds */
+  --bg-app: #fafafa;
+  --bg-panel: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f0f0f2;
+  --bg-menu: #ffffff;
+  --bg-menu-hover: #f5f5f5;
+  --bg-input: #fafafa;
+  --bg-loading: #ffffff;
+  --bg-row-hover: #f2f2f2;
+  --bg-popup-hover: #f0f0f2;
+  --bg-danger-hover: #fce8e9;
+  --bg-secondary-btn: #efefef;
+  --bg-secondary-btn-hover: #e0e0e0;
+  --bg-unread: #eaf3ff;
+
+  /* Borders */
+  --border-soft: #efefef;
+  --border-popup: #dbdbdb;
+  --border-container: #dbdbdb;
+  --border-select: #dbdbdb;
+  --border-input: #c7c7c7;
+
+  /* Text */
+  --text-primary: #262626;
+  --text-secondary: #737373;
+  --text-muted: #8e8e8e;
+  --text-input: #262626;
+
+  /* Toggle / misc */
+  --toggle-track-off: #d1d1d1;
+  --link-muted: #3b5bdb;
+  --link-muted-hover: #2f4bc4;
+}
+
+/* ============================
+   Utilities
+   ============================ */
+
 /* Hide scrollbar for Chrome, Safari and Opera */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;

@@ -53,8 +53,6 @@ const navigate = useNavigate()
   }
 }, [location, navigate]);
 
-  // Prepend any freshly-completed image-post uploads that finished while
-  // the user was away (or is currently on this page).
   useEffect(() => {
     const unconsumed = uploads.filter((u) => u.status === "success" && !u.consumed);
     if (unconsumed.length === 0) return;
@@ -63,8 +61,6 @@ const navigate = useNavigate()
       if (u.type === "image" && u.resultData?.post) {
         setPosts((prev) => [u.resultData.post, ...prev]);
       }
-      // reels aren't part of this feed's shape — just mark consumed so the
-      // pill/toast lifecycle in UploadContext finishes cleanly
       markConsumed(u.id);
     });
   }, [uploads, markConsumed]);
@@ -85,7 +81,7 @@ const navigate = useNavigate()
 
 
   return (
-    <div className='homePage w-[100vw] h-[100vh] bg-[#0c1014] flex text-white overflow-x-hidden'>
+    <div className='homePage w-[100vw] h-[100vh] bg-[var(--bg-app)] flex text-[var(--text-primary)] overflow-x-hidden'>
 
      
 
@@ -126,7 +122,7 @@ const navigate = useNavigate()
               />
             ))
           ) : (
-            <div className="w-full h-[300px] flex justify-center items-center text-white">
+            <div className="w-full h-[300px] flex justify-center items-center text-[var(--text-primary)]">
               No posts available
             </div>
           )}

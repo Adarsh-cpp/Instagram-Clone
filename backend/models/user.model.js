@@ -137,6 +137,18 @@ const userSchema = new mongoose.Schema(
         ref: "Reel",
     }],
 
+    savedItems: [
+  {
+    itemType: { type: String, enum: ["Post", "Reel"], required: true },
+    itemId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      refPath: "savedItems.itemType", // resolves to Post or Reel per-document
+    },
+    savedAt: { type: Date, default: Date.now },
+  },
+],
+
     lastSeen: {
         type: Date,
         default: Date.now,

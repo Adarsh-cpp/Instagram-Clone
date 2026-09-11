@@ -72,20 +72,20 @@ const NotificationsPage = () => {
   };
 
   return (
-    <div className="NotificationsPage w-[100vw] h-[100vh] flex justify-between items-center bg-[#0c1014]">
+    <div className="NotificationsPage w-[100vw] h-[100vh] flex justify-between items-center bg-[var(--bg-app)]">
       <IconSidebar />
 
       <div className="notifSection w-full md:w-[88%] 2xl:w-[80%] h-full flex justify-center items-start overflow-x-hidden overflow-y-auto">
         <div className="notifContainer w-full 2xl:w-[70%] h-full">
-          <div className="notifHeader w-full h-[70px] flex items-center px-4 sm:px-8 border-b border-[#2b3036]">
-            <h2 className="text-white text-[20px] font-bold">Notifications</h2>
+          <div className="notifHeader w-full h-[70px] flex items-center px-4 sm:px-8 border-b border-[var(--border-soft)]">
+            <h2 className="text-[var(--text-primary)] text-[20px] font-bold">Notifications</h2>
           </div>
 
           <div className="notifList w-full flex flex-col">
             {items.length === 0 && !loading && (
               <div className="w-full h-[200px] flex flex-col justify-center items-center gap-2">
-                <h3 className="text-white text-lg font-bold">No notifications yet</h3>
-                <p className="text-[#A8A8A8] text-sm">
+                <h3 className="text-[var(--text-primary)] text-lg font-bold">No notifications yet</h3>
+                <p className="text-[var(--text-muted)] text-sm">
                   When someone follows you or interacts with your posts, it'll show up here.
                 </p>
               </div>
@@ -94,9 +94,7 @@ const NotificationsPage = () => {
             {items.map((n) => {
               const isFollow = n.type === "follow";
                
-                // prefer a follow-back click the user just made; otherwise trust the server's real status
                 const isFollowingBack = followBackState[n.sender._id] ?? n.isFollowingSender ?? false;
-              // follow -> sender's avatar; like/comment -> the post image
               const thumbSrc = isFollow
                   ? n.sender.profilePic || "/images/default-profile-pic.jpg"
                   : n.reel
@@ -106,8 +104,8 @@ const NotificationsPage = () => {
               return (
                 <div
                   key={n._id}
-                  className={`notifItem w-full px-4 sm:px-8 py-3 flex items-center justify-between gap-3 hover:bg-[#121212] transition-colors ${
-                    !n.isRead ? "bg-[#0d1b2a]" : ""
+                  className={`notifItem w-full px-4 sm:px-8 py-3 flex items-center justify-between gap-3 hover:bg-[var(--bg-row-hover)] transition-colors ${
+                    !n.isRead ? "bg-[var(--bg-unread)]" : ""
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -122,7 +120,7 @@ const NotificationsPage = () => {
                       className="shrink-0"
                     >
                       <div
-                        className={`w-[48px] h-[48px] overflow-hidden border border-[#2b3036] ${
+                        className={`w-[48px] h-[48px] overflow-hidden border border-[var(--border-soft)] ${
                           isFollow ? "rounded-full" : "rounded-md"
                         }`}
                       >
@@ -130,14 +128,14 @@ const NotificationsPage = () => {
                       </div>
                     </Link>
 
-                    <div className="notifText min-w-0 text-[14px] text-white leading-tight">
+                    <div className="notifText min-w-0 text-[14px] text-[var(--text-primary)] leading-tight">
                       <span className="truncate">
                         <Link to={`/user/get-profile/${n.sender._id}`} className="font-bold hover:underline">
                           {n.sender.username}
                         </Link>{" "}
-                        <span className="text-[#A8A8A8]">{notificationText(n)}</span>
+                        <span className="text-[var(--text-muted)]">{notificationText(n)}</span>
                       </span>
-                      <div className="text-[#A8A8A8] text-[12px]">{timeAgo(n.createdAt)}</div>
+                      <div className="text-[var(--text-muted)] text-[12px]">{timeAgo(n.createdAt)}</div>
                     </div>
                   </div>
 
@@ -146,8 +144,8 @@ const NotificationsPage = () => {
                       onClick={() => handleFollowBack(n.sender._id)}
                       className={`shrink-0 w-[100px] h-[32px] text-[13px] font-bold rounded-lg cursor-pointer ${
                         isFollowingBack
-                          ? "bg-[#363636] hover:bg-[#4a4a4a] text-white"
-                          : "bg-[#4a5df9] hover:bg-[#4150f7] text-white"
+                          ? "bg-[var(--bg-secondary-btn)] hover:bg-[var(--bg-secondary-btn-hover)] text-[var(--text-primary)]"
+                          : "bg-[var(--accent-indigo)] hover:bg-[var(--accent-indigo-hover)] text-white"
                       }`}
                     >
                       {isFollowingBack ? "Following" : "Follow back"}
@@ -167,7 +165,7 @@ const NotificationsPage = () => {
                   loadNotifications(next);
                 }}
                 disabled={loading}
-                className="text-[#85a1ff] hover:text-[#a3bcff] text-[14px] cursor-pointer"
+                className="text-[var(--link-muted)] hover:text-[var(--link-muted-hover)] text-[14px] cursor-pointer"
               >
                 {loading ? "Loading..." : "Load more"}
               </button>

@@ -207,13 +207,13 @@ const CommentsOverlay = ({
           onDoubleClick={doubleClickToLike}
           onTouchStart={isCarousel ? handleTouchStart : undefined}
           onTouchEnd={isCarousel ? handleTouchEnd : undefined}
-          className="relative w-full flex justify-center items-center lg:w-1/2 bg-black overflow-hidden"
+          className="relative w-full flex justify-center items-center lg:w-1/2 bg-black overflow-hidden select-none"
         >
           <div
             ref={animatedLikeRef}
-            className="likeAnimation absolute top-[50%] left-[50%] -translate-x-[50%] -translate-y-[50%] w-[0px] h-[150px] rounded-full flex justify-center items-center transition-all ease-in-out duration-[3s] z-10"
+            className="likeAnimation absolute top-[50%] left-[50%] -translate-x-[50%] -translate-y-[50%] w-[0px] h-[150px] rounded-full flex justify-center items-center transition-all ease-in-out duration-[3s] z-10 select-none"
           >
-            <img src="/images/gradient-like-icon.png" alt="" className="w-full" />
+            <img src="/images/gradient-like-icon.png" alt="" draggable="false" className="w-full select-none" />
           </div>
 
           {isReel ? (
@@ -221,7 +221,7 @@ const CommentsOverlay = ({
             <video
               src={item.media.url}
               poster={item.media.thumbnailUrl}
-              className="max-w-full max-h-full w-auto h-auto object-contain"
+              className="max-w-full max-h-full w-auto h-auto object-contain select-none"
               style={{ aspectRatio: `${item.media.width} / ${item.media.height}` }}
               controls
               autoPlay
@@ -232,7 +232,7 @@ const CommentsOverlay = ({
           ) : mediaList[activeSlide]?.mediaType === "video" ? (
             <video
               src={mediaList[activeSlide]?.url}
-              className="w-full object-cover aspect-auto"
+              className="w-full object-cover aspect-auto select-none"
               controls
               muted
               loop
@@ -242,14 +242,15 @@ const CommentsOverlay = ({
             <img
               src={mediaList[activeSlide]?.url}
               alt="Post"
-              className="w-full object-cover aspect-auto"
+              draggable="false"
+              className="w-full object-cover aspect-auto select-none"
             />
           )}
 
           {isCarousel && activeSlide > 0 && (
             <div
               onClick={goPrev}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10"
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10 select-none"
             >
               <ChevronLeft size={20} color="white" />
             </div>
@@ -257,20 +258,20 @@ const CommentsOverlay = ({
           {isCarousel && activeSlide < mediaList.length - 1 && (
             <div
               onClick={goNext}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10 select-none"
             >
               <ChevronRight size={20} color="white" />
             </div>
           )}
 
           {isCarousel && (
-            <div className="absolute top-3 right-3 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full z-10">
+            <div className="absolute top-3 right-3 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full z-10 select-none">
               {activeSlide + 1}/{mediaList.length}
             </div>
           )}
 
           {isCarousel && (
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10 select-none">
               {mediaList.map((_, i) => (
                 <div
                   key={i}
@@ -336,8 +337,9 @@ const CommentsOverlay = ({
               <img
                 src={isLiked ? "/images/redlike-icon.png" : "/images/postlike-icon.png"}
                 alt=""
+                draggable="false"
                 onClick={toggleLike}
-                className="w-[35px] h-[30px] cursor-pointer"
+                className="w-[35px] h-[30px] cursor-pointer select-none"
               />
               <button className="hover:opacity-80 transition cursor-pointer">
                 <MessageCircle size={22} />
@@ -352,8 +354,9 @@ const CommentsOverlay = ({
             <img
               src={isSaved ? "/images/filledsave-icon.png" : "/images/postsave-icon.png"}
               alt=""
+              draggable="false"
               onClick={handleSave}
-              className="w-[30px] h-[30px] cursor-pointer"
+              className="w-[30px] h-[30px] cursor-pointer select-none"
             />
           </div>
 

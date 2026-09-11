@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import EmojiPicker from "emoji-picker-react";
 import { Play, ChevronLeft, ChevronRight } from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
 
 const CaptionSharePage = ({
   images,       // File[]/Blob[] — image posts only
@@ -13,6 +14,7 @@ const CaptionSharePage = ({
   user,
   isLoading,
 }) => {
+  const { theme } = useTheme();
   const [caption, setCaption] = useState("");
   const [showPicker, setShowPicker] = useState(false);
   const [mediaUrls, setMediaUrls] = useState([]);
@@ -120,11 +122,11 @@ const CaptionSharePage = ({
   }, []);
 
   return (
-    <div className="w-[100vw] h-[100vh] flex justify-center items-center bg-[#0c1014]">
+    <div className="w-[100vw] h-[100vh] flex justify-center items-center bg-[var(--bg-app)]">
       <div className="cropContainerOverlay w-full h-full flex justify-center items-center bg-[rgba(0,0,0,0)] px-2 sm:px-4">
-        <div className="cropContainer relative w-full max-w-[950px] md:w-[90%] lg:w-[80%] xl:w-[60%] h-[95vh] md:h-[70%] rounded-2xl bg-[#212328] overflow-hidden">
+        <div className="cropContainer relative w-full max-w-[950px] md:w-[90%] lg:w-[80%] xl:w-[60%] h-[95vh] md:h-[70%] rounded-2xl bg-[var(--bg-surface)] overflow-hidden">
           {/* Header */}
-          <div className="header w-full h-[40px] px-3 sm:px-4 flex justify-between items-center bg-[rgb(12,16,20)]">
+          <div className="header w-full h-[40px] px-3 sm:px-4 flex justify-between items-center bg-[var(--bg-app)]">
             <div onClick={back} className="back cursor-pointer">
               <img
                 src="/images/arrow-back-icon.png"
@@ -133,13 +135,13 @@ const CaptionSharePage = ({
               />
             </div>
 
-            <div className="heading text-white text-[15px] sm:text-[18px] font-semibold">
+            <div className="heading text-[var(--text-primary)] text-[15px] sm:text-[18px] font-semibold">
               {mediaType === "video" ? "Create new reel" : "Create new post"}
             </div>
 
             <div
               onClick={() => handlePost(caption)}
-              className="next text-[rgb(53,121,234)] hover:text-[rgb(20,100,255)] hover:underline cursor-pointer text-sm sm:text-base"
+              className="next text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] hover:underline cursor-pointer text-sm sm:text-base"
             >
               Share
             </div>
@@ -150,7 +152,7 @@ const CaptionSharePage = ({
           <div className="main w-full h-[calc(100%-40px)] flex flex-col md:flex-row">
             {/* Left — preview */}
             <div
-              className="left relative w-full md:w-[50%] h-[40%] md:h-full flex justify-center items-center overflow-hidden bg-[#25292e]"
+              className="left relative w-full md:w-[50%] h-[40%] md:h-full flex justify-center items-center overflow-hidden bg-[var(--bg-elevated)]"
               onTouchStart={isCarousel ? handleTouchStart : undefined}
               onTouchEnd={isCarousel ? handleTouchEnd : undefined}
             >
@@ -223,7 +225,7 @@ const CaptionSharePage = ({
                       <div
                         key={i}
                         className={`w-1.5 h-1.5 rounded-full ${
-                          i === activeSlide ? "bg-[rgb(53,121,234)]" : "bg-white/60"
+                          i === activeSlide ? "bg-[var(--accent-blue)]" : "bg-white/60"
                         }`}
                       />
                     ))}
@@ -238,7 +240,7 @@ const CaptionSharePage = ({
                 <div className="profilePicSection w-[40px] h-[40px] rounded-full overflow-hidden">
                   <img src={user?.profilePic ? user.profilePic : "/images/default-profile-pic.jpg"} alt="" />
                 </div>
-                <div className="usernameSection h-full flex items-center px-2 text-white font-semibold text-sm sm:text-base">
+                <div className="usernameSection h-full flex items-center px-2 text-[var(--text-primary)] font-semibold text-sm sm:text-base">
                   {user?.username}
                 </div>
               </div>
@@ -253,7 +255,7 @@ const CaptionSharePage = ({
                     maxLength={2200}
                     name="caption"
                     id="caption"
-                    className="w-full h-full resize-none focus:outline-none text-white text-[16px] sm:text-[18px] px-4 bg-transparent"
+                    className="w-full h-full resize-none focus:outline-none text-[var(--text-primary)] text-[16px] sm:text-[18px] px-4 bg-transparent"
                   />
                 </div>
               </div>
@@ -272,12 +274,12 @@ const CaptionSharePage = ({
                       ref={pickerRef}
                       className="absolute bottom-16 left-2 sm:left-4 z-50 max-w-[calc(100vw-20px)] overflow-hidden"
                     >
-                      <EmojiPicker theme="dark" onEmojiClick={handleEmojiClick} />
+                      <EmojiPicker theme={theme} onEmojiClick={handleEmojiClick} />
                     </div>
                   )}
                 </div>
 
-                <div className="letterCount w-[50%] h-full flex justify-end items-center px-4 text-white text-sm sm:text-base">
+                <div className="letterCount w-[50%] h-full flex justify-end items-center px-4 text-[var(--text-primary)] text-sm sm:text-base">
                   {caption.length}/2,200
                 </div>
               </div>
@@ -286,8 +288,8 @@ const CaptionSharePage = ({
                 <div className="loadingSection absolute z-50 w-full h-full top-0">
                   <div className="absolute inset-0 flex items-center justify-center bg-[rgb(0,0,0,0.4)]">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 via-red-500 to-yellow-500 animate-spin p-[3px]">
-                      <div className="w-full h-full relative bg-[#141518] rounded-full">
-                        <div className="block absolute top-[-7px] w-[20px] h-[20px] rounded-full bg-[#141518]"></div>
+                      <div className="w-full h-full relative bg-[var(--bg-loading)] rounded-full">
+                        <div className="block absolute top-[-7px] w-[20px] h-[20px] rounded-full bg-[var(--bg-loading)]"></div>
                       </div>
                     </div>
                   </div>

@@ -5,7 +5,7 @@ import ShareOverlay from "./ShareOverlay";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import { NavLink } from "react-router-dom";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 
 const BASE_URL = "http://localhost:4000";
 
@@ -44,6 +44,7 @@ const HomepagePostCard = ({ ...props }) => {
 
   const animatedLikeRef = useRef();
   const touchStartX = useRef(null);
+  const menuRef = useRef(null);
 
   const [isLiked, setIsLiked] = useState(props.isLiked || false);
   const [likesCount, setLikesCount] = useState(props.likesCount || 0);
@@ -53,9 +54,27 @@ const HomepagePostCard = ({ ...props }) => {
   const [showFullCaption, setShowFullCaption] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
 
+  // 3-dot menu / delete flow
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleted, setIsDeleted] = useState(false);
+
   useEffect(() => {
     setIsLiked(props.isLiked);
   }, [props.isLiked]);
+
+  // close the 3-dot menu when clicking anywhere outside it
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isMenuOpen]);
 
   // Prefer the real media array from the backend (media: [{url, mediaType}]).
   // Falls back to the old single-image props so any caller that hasn't been
@@ -140,6 +159,21 @@ const HomepagePostCard = ({ ...props }) => {
     }
   }, [props?.postId, isSaved]);
 
+  const handleDeletePost = async () => {
+    setIsDeleting(true);
+    try {
+      await axios.delete(`${BASE_URL}/post/${props.postId}/delete`, authConfig());
+      setIsDeleteConfirmOpen(false);
+      setIsDeleted(true);
+      toast.success("Post deleted");
+      props.onDeleted?.(props.postId);
+    } catch (error) {
+      toast.error("Something went wrong while deleting the post");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const post = useMemo(
     () => ({
       _id: props.postId,
@@ -154,6 +188,10 @@ const HomepagePostCard = ({ ...props }) => {
     }),
     [props.postId, mediaList, props.author, props.profileImgSrc, props.caption, props.createdAt, likesCount]
   );
+
+  // once deleted, this card just disappears — the parent list should also
+  // drop it via onDeleted, but this guards against a stale render in between
+  if (isDeleted) return null;
 
   return (
     <div className="postCard w-full mt-4 ">
@@ -178,6 +216,33 @@ const HomepagePostCard = ({ ...props }) => {
           </div>
           <div className="location w-full h-[50%]">Odisha, India</div>
         </div>
+
+        {/* 3-dot menu — only visible on the logged-in user's own post */}
+        {isOwnPost && (
+          <div ref={menuRef} className="relative ml-auto pr-1">
+            <button
+              onClick={() => setIsMenuOpen((prev) => !prev)}
+              className="text-white/70 hover:text-white transition cursor-pointer p-1"
+              aria-label="Post options"
+            >
+              <MoreHorizontal size={22} />
+            </button>
+
+            {isMenuOpen && (
+              <div className="absolute right-0 top-[110%] w-[160px] bg-[#212328] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-20">
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setIsDeleteConfirmOpen(true);
+                  }}
+                  className="w-full text-left px-4 py-3 text-sm font-semibold text-[#ED4956] hover:bg-white/5 cursor-pointer transition"
+                >
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Post media (carousel) */}
@@ -341,6 +406,34 @@ const HomepagePostCard = ({ ...props }) => {
 
       {isShareOpen && (
         <ShareOverlay post={post} onClose={() => setIsShareOpen(false)} />
+      )}
+
+      {/* Delete confirmation */}
+      {isDeleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex justify-center items-center bg-black/70 p-4">
+          <div className="w-full max-w-[340px] rounded-2xl bg-[#212328] overflow-hidden text-center shadow-2xl">
+            <div className="px-6 py-6 border-b border-white/10">
+              <h3 className="text-white font-semibold text-base mb-2">Delete post?</h3>
+              <p className="text-white/50 text-sm">
+                This action cannot be undone. This post will be permanently removed.
+              </p>
+            </div>
+            <button
+              onClick={handleDeletePost}
+              disabled={isDeleting}
+              className="w-full py-3 text-[#ED4956] font-semibold text-sm border-b border-white/10 hover:bg-white/5 transition cursor-pointer disabled:opacity-50"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </button>
+            <button
+              onClick={() => setIsDeleteConfirmOpen(false)}
+              disabled={isDeleting}
+              className="w-full py-3 text-white font-medium text-sm hover:bg-white/5 transition cursor-pointer disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

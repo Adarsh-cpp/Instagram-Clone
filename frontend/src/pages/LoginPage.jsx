@@ -14,13 +14,11 @@ const LoginPage = () => {
   const onSubmit = async (data) => {
     
      try {
-      // API call
       const response = await axios.post("http://localhost:4000/auth/login", {
         contact: data.contact,
         password: data.password,
       });
 
-       // Save token in localStorage
     const token = response.data.token;
     localStorage.setItem("authToken", token);
 
@@ -52,7 +50,7 @@ const LoginPage = () => {
    
 
   return (
-   <div className="loginPage h-[100vh] w-[100vw] bg-[#0c1014] flex justify-center">
+   <div className="loginPage h-[100vh] w-[100vw] bg-[var(--bg-app)] flex justify-center">
         <div className="container h-full w-[900px] flex justify-center">
           <div className="imgContainer h-full w-[550px] hidden lg:flex justify-center items-center ">
             <img src="/images/loginPage-img.png" alt="" />
@@ -76,7 +74,7 @@ const LoginPage = () => {
                 message: "Enter valid username, email, or phone number",
               },
             })}
-            className={`h-[36px] w-[270px] bg-[#121212] text-[12px] outline-none placeholder-[#A8A8A8] text-[#F5F5F5] rounded-[5px]  px-[10px] my-[3px] ${errors.contact ? " border border-[#FF3040]" : "border border-[#555555]" }`}
+            className={`h-[36px] w-[270px] bg-[var(--bg-input)] text-[12px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px]  px-[10px] my-[3px] ${errors.contact ? " border border-[var(--color-error)]" : "border border-[var(--border-input)]" }`}
             placeholder="Phone number, username or email address"
           />
           {errors.contact && (
@@ -104,7 +102,7 @@ const LoginPage = () => {
                 message: "Password must be at least 6 characters",
               },
             })}
-            className={`h-[36px] w-[270px] bg-[#121212] text-[12px] outline-none placeholder-[#A8A8A8] text-[#F5F5F5] rounded-[5px]  px-[10px] my-[3px] ${errors.password ? " border border-[#FF3040]" : "border border-[#555555]" }`}
+            className={`h-[36px] w-[270px] bg-[var(--bg-input)] text-[12px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px]  px-[10px] my-[3px] ${errors.password ? " border border-[var(--color-error)]" : "border border-[var(--border-input)]" }`}
             placeholder="Password"
           />
           {errors.password && (
@@ -117,7 +115,7 @@ const LoginPage = () => {
         {/* Submit Button */}
         <button
           type="submit"
-          className="loginBtn w-[270px] h-[32px] my-[10px] rounded-[8px] bg-[#0095f6] hover:bg-[#1877f2] text-[#ffffff] text-[14px] font-bold cursor-pointer"
+          className="loginBtn w-[270px] h-[32px] my-[10px] rounded-[8px] bg-[var(--brand-blue)] hover:bg-[var(--brand-blue-hover)] text-[var(--text-on-brand)] text-[14px] font-bold cursor-pointer"
         >
           Login
         </button>
@@ -126,20 +124,20 @@ const LoginPage = () => {
 
             <div className="divisonSection w-full h-[30px] flex justify-center ">
               <div className="divisionContainer h-full w-[270px] flex">
-                <div className="line1 h-full w-[40%] flex items-center"><hr className="inline-block w-full border border-[#262626]" /></div>
-                <div className="text h-full w-[20%] text-white text-[16px] text-center ">OR</div>
-                <div className="line2 h-full w-[40%] flex items-center"><hr className="inline-block w-full border border-[#262626]" /></div>
+                <div className="line1 h-full w-[40%] flex items-center"><hr className="inline-block w-full border border-[var(--border-select)]" /></div>
+                <div className="text h-full w-[20%] text-[var(--text-primary)] text-[16px] text-center ">OR</div>
+                <div className="line2 h-full w-[40%] flex items-center"><hr className="inline-block w-full border border-[var(--border-select)]" /></div>
               </div>
             </div>
           
           <div className="facebook w-full h-[80px] ">
-            <div className="top h-[50%] w-full flex justify-center items-center text-[rgb(53,121,234)] hover:text-[rgb(20,100,255)] text-[14px] font-bold cursor-pointer ">
+            <div className="top h-[50%] w-full flex justify-center items-center text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] text-[14px] font-bold cursor-pointer ">
               <img src="/images/facebook-logo.png" alt="" className="w-[30px] h-[20px]" /> <span onClick={handleFacebookLogin}>Log in with Facebook</span>
             </div>
-            <div className="bottom h-[50%] w-full flex justify-center items-center text-[#FAFAFA] text-[14px] hover:text-[#7D7D7D] cursor-pointer font-bold "><Link to="/user/forgot-password">Forgotten your password?</Link></div>
+            <div className="bottom h-[50%] w-full flex justify-center items-center text-[var(--text-primary)] text-[14px] hover:text-[var(--text-muted)] cursor-pointer font-bold "><Link to="/user/forgot-password">Forgotten your password?</Link></div>
           </div>
           
-          <div className="signup w-full h-[100px] text-white text-[14px] flex justify-center items-center ">Don't have an account? <span className="text-[rgb(53,121,234)] hover:text-[rgb(20,100,255)]  font-bold cursor-pointer"> &nbsp;<Link to="/user/signup"> Sign up</Link></span></div>
+          <div className="signup w-full h-[100px] text-[var(--text-primary)] text-[14px] flex justify-center items-center ">Don't have an account? <span className="text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)]  font-bold cursor-pointer"> &nbsp;<Link to="/user/signup"> Sign up</Link></span></div>
             </div>
           </div>
         </div>

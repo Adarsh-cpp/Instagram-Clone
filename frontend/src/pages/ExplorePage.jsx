@@ -69,14 +69,14 @@ useEffect(() => {
 
    
     return (
-    <div className="explorePage w-screen min-h-screen md:h-screen bg-[#0c1014] flex flex-col md:flex-row text-white overflow-y-auto md:overflow-hidden">
+    <div className="explorePage w-screen min-h-screen md:h-screen bg-[var(--bg-app)] flex flex-col md:flex-row text-[var(--text-primary)] overflow-y-auto md:overflow-hidden">
       <IconSidebar />
 
 
       <div className="exploreSection w-full md:w-[80%] h-auto md:h-full flex flex-col md:flex-row ">
 
 
-       <div className="exploreContainer w-full md:w-[70%] lg:w-[65%] md:min-h-full grid grid-cols-3 auto-rows-[110px] xs:auto-rows-[130px] sm:auto-rows-[160px] md:auto-rows-[200px] lg:auto-rows-[250px] gap-[2px] md:overflow-y-auto hide-scrollbar bg-black">
+       <div className="exploreContainer w-full md:w-[70%] lg:w-[65%] md:min-h-full grid grid-cols-3 auto-rows-[110px] xs:auto-rows-[130px] sm:auto-rows-[160px] md:auto-rows-[200px] lg:auto-rows-[250px] gap-[2px] md:overflow-y-auto hide-scrollbar bg-[var(--bg-app)]">
   {posts.map((post, index) => {
     const group = Math.floor(index / 5);
     const position = index % 5;
@@ -102,7 +102,7 @@ useEffect(() => {
 </div>
 
 
-<div className="followingSuggestions w-full md:w-[30%] lg:w-[35%] h-auto md:h-full flex flex-col md:overflow-y-auto bg-black border-l border-[#2b3036]">
+<div className="followingSuggestions w-full md:w-[30%] lg:w-[35%] h-auto md:h-full flex flex-col md:overflow-y-auto bg-[var(--bg-app)] border-l border-[var(--border-soft)]">
 
 
   <div className="heading w-full h-[60px] flex justify-center items-center text-[14px] font-semibold text-center px-2">
@@ -112,9 +112,9 @@ useEffect(() => {
 
   {/* Search Bar */}
   <div className="searchSection w-full px-3 py-2">
-    <div className="searchContainer w-full h-[40px] bg-[#1e1e1e] rounded-lg flex items-center px-3 border border-[#2b3036] focus-within:border-[#0095f6] transition-colors">
+    <div className="searchContainer w-full h-[40px] bg-[var(--bg-elevated)] rounded-lg flex items-center px-3 border border-[var(--border-soft)] focus-within:border-[var(--brand-blue)] transition-colors">
       <svg 
-        className="w-5 h-5 text-gray-400 mr-2" 
+        className="w-5 h-5 text-[var(--text-muted)] mr-2" 
         fill="none" 
         stroke="currentColor" 
         viewBox="0 0 24 24"
@@ -131,12 +131,12 @@ useEffect(() => {
         placeholder="Search users..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        className="w-full bg-transparent text-white text-sm outline-none placeholder-gray-500"
+        className="w-full bg-transparent text-[var(--text-primary)] text-sm outline-none placeholder-[var(--text-muted)]"
       />
       {searchQuery && (
         <button
           onClick={() => setSearchQuery("")}
-          className="text-gray-400 hover:text-white transition-colors"
+          className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
         >
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
             <path 
@@ -162,7 +162,7 @@ useEffect(() => {
         />
       ))
     ) : (
-      <div className="w-full flex justify-center items-center py-8 text-gray-400 text-sm">
+      <div className="w-full flex justify-center items-center py-8 text-[var(--text-muted)] text-sm">
         No users found
       </div>
     )}

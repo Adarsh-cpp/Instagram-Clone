@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react'
 import MessageCard from '../components/MessageCard'
 import Chat from '../components/Chat'
@@ -14,45 +13,46 @@ const DirectMessagePage = () => {
   const { user } = useAuth()
 
   useEffect(() => {
-  const getAllConversations = async () => {
-    try {
-      const url = "http://localhost:4000/conversation/get-all-conversations"
-      const token = localStorage.getItem("authToken")
+    const getAllConversations = async () => {
+      try {
+        const url = "http://localhost:4000/conversation/get-all-conversations"
+        const token = localStorage.getItem("authToken")
 
-      const response = await axios.get(url,{
-        headers:{
-          Authorization: `Bearer ${token}`
-        }}
-      )
+        const response = await axios.get(url, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+        )
 
-      if(response.status === 200){
-        setConversations(response.data.conversations)
+        if (response.status === 200) {
+          setConversations(response.data.conversations)
+        }
+        else
+          console.log("error fetching conversations")
+
+      } catch (error) {
+        console.log(error.message)
       }
-      else
-        console.log("error fetching conversations")
-
-    } catch (error) {
-      console.log(error.message)
     }
-  }
-  getAllConversations()
+    getAllConversations()
   }, [])
-  
+
 
   return (
-    <div className="messagePage w-screen h-screen flex bg-[#0c1014] overflow-hidden">
+    <div className="messagePage w-screen h-screen flex bg-[var(--bg-app)] overflow-hidden">
 
-      <div className="messagesList w-full md:w-[35%] lg:w-[30%] h-full border-r border-[#2C2C2C] bg-[#0c1014] ">
+      <div className="messagesList w-full md:w-[35%] lg:w-[30%] h-full border-r border-[var(--border-soft)] bg-[var(--bg-app)] ">
 
         <div className="upperPart w-full h-[20%]">
 
-          <div className="accName w-full h-[40%] text-white text-[18px] sm:text-[20px] font-semibold px-4 sm:px-8 flex justify-start items-center">
+          <div className="accName w-full h-[40%] text-[var(--text-primary)] text-[18px] sm:text-[20px] font-semibold px-4 sm:px-8 flex justify-start items-center">
             {user?.username}
           </div>
 
-          <div className="searchSection w-full h-[60%] flex justify-center items-center border-b border-gray-700">
+          <div className="searchSection w-full h-[60%] flex justify-center items-center border-b border-[var(--border-soft)]">
 
-            <div className="searchbar w-[90%] h-[60%] flex justify-center items-center bg-[#25292e] rounded-3xl overflow-hidden">
+            <div className="searchbar w-[90%] h-[60%] flex justify-center items-center bg-[var(--bg-elevated)] rounded-3xl overflow-hidden">
 
               <div className="searchIcon w-[15%] sm:w-[10%] h-full flex justify-center items-center">
                 <img
@@ -67,7 +67,7 @@ const DirectMessagePage = () => {
                   type="text"
                   name="search"
                   id="search"
-                  className="w-full h-full outline-none text-white px-4 bg-transparent"
+                  className="w-full h-full outline-none text-[var(--text-primary)] px-4 bg-transparent"
                   placeholder="Search"
                 />
               </div>
@@ -80,14 +80,14 @@ const DirectMessagePage = () => {
 
         <div className="bottomPart w-full h-[75%]  overflow-y-auto">
 
-       {
-          conversations.map((conversation) => (
-            <MessageCard
-              key={conversation._id}
-              conversation={conversation}
-            />
-          ))
-        }
+          {
+            conversations.map((conversation) => (
+              <MessageCard
+                key={conversation._id}
+                conversation={conversation}
+              />
+            ))
+          }
         </div>
 
       </div>

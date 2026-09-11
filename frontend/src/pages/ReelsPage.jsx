@@ -44,7 +44,6 @@ const ReelsPage = () => {
   const clickTimer = useRef(null)
   const isFetchingRef = useRef(false)
 
-  // ── feed state ──────────────────────────────────────────────
   const [reels, setReels] = useState([])
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
@@ -53,13 +52,11 @@ const ReelsPage = () => {
 
   const currentReel = reels[currentIndex] || null
 
-  // ── playback / UI state ─────────────────────────────────────
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
   const [showPlayIcon, setShowPlayIcon] = useState(true)
   const [showLikeBurst, setShowLikeBurst] = useState(false)
 
-  // ── aspect-ratio-driven sizing ───────────────────────────────
   const [videoAspect, setVideoAspect] = useState(9 / 16)
   const [isLandscape, setIsLandscape] = useState(false)
   const [dims, setDims] = useState({ width: 0, height: 0 })
@@ -104,9 +101,6 @@ const ReelsPage = () => {
     return () => window.removeEventListener('resize', computeDims)
   }, [computeDims])
 
-  // Seed the aspect ratio from the reel's stored data immediately (no flash
-  // while the video element itself is still loading), then confirm/refine
-  // it once real metadata is available.
   useEffect(() => {
     if (!currentReel) return
     const seeded = currentReel.aspectRatio === "16:9" ? 16 / 9 : 9 / 16
@@ -122,7 +116,6 @@ const ReelsPage = () => {
     setIsLandscape(aspect > 1)
   }
 
-  // ── fetching reels ───────────────────────────────────────────
   const loadReels = useCallback(async () => {
     if (isFetchingRef.current || !hasMore) return
     isFetchingRef.current = true
@@ -151,8 +144,6 @@ const ReelsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Fetch the next batch proactively once the user is within 2 reels of
-  // the end of what's currently loaded.
   useEffect(() => {
     if (reels.length === 0) return
     if (currentIndex >= reels.length - 2 && hasMore) {
@@ -160,7 +151,6 @@ const ReelsPage = () => {
     }
   }, [currentIndex, reels.length, hasMore, loadReels])
 
-  // ── navigation between reels ────────────────────────────────
   const goToNext = () => {
     if (currentIndex < reels.length - 1) {
       setCurrentIndex((i) => i + 1)
@@ -173,7 +163,6 @@ const ReelsPage = () => {
     }
   }
 
-  // Reset per-reel playback UI whenever the active reel changes
   useEffect(() => {
     setIsPlaying(false)
     setShowPlayIcon(true)
@@ -184,19 +173,15 @@ const ReelsPage = () => {
         setIsPlaying(true)
         setShowPlayIcon(false)
       }).catch(() => {
-        // autoplay blocked — user will tap to play, which is fine
       })
     }
   }, [currentIndex])
 
-  // Close the comments sheet whenever the viewer swipes to a different reel,
-  // so it never lingers open over the wrong video.
   useEffect(() => {
     setIsCommentsOpen(false)
     setIsShareOpen(false)
   }, [currentIndex])
 
-  // ── playback controls ───────────────────────────────────────
   const togglePlay = () => {
     const video = videoRef.current
     if (!video) return
@@ -217,7 +202,6 @@ const ReelsPage = () => {
     const reelId = currentReel._id
     const wasLiked = currentReel.isLiked
 
-    // optimistic UI update
     setReels((prev) =>
       prev.map((r, i) =>
         i === currentIndex
@@ -238,7 +222,6 @@ const ReelsPage = () => {
       await axios.post(`${BASE_URL}/reels/${reelId}/like`, {}, authHeaders())
       await refreshUser()
     } catch (error) {
-      // revert on failure
       setReels((prev) =>
         prev.map((r, i) =>
           i === currentIndex
@@ -290,7 +273,6 @@ const ReelsPage = () => {
   }
 }
 
-  // updates the local sharesCount after ShareOverlay successfully registers a share
   const handleShared = (newSharesCount) => {
     setReels((prev) =>
       prev.map((r, i) =>
@@ -319,40 +301,40 @@ const ReelsPage = () => {
   }, [])
 
   return (
-    <div className="reelsPage w-[100vw] h-[100vh] bg-[#0c1014] flex justify-center items-center text-white overflow-x-hidden">
+    <div className="reelsPage w-[100vw] h-[100vh] bg-[var(--bg-app)] flex justify-center items-center text-[var(--text-primary)] overflow-x-hidden">
       <IconSidebar />
 
       <div
         ref={sectionRef}
-        className="reelSection w-full md:w-[80%] min-h-full flex justify-center items-center overflow-y-auto bg-[#0c1014] relative"
+        className="reelSection w-full md:w-[80%] min-h-full flex justify-center items-center overflow-y-auto bg-[var(--bg-app)] relative"
       >
-        {/* up / down nav arrows */}
+        {/* up / down nav arrows — floating over media, stays fixed dark */}
         <div className="hidden sm:flex fixed right-4 md:right-6 top-1/2 -translate-y-1/2 flex-col gap-3 md:gap-4 z-30">
           <button
             onClick={goToPrev}
             disabled={currentIndex === 0}
-            className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-neutral-800/70 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+            className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-neutral-800/70 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white"
           >
             <ChevronUp size={18} />
           </button>
           <button
             onClick={goToNext}
             disabled={currentIndex >= reels.length - 1}
-            className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-neutral-800/70 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+            className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-neutral-800/70 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white"
           >
             <ChevronDown size={18} />
           </button>
         </div>
 
         {!currentReel && !isFeedLoading && (
-          <div className="text-neutral-400 text-sm">No reels yet</div>
+          <div className="text-[var(--text-muted)] text-sm">No reels yet</div>
         )}
 
         {currentReel && (
           <div className="relative flex items-end gap-2 md:gap-3 w-full h-full justify-center px-2">
-            {/* video container */}
+            {/* video container — backdrop behind the media itself */}
             <div
-              className="relative bg-neutral-900 rounded-md overflow-hidden select-none cursor-pointer shrink-0"
+              className="relative bg-[var(--bg-elevated)] rounded-md overflow-hidden select-none cursor-pointer shrink-0"
               style={
                 dims.width && dims.height
                   ? { width: dims.width, height: dims.height }
@@ -407,11 +389,11 @@ const ReelsPage = () => {
                   setIsMuted((m) => !m)
                 }}
               >
-                {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                {isMuted ? <VolumeX size={16} className="text-white" /> : <Volume2 size={16} className="text-white" />}
               </button>
 
-              {/* bottom-left creator info */}
-              <div className="absolute bottom-3 left-3 right-14 sm:right-16 z-10">
+              {/* bottom-left creator info — overlays the video itself, stays fixed white */}
+              <div className="absolute bottom-3 left-3 right-14 sm:right-16 z-10 text-white">
                 <div className="flex items-center gap-2 flex-wrap">
                   <NavLink to={`/user/get-profile/${currentReel?.author?._id}`}>
                   <img
@@ -454,18 +436,18 @@ const ReelsPage = () => {
               </div>
             </div>
 
-            {/* right action rail */}
+            {/* right action rail — sits on page background on desktop, so it themes */}
             <div
               className="
                 flex flex-col items-center gap-4 sm:gap-5 pb-4 sm:pb-6
                 sm:static absolute bottom-16 right-2 sm:right-auto
-                bg-transparent 
+                bg-transparent text-[var(--text-primary)]
               "
             >
               <button className="flex flex-col items-center gap-1 cursor-pointer" onClick={triggerLike}>
                 <Heart
                   size={24}
-                  className={currentReel.isLiked ? 'text-red-500' : 'text-white'}
+                  className={currentReel.isLiked ? 'text-red-500' : ''}
                   fill={currentReel.isLiked ? 'currentColor' : 'none'}
                 />
                 <span className="text-[11px] sm:text-xs">{formatCount(currentReel.likesCount)}</span>
@@ -493,8 +475,7 @@ const ReelsPage = () => {
               <button className="cursor-pointer" onClick={triggerSave}>
                 <Bookmark
                   size={20}
-                  className="text-white"
-                  fill={currentReel.isSaved ? 'white' : 'none'}
+                  fill={currentReel.isSaved ? 'currentColor' : 'none'}
                 />
               </button>
 
