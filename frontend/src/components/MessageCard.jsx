@@ -38,7 +38,7 @@ const MessageCard = ({ ...props }) => {
 
   return (
     <Link to={`/user/messages/${props.conversation?._id}`}>
-      <div className="messageCard w-full h-[80px] sm:h-[85px] flex justify-center items-center rounded-xl hover:bg-[#25292e] cursor-pointer px-2">
+      <div className="messageCard w-full h-[80px] sm:h-[85px] flex justify-center items-center rounded-xl hover:bg-[var(--bg-row-hover)] cursor-pointer px-2">
 
         <div className="profilePicSection w-[20%] h-full flex justify-center items-center">
           <div className="profilePic relative w-[55px] h-[55px] sm:w-[70px] sm:h-[70px]">
@@ -51,27 +51,27 @@ const MessageCard = ({ ...props }) => {
             </div>
 
             {isOnline && (
-              <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-[#121212]" />
+              <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-[var(--bg-app)]" />
             )}
           </div>
         </div>
 
         <div className="messageDetails w-[80%] h-full">
-          <div className="fullname w-full h-[50%] flex justify-start items-end text-white text-[18px] md:text-[15px] lg:text-[18px]">
+          <div className="fullname w-full h-[50%] flex justify-start items-end text-[var(--text-primary)] text-[18px] md:text-[15px] lg:text-[18px]">
             <span className="ml-2">{friend?.fullname}</span>
           </div>
 
           <div className="lastMsg w-full h-[50%] flex justify-start items-start text-[14px] md:text-[12px] lg:text-[14px] mt-1">
             {unreadCount > 1 ? (
-              <span className="ml-2 text-white font-semibold">
+              <span className="ml-2 text-[var(--text-primary)] font-semibold">
                 {unreadCount > 9 ? "9+ new messages" : `${unreadCount} new messages`}
               </span>
             ) : (
               <>
-                <span className={`ml-2 ${unreadCount === 1 ? "text-white font-semibold" : "text-[#a2a3a3]"}`}>
+                <span className={`ml-2 ${unreadCount === 1 ? "text-[var(--text-primary)] font-semibold" : "text-[var(--text-muted)]"}`}>
                   {shortText}
                 </span>
-                <span className="ml-2 text-[#a2a3a3]">· {timeAgo}</span>
+                <span className="ml-2 text-[var(--text-muted)]">· {timeAgo}</span>
               </>
             )}
           </div>

@@ -195,15 +195,15 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
       onClick={onClose}
     >
       <div
-        className="ShareOverlay relative z-[100] w-[500px] h-[500px] rounded-[12px] overflow-hidden bg-[#212328] flex flex-col"
+        className="ShareOverlay relative z-[100] w-[500px] h-[500px] rounded-[12px] overflow-hidden bg-[var(--bg-surface)] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Heading */}
-        <div className="heading w-full h-[10%] shrink-0 relative flex justify-center items-center text-white font-semibold text-[16px] border-b border-[#363636]">
+        <div className="heading w-full h-[10%] shrink-0 relative flex justify-center items-center text-[var(--text-primary)] font-semibold text-[16px] border-b border-[var(--border-container)]">
           Share
           <button
             onClick={onClose}
-            className="absolute right-4 cursor-pointer text-white"
+            className="absolute right-4 cursor-pointer text-[var(--text-primary)]"
           >
             <X size={22} />
           </button>
@@ -211,7 +211,7 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
 
         {/* Preview of item being shared */}
         {previewThumbUrl && (
-          <div className="postPreview w-full h-[60px] shrink-0 flex items-center gap-3 px-4 border-b border-[#363636]">
+          <div className="postPreview w-full h-[60px] shrink-0 flex items-center gap-3 px-4 border-b border-[var(--border-container)]">
             <div
               className="w-[42px] h-[42px] rounded-md overflow-hidden shrink-0"
               style={shareType === 'story' ? { backgroundColor: item.bgColor || undefined } : undefined}
@@ -223,11 +223,11 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
               )}
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-white text-[13px] font-medium">
+              <span className="text-[var(--text-primary)] text-[13px] font-medium">
                 {shareType === 'story' ? `${item.author?.username}'s story` : item.author?.username}
               </span>
               {item.caption && (
-                <span className="text-[#AEB0B2] text-[12px] truncate max-w-[380px]">
+                <span className="text-[var(--text-muted)] text-[12px] truncate max-w-[380px]">
                   {item.caption}
                 </span>
               )}
@@ -244,7 +244,7 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
             placeholder="Search"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-[95%] h-[70%] rounded-md focus:outline-none bg-[#363636] px-2 text-[#AEB0B2] placeholder:text-[#4B4D4F]"
+            className="w-[95%] h-[70%] rounded-md focus:outline-none bg-[var(--bg-secondary-btn)] px-2 text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
           />
         </div>
 
@@ -255,15 +255,15 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
           className="listDiv w-full flex-1 overflow-y-auto px-3 py-3"
         >
           {isInitialLoading ? (
-            <div className="w-full h-full flex justify-center items-center text-[#AEB0B2] text-[14px]">
+            <div className="w-full h-full flex justify-center items-center text-[var(--text-muted)] text-[14px]">
               Loading...
             </div>
           ) : error ? (
-            <div className="w-full h-full flex justify-center items-center text-[#AEB0B2] text-[14px]">
+            <div className="w-full h-full flex justify-center items-center text-[var(--text-muted)] text-[14px]">
               {error}
             </div>
           ) : users.length === 0 ? (
-            <div className="w-full h-full flex justify-center items-center text-[#AEB0B2] text-[14px]">
+            <div className="w-full h-full flex justify-center items-center text-[var(--text-muted)] text-[14px]">
               No results found
             </div>
           ) : (
@@ -282,16 +282,16 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
                           src={user.profilePic || "/images/default-profile-pic.jpg"}
                           alt={user.username}
                           className={`w-[60px] h-[60px] rounded-full object-cover border-2 ${
-                            isSelected ? 'border-[#0095F6]' : 'border-[#363636]'
+                            isSelected ? 'border-[var(--brand-blue)]' : 'border-[var(--border-container)]'
                           }`}
                         />
                         {isSelected && (
-                          <div className="absolute bottom-0 right-0 bg-[#0095F6] rounded-full w-[18px] h-[18px] flex items-center justify-center border-2 border-[#212328]">
-                            <Check size={11} className="text-white" strokeWidth={3} />
+                          <div className="absolute bottom-0 right-0 bg-[var(--brand-blue)] rounded-full w-[18px] h-[18px] flex items-center justify-center border-2 border-[var(--bg-surface)]">
+                            <Check size={11} className="text-[var(--text-on-brand)]" strokeWidth={3} />
                           </div>
                         )}
                       </div>
-                      <span className="text-white text-[12px] truncate max-w-[70px] text-center">
+                      <span className="text-[var(--text-primary)] text-[12px] truncate max-w-[70px] text-center">
                         {user.username}
                       </span>
                     </div>
@@ -299,7 +299,7 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
                 })}
               </div>
               {isLoading && (
-                <div className="w-full h-[50px] flex justify-center items-center text-[#AEB0B2] text-[13px]">
+                <div className="w-full h-[50px] flex justify-center items-center text-[var(--text-muted)] text-[13px]">
                   Loading more...
                 </div>
               )}
@@ -309,11 +309,11 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
 
         {/* Send footer */}
         {selectedUsers.size > 0 && (
-          <div className="sendFooter w-full shrink-0 border-t border-[#363636] flex justify-center items-center py-2.5">
+          <div className="sendFooter w-full shrink-0 border-t border-[var(--border-container)] flex justify-center items-center py-2.5">
             <button
               onClick={handleSend}
               disabled={isSending}
-              className="w-[95%] py-2 rounded-md bg-[#0095F6] text-white text-[14px] font-semibold cursor-pointer hover:bg-[#1782d4] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+              className="w-[95%] py-2 rounded-md bg-[var(--brand-blue)] text-[var(--text-on-brand)] text-[14px] font-semibold cursor-pointer hover:bg-[var(--brand-blue-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
             >
               {isSending ? (
                 <>

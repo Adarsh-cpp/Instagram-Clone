@@ -1,6 +1,7 @@
 // Comment.jsx
 import React, { useState } from "react";
 import axios from "axios";
+import { toast } from "react-toastify";
 import { getTimeAgo } from "../utils/timeAgo";
 import { useAuth } from "../context/AuthContext";
 
@@ -21,7 +22,7 @@ const renderTextWithMention = (text = "") => {
   const rest = text.slice(match[0].length);
   return (
     <>
-      <span className="text-[#e0f2ff] font-medium">{mention}</span> {rest}
+      <span className="text-[var(--link-muted)] font-medium">{mention}</span> {rest}
     </>
   );
 };
@@ -33,6 +34,8 @@ const Comment = ({
   currentUserId,
   isReply = false,  // true when this Comment is being rendered inside a replies thread
   onReplyClick,     // only used when isReply — bubbles the reply target up to the top-level Comment
+  onDeleted,        // only used for top-level comments — tells CommentsOverlay to drop it from the list
+  onReplyDeleted,   // only used for replies — tells the parent Comment to drop it from its replies state
   // fallback props — used only for the post-caption pseudo-comment, which has no real Comment doc
   author,
   authorDP,
@@ -41,8 +44,8 @@ const Comment = ({
   verified,
 }) => {
 
-  const { user } = useAuth()
-  const isOwnComment = user?._id?.toString() === comment?.author?._id?.toString()
+  const { user, refreshUser } = useAuth();
+  const isOwnComment = user?._id?.toString() === comment?.author?._id?.toString();
 
   const isRealComment = Boolean(comment?._id);
 
@@ -67,7 +70,12 @@ const Comment = ({
   const [replyText, setReplyText] = useState("");
   const [posting, setPosting] = useState(false);
 
- const toggleLike = async () => {
+  // delete flow: 3-dot button -> tiny "Delete comment" popup -> confirm dialog
+  const [showMenu, setShowMenu] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const toggleLike = async () => {
     if (!isRealComment) return;
     try {
       const url = reelId
@@ -134,11 +142,38 @@ const Comment = ({
     } finally {
       setPosting(false);
     }
-};
+  };
+
+  const handleDeleteComment = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      const url = reelId
+        ? `${BASE_URL}/reels/${reelId}/comment/${comment._id}/delete`
+        : `${BASE_URL}/${postId}/comment/${comment._id}/delete`;
+
+      await axios.delete(url, authConfig());
+
+      if (isReply) {
+        onReplyDeleted?.(comment._id);
+      } else {
+        onDeleted?.(comment._id);
+      }
+
+      // keeps commentsCount in sync everywhere it's shown (feed, post detail, profile grid, etc.)
+      await refreshUser();
+    } catch (error) {
+      console.log(error);
+      toast.error("Couldn't delete comment, try again");
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
 
   return (
     <div className={isReply ? "flex flex-col ml-10 sm:ml-12 mt-2" : "flex flex-col"}>
-      <div className="flex gap-3 rounded-2xl px-2 py-3 sm:px-3 hover:bg-white/5 transition">
+      <div className="flex gap-3 rounded-2xl px-2 py-3 sm:px-3 hover:bg-[var(--bg-row-hover)] transition">
         <img
           src={displayDP}
           alt={displayAuthor}
@@ -149,7 +184,7 @@ const Comment = ({
 
         <div className="min-w-0 flex-1" onDoubleClick={handleDoubleClick}>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h4 className="text-sm sm:text-[15px] font-semibold text-white truncate">
+            <h4 className="text-sm sm:text-[15px] font-semibold text-[var(--text-primary)] truncate">
              {isOwnComment ? "You" : displayAuthor}
             </h4>
 
@@ -159,18 +194,18 @@ const Comment = ({
               </span>
             )}
 
-            <span className="text-[11px] sm:text-xs text-white/45">{commentTime}</span>
+            <span className="text-[11px] sm:text-xs text-[var(--text-muted)]">{commentTime}</span>
           </div>
 
-          <p className="mt-1 text-sm sm:text-[15px] leading-5 text-white/85 break-words">
+          <p className="mt-1 text-sm sm:text-[15px] leading-5 text-[var(--text-secondary)] break-words">
             {renderTextWithMention(displayText)}
           </p>
 
           {isRealComment && (
-            <div className="mt-2 flex items-center gap-4 text-xs sm:text-sm text-white/50">
+            <div className="mt-2 flex items-center gap-4 text-xs sm:text-sm text-[var(--text-muted)]">
               <button
                 onClick={isReply ? () => onReplyClick?.(displayAuthor) : openReplyBox}
-                className="hover:text-white transition cursor-pointer"
+                className="hover:text-[var(--text-primary)] transition cursor-pointer"
               >
                 Reply
               </button>
@@ -182,7 +217,7 @@ const Comment = ({
               {!isReply && replies.length > 0 && (
                 <button
                   onClick={() => setShowReplies((prev) => !prev)}
-                  className="hover:text-white transition cursor-pointer font-semibold"
+                  className="hover:text-[var(--text-primary)] transition cursor-pointer font-semibold"
                 >
                   {showReplies ? "Hide replies" : `Replies (${replies.length})`}
                 </button>
@@ -195,23 +230,87 @@ const Comment = ({
           <div className="shrink-0 relative flex flex-col items-center gap-1">
             <button
               onClick={toggleLike}
-              className="text-white/70 hover:text-white transition cursor-pointer px-1"
+              className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition cursor-pointer px-1"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill={isLiked ? "#ED4956" : "none"} stroke={isLiked ? "#ED4956" : "currentColor"} strokeWidth="2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill={isLiked ? "var(--color-danger)" : "none"} stroke={isLiked ? "var(--color-danger)" : "currentColor"} strokeWidth="2">
                 <path d="M12 21s-6.7-4.35-9.33-8.2C1.1 10.6 1.5 7.3 4.2 5.6c2.2-1.4 4.9-.8 6.4 1.1L12 8l1.4-1.3c1.5-1.9 4.2-2.5 6.4-1.1 2.7 1.7 3.1 5 1.53 7.2C18.7 16.65 12 21 12 21z" />
               </svg>
             </button>
 
             {showHeartPop && (
-              <span className="absolute -top-3 text-[#ED4956] text-lg animate-ping pointer-events-none">
+              <span className="absolute -top-3 text-[var(--color-danger)] text-lg animate-ping pointer-events-none">
                 ❤
               </span>
+            )}
+
+            {/* 3-dot menu — only the comment's own author sees this */}
+            {isOwnComment && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowMenu((prev) => !prev)}
+                  className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition cursor-pointer px-1 text-sm leading-none"
+                >
+                  ⋯
+                </button>
+
+                {showMenu && (
+                  <>
+                    {/* click-away layer */}
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowMenu(false)}
+                    />
+                    <div className="absolute right-0 top-full mt-1 z-50 w-32 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-surface)] shadow-lg py-1">
+                      <button
+                        onClick={() => {
+                          setShowMenu(false);
+                          setShowDeleteConfirm(true);
+                        }}
+                        className="w-full text-left px-3 py-1.5 text-xs sm:text-sm text-[var(--color-danger)] hover:bg-[var(--bg-row-hover)] transition cursor-pointer"
+                      >
+                        Delete comment
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </div>
         )}
       </div>
 
-      
+      {/* delete confirmation dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(0,0,0,0.6)] px-4">
+          <div className="w-full max-w-xs rounded-2xl bg-[var(--bg-surface)] shadow-2xl overflow-hidden">
+            <div className="px-5 py-5 text-center">
+              <h3 className="text-sm sm:text-base font-semibold text-[var(--text-primary)]">
+                Delete comment?
+              </h3>
+              <p className="mt-1 text-xs sm:text-sm text-[var(--text-muted)]">
+                This can't be undone. Are you sure?
+              </p>
+            </div>
+            <div className="border-t border-[var(--border-soft)] flex">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="flex-1 py-3 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-row-hover)] transition cursor-pointer disabled:opacity-50 border-r border-[var(--border-soft)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteComment}
+                disabled={deleting}
+                className="flex-1 py-3 text-sm font-semibold text-[var(--color-danger)] hover:bg-[var(--bg-row-hover)] transition cursor-pointer disabled:opacity-50"
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isRealComment && !isReply && showReplies && (
         <div className="flex flex-col">
           {replies.map((reply) => (
@@ -226,6 +325,9 @@ const Comment = ({
                 setReplyTarget({ username });
                 setShowReplies(true);
               }}
+              onReplyDeleted={(replyId) =>
+                setReplies((prev) => prev.filter((r) => r._id !== replyId))
+              }
             />
           ))}
 
@@ -238,12 +340,12 @@ const Comment = ({
                 if (e.key === "Enter" && !e.shiftKey) handlePostReply();
               }}
               placeholder={replyTarget ? `Reply to @${replyTarget.username}...` : "Write a reply..."}
-              className="flex-1 bg-transparent text-sm text-white outline-none border-b border-white/10 focus:border-white/30 py-1"
+              className="flex-1 bg-transparent text-sm text-[var(--text-primary)] outline-none border-b border-[var(--border-popup)] focus:border-[var(--border-input)] py-1"
             />
             <button
               onClick={handlePostReply}
               disabled={posting || !replyText.trim()}
-              className="text-xs font-semibold text-white/60 hover:text-white disabled:opacity-40 transition cursor-pointer"
+              className="text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-40 transition cursor-pointer"
             >
               Post
             </button>

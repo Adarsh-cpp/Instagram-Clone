@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
 import EmojiPicker from "emoji-picker-react";
-import { Play, ChevronLeft, ChevronRight } from "lucide-react";
+import { Play, ChevronLeft, ChevronRight, MapPin, UserPlus, X } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import LocationPicker from "../components/LocationPicker";
+import TagPeoplePicker from "../components/TagPeoplePicker";
 
 const CaptionSharePage = ({
-  images,       // File[]/Blob[] — image posts only
-  video,        // File — reels only
+  images,
+  video,
   mediaType,
   trimData,
   isPreTrimmed,
@@ -20,6 +22,11 @@ const CaptionSharePage = ({
   const [mediaUrls, setMediaUrls] = useState([]);
   const [activeSlide, setActiveSlide] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+
+  // location + tagging state
+  const [location, setLocation] = useState(null); // { name, lat, lng } | null
+  const [taggedUsers, setTaggedUsers] = useState([]); // array of { _id, username, profilePic }
+  const [activePanel, setActivePanel] = useState(null); // "location" | "tag" | null
 
   const captionRef = useRef(null);
   const pickerRef = useRef(null);
@@ -140,7 +147,7 @@ const CaptionSharePage = ({
             </div>
 
             <div
-              onClick={() => handlePost(caption)}
+              onClick={() => handlePost(caption, location, taggedUsers)}
               className="next text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] hover:underline cursor-pointer text-sm sm:text-base"
             >
               Share
@@ -235,8 +242,8 @@ const CaptionSharePage = ({
             </div>
 
             {/* Right */}
-            <div className="right relative w-full md:w-[50%] h-[60%] md:h-full">
-              <div className="accountDetails w-full h-[60px] flex justify-start items-center px-4">
+            <div className="right relative w-full md:w-[50%] h-[60%] md:h-full flex flex-col overflow-hidden">
+              <div className="accountDetails w-full h-[60px] flex-shrink-0 flex justify-start items-center px-4">
                 <div className="profilePicSection w-[40px] h-[40px] rounded-full overflow-hidden">
                   <img src={user?.profilePic ? user.profilePic : "/images/default-profile-pic.jpg"} alt="" />
                 </div>
@@ -245,7 +252,7 @@ const CaptionSharePage = ({
                 </div>
               </div>
 
-              <div className="caption w-full h-[calc(100%-110px)]">
+              <div className="caption w-full flex-1 min-h-[60px]">
                 <div className="captionSpace w-full h-full">
                   <textarea
                     ref={captionRef}
@@ -260,7 +267,63 @@ const CaptionSharePage = ({
                 </div>
               </div>
 
-              <div className="emojiSection relative w-full h-[50px] flex">
+              {/* Location + Tag People rows */}
+              <div className="detailsRow w-full flex-shrink-0 border-t border-[rgba(128,128,128,0.15)]">
+                <div
+                  onClick={() => setActivePanel("location")}
+                  className="flex items-center justify-between px-4 h-[46px] cursor-pointer hover:bg-[var(--bg-elevated)] transition-colors"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <MapPin size={18} className="text-[var(--text-primary)] shrink-0" />
+                    <span
+                      className={`text-sm truncate ${
+                        location ? "text-[var(--text-primary)]" : "text-[#8e8e8e]"
+                      }`}
+                    >
+                      {location ? location.name : "Add location"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {location && (
+                      <X
+                        size={14}
+                        className="text-[#8e8e8e] hover:text-[var(--text-primary)]"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLocation(null);
+                        }}
+                      />
+                    )}
+                    <ChevronRight size={16} className="text-[#8e8e8e]" />
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setActivePanel("tag")}
+                  className="flex items-center justify-between px-4 h-[46px] cursor-pointer hover:bg-[var(--bg-elevated)] transition-colors border-t border-[rgba(128,128,128,0.15)]"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <UserPlus size={18} className="text-[var(--text-primary)] shrink-0" />
+                    <span
+                      className={`text-sm truncate ${
+                        taggedUsers.length > 0 ? "text-[var(--text-primary)]" : "text-[#8e8e8e]"
+                      }`}
+                    >
+                      {taggedUsers.length > 0
+                        ? taggedUsers.map((u) => u.username).join(", ")
+                        : "Tag people"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {taggedUsers.length > 0 && (
+                      <span className="text-xs text-[#8e8e8e]">{taggedUsers.length}</span>
+                    )}
+                    <ChevronRight size={16} className="text-[#8e8e8e]" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="emojiSection relative w-full h-[50px] flex-shrink-0 flex">
                 <div className="emojiPart w-[50%] h-full flex justify-start items-center px-4">
                   <img
                     onClick={() => setShowPicker(!showPicker)}
@@ -283,6 +346,22 @@ const CaptionSharePage = ({
                   {caption.length}/2,200
                 </div>
               </div>
+
+              {/* Slide-over panels */}
+              {activePanel === "location" && (
+                <LocationPicker
+                  value={location}
+                  onChange={setLocation}
+                  onClose={() => setActivePanel(null)}
+                />
+              )}
+              {activePanel === "tag" && (
+                <TagPeoplePicker
+                  selected={taggedUsers}
+                  onChange={setTaggedUsers}
+                  onClose={() => setActivePanel(null)}
+                />
+              )}
 
               {isLoading && (
                 <div className="loadingSection absolute z-50 w-full h-full top-0">

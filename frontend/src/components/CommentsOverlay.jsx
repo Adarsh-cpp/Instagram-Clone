@@ -1,11 +1,13 @@
 // CommentsOverlay.jsx
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import Comment from "./Comment";
 import ShareOverlay from "./ShareOverlay";
 import { MessageCircle, Send, Smile, ChevronLeft, ChevronRight, X } from "lucide-react";
 import EmojiPicker from "emoji-picker-react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { NavLink } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -27,6 +29,7 @@ const CommentsOverlay = ({
 }) => {
 
   const { user, refreshUser } = useAuth();
+  const { theme } = useTheme();
 
   // works for either a post or a reel — only one of the two props is ever passed in
   const isReel = Boolean(reel);
@@ -193,21 +196,21 @@ const CommentsOverlay = ({
     }
   };
 
-  return (
+  const overlay = (
     <div className="fixed inset-0 z-50 p-2 sm:p-4 md:p-6 overflow-y-auto flex justify-center items-center bg-[rgba(0,0,0,0.8)]">
 
       <div onClick={onClose} className="cmntsClose w-[40px] h-[40px] absolute right-[10px] top-[10px]">
         <X className="w-[98%] h-[98%] text-white hover:w-full hover:h-full ease-in-out transition-all cursor-pointer"/>
       </div>
 
-      <div className="mx-auto flex h-[92vh] w-full max-w-7xl overflow-hidden rounded-2xl bg-[#212328] shadow-2xl flex-col lg:flex-row">
+      <div className="mx-auto flex h-[92vh] w-[90vw] overflow-hidden rounded-2xl bg-[var(--bg-surface)] shadow-2xl flex-col lg:flex-row">
 
         {/* Left — media */}
         <div
           onDoubleClick={doubleClickToLike}
           onTouchStart={isCarousel ? handleTouchStart : undefined}
           onTouchEnd={isCarousel ? handleTouchEnd : undefined}
-          className="relative w-full flex justify-center items-center lg:w-1/2 bg-black overflow-hidden select-none"
+          className="relative w-full h-[45vh] lg:h-full shrink-0 flex justify-center items-center lg:w-1/2 bg-black overflow-hidden select-none"
         >
           <div
             ref={animatedLikeRef}
@@ -232,7 +235,7 @@ const CommentsOverlay = ({
           ) : mediaList[activeSlide]?.mediaType === "video" ? (
             <video
               src={mediaList[activeSlide]?.url}
-              className="w-full object-cover aspect-auto select-none"
+              className="max-w-full max-h-full w-auto h-auto object-contain select-none"
               controls
               muted
               loop
@@ -243,7 +246,7 @@ const CommentsOverlay = ({
               src={mediaList[activeSlide]?.url}
               alt="Post"
               draggable="false"
-              className="w-full object-cover aspect-auto select-none"
+              className="max-w-full max-h-full w-auto h-auto object-contain select-none"
             />
           )}
 
@@ -283,10 +286,10 @@ const CommentsOverlay = ({
         </div>
 
         {/* Right — comments */}
-        <div className="flex w-full lg:w-1/2 flex-col border-t border-white/10 lg:border-t-0 lg:border-l border-l-0 min-h-0">
+        <div className="flex w-full lg:w-1/2 flex-col border-t border-[var(--border-soft)] lg:border-t-0 lg:border-l border-l-0 min-h-0 flex-1">
 
           {/* Author header */}
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-5 sm:py-4">
+          <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-4 py-3 sm:px-5 sm:py-4">
             <div className="flex items-center gap-3 min-w-0">
               <img
                 src={item.author.profilePic ? item.author.profilePic :"/images/default-profile-pic.jpg"}
@@ -296,24 +299,26 @@ const CommentsOverlay = ({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                  <NavLink to={profileURL}>
-                  <h3 className="truncate text-sm sm:text-base font-semibold text-white">
+                  <h3 className="truncate text-sm sm:text-base font-semibold text-[var(--text-primary)]">
                     {authorName}
                   </h3>
                   </NavLink> 
                   {item.author.username !== user?.username && (
-                    <span className="text-[#85a1ff] hover:text-[#a3bcff] cursor-pointer text-xs sm:text-sm">
+                    <span className="text-[var(--link-muted)] hover:text-[var(--link-muted-hover)] cursor-pointer text-xs sm:text-sm">
                       Follow
                     </span>
                   )}
                 </div>
-                <p className="text-xs sm:text-sm text-white/50">Odisha, India</p>
+                <p className="text-xs sm:text-sm text-[var(--text-muted)]">
+                  {!isReel ? item.location?.name || "India" : "India"}
+                </p>
               </div>
             </div>
-            <button className="text-white/70 hover:text-white transition px-2">⋯</button>
+            <button className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition px-2">⋯</button>
           </div>
 
-          {/* Comments list */}
-          <div className="flex-1 overflow-y-auto px-3 py-2 sm:px-4 hide-scrollbar">
+                   {/* Comments list */}
+          <div className="flex-1 overflow-y-auto px-3 py-2 sm:px-4 hide-scrollbar min-h-0">
             <Comment
               author={authorName}
               authorDP={item.author.profilePic}
@@ -327,13 +332,16 @@ const CommentsOverlay = ({
                 postId={isReel ? undefined : item._id}
                 reelId={isReel ? item._id : undefined}
                 currentUserId={user?._id}
+                onDeleted={(id) =>
+                  setFetchedComments((prev) => prev.filter((fc) => fc._id !== id))
+                }
               />
             ))}
           </div>
 
           {/* Action icons */}
-          <div className="flex items-center justify-between border-t border-white/10 px-4 py-3 sm:px-5">
-            <div className="flex items-center gap-4 text-white">
+          <div className="flex items-center justify-between border-t border-[var(--border-soft)] px-4 py-3 sm:px-5">
+            <div className="flex items-center gap-4 text-[var(--text-primary)]">
               <img
                 src={isLiked ? "/images/redlike-icon.png" : "/images/postlike-icon.png"}
                 alt=""
@@ -361,17 +369,17 @@ const CommentsOverlay = ({
           </div>
 
           {/* Likes count */}
-          <div className="px-4 pb-2 sm:px-5 text-sm font-semibold text-white">
+          <div className="px-4 pb-2 sm:px-5 text-sm font-semibold text-[var(--text-primary)]">
             {likesCount} likes
           </div>
 
           {/* Comment input */}
-          <div className="flex items-center gap-3 border-t border-white/10 px-4 py-3 sm:px-5">
+          <div className="flex items-center gap-3 border-t border-[var(--border-soft)] px-4 py-3 sm:px-5">
             <button
               onClick={() => setShowPicker((prev) => !prev)}
               className="shrink-0 cursor-pointer"
             >
-              <Smile size={20} className="text-white/60 hover:text-white" />
+              <Smile size={20} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]" />
             </button>
 
             <div className="relative w-full flex items-center gap-3 px-4 py-3 sm:px-5">
@@ -383,18 +391,18 @@ const CommentsOverlay = ({
                   if (e.key === "Enter" && !e.shiftKey) handlePostComment();
                 }}
                 placeholder="Add a comment..."
-                className="w-full bg-transparent text-white outline-none"
+                className="w-full bg-transparent text-[var(--text-primary)] outline-none"
               />
               {showPicker && (
                 <div className="absolute bottom-14 left-0 z-50">
-                  <EmojiPicker theme="dark" onEmojiClick={handleEmojiClick} />
+                  <EmojiPicker theme={theme} onEmojiClick={handleEmojiClick} />
                 </div>
               )}
             </div>
 
             <button
               onClick={handlePostComment}
-              className="text-sm sm:text-base font-semibold text-white/60 hover:text-white transition cursor-pointer"
+              className="text-sm sm:text-base font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition cursor-pointer"
             >
               Post
             </button>
@@ -412,6 +420,8 @@ const CommentsOverlay = ({
       )}
     </div>
   );
+
+  return createPortal(overlay, document.body);
 };
 
 export default CommentsOverlay;

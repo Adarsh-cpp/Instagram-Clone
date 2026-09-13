@@ -11,11 +11,11 @@ function CreatePostPage() {
   const [step, setStep] = useState(1);
 
   const [mediaType, setMediaType] = useState(null);
-  const [originalMedia, setOriginalMedia] = useState(null); // File (video) OR File[] (images)
+  const [originalMedia, setOriginalMedia] = useState(null);
   const { user } = useAuth();
   const { startUpload } = useUpload();
 
-  const [editedImages, setEditedImages] = useState([]); // cropped image files, array
+  const [editedImages, setEditedImages] = useState([]);
   const [aspectRatio, setAspectRatio] = useState("1:1");
 
   const [trimmedMedia, setTrimmedMedia] = useState(null);
@@ -23,7 +23,7 @@ function CreatePostPage() {
 
   const navigate = useNavigate();
 
-  const handlePost = (caption) => {
+  const handlePost = (caption, location, taggedUsers) => {
     const isVideo = mediaType === "video";
     const token = localStorage.getItem("authToken");
 
@@ -40,6 +40,14 @@ function CreatePostPage() {
       }
       formData.append("caption", caption);
       formData.append("ratio", aspectRatio);
+
+      if (location) {
+        formData.append("location", JSON.stringify(location));
+      }
+      if (taggedUsers && taggedUsers.length > 0) {
+        formData.append("taggedUsers", JSON.stringify(taggedUsers.map((u) => u._id)));
+      }
+
       return formData;
     };
 

@@ -18,6 +18,8 @@ const actionText = (n) => {
       return `liked your comment: "${truncate(n.commentText)}"`;
     case "reply":
       return `replied "${truncate(n.commentText)}" to your comment "${truncate(n.parentCommentText)}"`;
+    case "tag":
+      return n.reel ? "tagged you in a reel" : "tagged you in a post";
     default:
       return "sent you a notification";
   }

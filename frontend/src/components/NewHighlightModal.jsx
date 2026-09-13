@@ -31,12 +31,12 @@ const NewHighlightModal = ({ onClose, onCreated }) => {
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center" onClick={onClose}>
       <div
-        className="bg-[#161616] w-[90%] max-w-sm rounded-2xl p-5 border border-white/10"
+        className="bg-[var(--bg-panel)] w-[90%] max-w-sm rounded-2xl p-5 border border-[var(--border-popup)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-white text-base font-semibold">New highlight</h3>
-          <button onClick={onClose} className="text-white/60 hover:text-white">
+          <h3 className="text-[var(--text-primary)] text-base font-semibold">New highlight</h3>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]">
             <X size={18} />
           </button>
         </div>
@@ -48,14 +48,14 @@ const NewHighlightModal = ({ onClose, onCreated }) => {
           maxLength={20}
           placeholder="Highlight name"
           onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-          className="w-full bg-[#0c1014] border border-white/15 rounded-xl px-4 py-2.5 text-white text-sm placeholder-white/40 focus:outline-none focus:border-[#4a5df9]"
+          className="w-full bg-[var(--bg-input)] border border-[var(--border-input)] rounded-xl px-4 py-2.5 text-[var(--text-input)] text-sm placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-indigo)]"
         />
-        <div className="text-white/30 text-[11px] mt-1 text-right">{title.length}/20</div>
+        <div className="text-[var(--text-muted)] text-[11px] mt-1 text-right">{title.length}/20</div>
 
         <button
           onClick={handleCreate}
           disabled={saving}
-          className="w-full mt-3 bg-[#4a5df9] hover:bg-[#4150f7] disabled:opacity-50 text-white text-sm font-bold py-2.5 rounded-xl"
+          className="w-full mt-3 bg-[var(--accent-indigo)] hover:bg-[var(--accent-indigo-hover)] disabled:opacity-50 text-[var(--text-on-brand)] text-sm font-bold py-2.5 rounded-xl"
         >
           {saving ? "Creating..." : "Create"}
         </button>

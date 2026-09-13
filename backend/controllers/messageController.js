@@ -68,15 +68,20 @@ const buildLastMessagePreview = (msg) => {
   };
 };
 
+// GET /message/:conversationId?limit=30&cursor=<base64>
+// Cursor-based, newest-messages-first pagination. Without a cursor, returns
+// the most recent `limit` messages. With a cursor (the oldest message
+// currently loaded on the client), returns the next `limit` messages older
+// than that. Response is always in chronological (ascending) order so the
+// client can append/prepend directly without re-sorting.
 export const getMessages = async (req, res) => {
 
   try {
 
     const userId = req.user._id
     const conversationId = req.params.conversationId;
-
-    console.log(userId, conversationId)
-
+    const limit = Math.min(parseInt(req.query.limit, 10) || 30, 50);
+    const cursor = req.query.cursor;
 
     if (!conversationId) {
       return res.status(400).json({
@@ -85,17 +90,53 @@ export const getMessages = async (req, res) => {
       });
     }
 
-    const messages = await messageModel
-      .find({ conversationId })
-      .sort({ createdAt: 1 })
+    const matchStage = { conversationId };
+
+    if (cursor) {
+      let decoded;
+      try {
+        decoded = JSON.parse(Buffer.from(cursor, "base64").toString("utf-8"));
+      } catch {
+        return res.status(400).json({ success: false, message: "Invalid cursor" });
+      }
+
+      const cursorDate = new Date(decoded.createdAt);
+      // keyset pagination: strictly older than the cursor message,
+      // with an _id tiebreaker for messages sharing the same createdAt millisecond
+      matchStage.$or = [
+        { createdAt: { $lt: cursorDate } },
+        { createdAt: cursorDate, _id: { $lt: decoded._id } },
+      ];
+    }
+
+    // fetch newest-first so LIMIT gets the relevant page, then reverse below
+    const docs = await messageModel
+      .find(matchStage)
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(limit + 1) // one extra to know if there's an older page left
       .populate("senderId", "fullname username profilePic")
       .populate("receiverId", "fullname username profilePic")
       .populate(SHARED_MEDIA_POPULATE);
+
+    const hasMore = docs.length > limit;
+    const page = hasMore ? docs.slice(0, limit) : docs;
+
+    let nextCursor = null;
+    if (hasMore && page.length > 0) {
+      const oldest = page[page.length - 1];
+      nextCursor = Buffer.from(
+        JSON.stringify({ createdAt: oldest.createdAt, _id: oldest._id })
+      ).toString("base64");
+    }
+
+    const messages = page.reverse(); // chronological ascending for rendering
 
     return res.status(200).json({
       success: true,
       message: "Messages fetched successfully",
       messages,
+      nextCursor,
+      hasMore,
     });
 
   } catch (error) {

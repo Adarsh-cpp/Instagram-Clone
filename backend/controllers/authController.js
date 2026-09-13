@@ -414,21 +414,17 @@ export const getFollowers = async (req, res) => {
       });
     }
 
-    // slice the raw id array first, so we only populate the page we need
     const pageIds = targetUser.followers.slice(skip, skip + limit);
 
     const populatedUsers = await userModel
       .find({ _id: { $in: pageIds } })
-      .select("username profilePic fullName");
+      .select("username profilePic fullname");
 
-    // preserve original order (Mongo's $in does not guarantee order)
     const orderedUsers = pageIds
       .map((id) => populatedUsers.find((u) => u._id.toString() === id.toString()))
       .filter(Boolean);
 
-    // figure out which of these the CURRENT logged-in user already follows,
-    // so the Follow/Unfollow button in the overlay renders correctly
-    const currentUser = await userModel.findById(req.user._id).select("followings");
+    const currentUser = await userModel.findById(req.user._id).select("following");
     const currentUserFollowingSet = new Set(
       (currentUser?.following || []).map((id) => id.toString())
     );
@@ -460,7 +456,7 @@ export const getFollowings = async (req, res) => {
     const skip = parseInt(req.query.skip) || 0;
     const limit = parseInt(req.query.limit) || 10;
 
-    const targetUser = await userModel.findById(targetUserId).select("followings");
+    const targetUser = await userModel.findById(targetUserId).select("following");
 
     if (!targetUser) {
       return res.status(404).json({
@@ -473,18 +469,18 @@ export const getFollowings = async (req, res) => {
 
     const populatedUsers = await userModel
       .find({ _id: { $in: pageIds } })
-      .select("username profilePic fullName");
+      .select("username profilePic fullname");
 
     const orderedUsers = pageIds
       .map((id) => populatedUsers.find((u) => u._id.toString() === id.toString()))
       .filter(Boolean);
 
-    const currentUser = await userModel.findById(req.user._id).select("followings");
+    const currentUser = await userModel.findById(req.user._id).select("following");
     const currentUserFollowingSet = new Set(
       (currentUser?.following || []).map((id) => id.toString())
     );
 
-    const followings = orderedUsers.map((u) => ({
+    const following = orderedUsers.map((u) => ({
       _id: u._id,
       username: u.username,
       profilePic: u.profilePic,
@@ -493,7 +489,7 @@ export const getFollowings = async (req, res) => {
     }));
 
     return res.status(200).json({
-      followings,
+      following,
       hasMore: skip + limit < targetUser.following.length,
     });
   } catch (error) {
@@ -504,4 +500,3 @@ export const getFollowings = async (req, res) => {
     });
   }
 };
-

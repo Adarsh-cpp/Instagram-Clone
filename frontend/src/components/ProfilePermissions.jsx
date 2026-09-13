@@ -15,8 +15,8 @@ import {
 
 const ProfilePermissions = () => {
   return (
-      <div className="profilePermissions hidden w-[35%] lg:w-[25%] h-full border border-r-[#2b3036] bg-[#0c1014] overflow-y-auto md:block ">
-        <div className="heading w-[100%] h-[15%] flex justify-center items-center text-[20px] text-white font-bold">
+      <div className="profilePermissions hidden w-[35%] lg:w-[25%] h-full border border-r-[var(--border-soft)] bg-[var(--bg-app)] overflow-y-auto md:block ">
+        <div className="heading w-[100%] h-[15%] flex justify-center items-center text-[20px] text-[var(--text-primary)] font-bold">
             Settings
           </div>
         <ProfileSettingsCard icon={<EditProfileIcon />} iconName={"Edit Profile"} />

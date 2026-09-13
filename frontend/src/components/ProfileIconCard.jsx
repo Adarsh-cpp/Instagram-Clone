@@ -28,8 +28,8 @@ const ProfileIconCard = ({ imgSrc, iconName, isActive, badgeCount = 0 }) => {
 
   return (
     <div
-      className={`iconcard w-full h-[60px] p-6 flex justify-start items-center text-white text-[18px] rounded-lg cursor-pointer transition-colors ${
-        isActive ? "bg-[#25282c] font-bold" : "hover:bg-[#25282c] font-normal"
+      className={`iconcard w-full h-[60px] p-6 flex justify-start items-center text-[var(--text-primary)] text-[18px] rounded-lg cursor-pointer transition-colors ${
+        isActive ? "bg-[var(--bg-row-hover)] font-bold" : "hover:bg-[var(--bg-row-hover)] font-normal"
       }`}
     >
       <div className="relative shrink-0 rounded-full overflow-hidden w-[40px] h-[40px] flex items-center justify-center">
@@ -39,7 +39,7 @@ const ProfileIconCard = ({ imgSrc, iconName, isActive, badgeCount = 0 }) => {
           IconComponent && <IconComponent active={isActive} />
         )}
         {badgeCount > 0 && (
-          <span className="absolute top-[3px] right-[3px] min-w-[16px] h-[16px] px-[3px] rounded-full bg-[#ED4956] text-white text-[10px] font-bold flex items-center justify-center leading-none">
+          <span className="absolute top-[3px] right-[3px] min-w-[16px] h-[16px] px-[3px] rounded-full bg-[var(--color-danger)] text-[var(--text-on-brand)] text-[10px] font-bold flex items-center justify-center leading-none">
             {badgeCount > 99 ? "99+" : badgeCount}
           </span>
         )}

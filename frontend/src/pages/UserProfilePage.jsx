@@ -245,7 +245,7 @@ const UserProfilePage = () => {
   }, []);
 
   return (
-    <div className="UserProfilePage w-[100vw] h-[100vh] flex justify-between items-center bg-[#0c1014]">
+    <div className="UserProfilePage w-[100vw] h-[100vh] flex justify-between items-center bg-[var(--bg-app)]">
 
       <IconSidebar />
 
@@ -305,7 +305,7 @@ const UserProfilePage = () => {
                     </div>
                     <div className="profileDetails w-[300px] sm:w-[70%] h-full ">
                         <div className="nameSection w-full h-[50%] md:h-[25%] flex flex-col md:flex-row justify-center items-start md:items-center  ">
-                           <div className="name w-[70%] h-[50%] md:h-full px-2 sm:px-6 flex items-center text-white text-[16px] sm:text-[20px] font-bold ">{user.username}</div>
+                           <div className="name w-[70%] h-[50%] md:h-full px-2 sm:px-6 flex items-center text-[var(--text-primary)] text-[16px] sm:text-[20px] font-bold ">{user.username}</div>
 
                            <div className="buttons  h-[50%] md:w-[60%] md:h-full flex justify-start items-center ">
                             {/* Edit Button */}
@@ -314,7 +314,7 @@ const UserProfilePage = () => {
                                   isOwnProfile ? "flex" : "hidden"
                                 }`}
                               >
-                            <Link to="/user/edit-profile"><button className='w-[100px] sm:w-[150px] h-[40px] bg-[#25292e] hover:bg-[#363c44] cursor-pointer text-white text-[14px] sm:text-[16px] font-bold rounded-xl'>Edit Profile</button></Link>
+                            <Link to="/user/edit-profile"><button className='w-[100px] sm:w-[150px] h-[40px] bg-[var(--bg-elevated)] hover:bg-[var(--bg-menu-hover)] cursor-pointer text-[var(--text-primary)] text-[14px] sm:text-[16px] font-bold rounded-xl'>Edit Profile</button></Link>
                            </div>
 
                            {/* Follow Button */}
@@ -324,10 +324,10 @@ const UserProfilePage = () => {
                                 <div className="followbtn w-[50%] h-full flex justify-center items-center">
                                    <button
                                     onClick={handleFollowToggle}
-                                    className={`w-[100px] sm:w-[150px] h-[40px]  cursor-pointer text-white text-[14px] sm:text-[16px] font-bold rounded-xl ${
+                                    className={`w-[100px] sm:w-[150px] h-[40px]  cursor-pointer text-[var(--text-on-brand)] text-[14px] sm:text-[16px] font-bold rounded-xl ${
                                     isFollowing
-                                        ? "bg-[#363636] hover:bg-[#4a4a4a]"
-                                        : "bg-[#4a5df9] hover:bg-[#4150f7]"
+                                        ? "bg-[var(--bg-secondary-btn)] hover:bg-[var(--bg-secondary-btn-hover)]"
+                                        : "bg-[var(--accent-indigo)] hover:bg-[var(--accent-indigo-hover)]"
                                     }`}
                                 >
                                     {isFollowing ? "Unfollow" : "Follow"}
@@ -336,7 +336,7 @@ const UserProfilePage = () => {
 
                                 {/* Message Button */}
                                 <div className="msgbtn w-[50%] h-full flex justify-center items-center">
-                                  <button onClick={handleMessage} className="w-[100px] sm:w-[150px] h-[40px] bg-[#25292e] hover:bg-[#363C34] cursor-pointer text-white text-[14px] sm:text-[16px] font-bold rounded-xl ml-4">
+                                  <button onClick={handleMessage} className="w-[100px] sm:w-[150px] h-[40px] bg-[var(--bg-elevated)] hover:bg-[var(--bg-menu-hover)] cursor-pointer text-[var(--text-primary)] text-[14px] sm:text-[16px] font-bold rounded-xl ml-4">
                                     Message
                                   </button>
                                 </div>
@@ -348,9 +348,9 @@ const UserProfilePage = () => {
                            
                         </div>
                         <div className="postCount w-full md:w-[80%] h-[20%] flex justify-center items-center ">
-                            <div className="posts w-[26%] sm:w-[30%] h-full px-2 sm:px-6 flex justify-start items-center text-[#A8A8A8] sm:text-[20px] text-[12px] "><span className='text-white'>{user.postsCount}</span>&nbsp;posts</div>
-                            <div onClick={() => openFollowOverlay("followers")} className="fllwers w-[37%] sm:w-[35%] h-full px-2 sm:px-6 flex justify-start items-center text-[#A8A8A8] sm:text-[20px] text-[12px] cursor-pointer "><span className='text-white'>{followers}</span>&nbsp;followers</div>
-                            <div onClick={() => openFollowOverlay("following")} className="fllwing w-[37%] sm:w-[35%] h-full px-2 sm:px-6 flex justify-start items-center text-[#A8A8A8] sm:text-[20px] text-[12px] cursor-pointer "><span className='text-white'>{user.following?.length}</span>&nbsp;following</div>
+                            <div className="posts w-[26%] sm:w-[30%] h-full px-2 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[12px] "><span className='text-[var(--text-primary)]'>{user.postsCount}</span>&nbsp;posts</div>
+                            <div onClick={() => openFollowOverlay("followers")} className="fllwers w-[37%] sm:w-[35%] h-full px-2 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[12px] cursor-pointer "><span className='text-[var(--text-primary)]'>{followers}</span>&nbsp;followers</div>
+                            <div onClick={() => openFollowOverlay("following")} className="fllwing w-[37%] sm:w-[35%] h-full px-2 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[12px] cursor-pointer "><span className='text-[var(--text-primary)]'>{user.following?.length}</span>&nbsp;following</div>
                         </div>
                         <BioCard bioText={user.bio || ""} />
                     </div>
@@ -367,10 +367,10 @@ const UserProfilePage = () => {
                             onClick={() => setShowNewHighlightModal(true)}
                             className="newHighlightsection h-full w-[100px] flex flex-col justify-center sm:justify-start items-center cursor-pointer"
                           >
-                             <div className="newHighLightCircle w-[70px] h-[70px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-full object-fit object-center border-[4px] border-[#363636] overflow-hidden flex justify-center items-center bg-[#121212]">
+                             <div className="newHighLightCircle w-[70px] h-[70px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-full object-fit object-center border-[4px] border-[var(--border-container)] overflow-hidden flex justify-center items-center bg-[var(--bg-input)]">
                                <img src="/images/plus-icon.png" alt="" draggable="false" className='w-[60%] h-[60%] select-none' />
                             </div>
-                            <div className="newtext text-white text-[12px]">New</div>
+                            <div className="newtext text-[var(--text-primary)] text-[12px]">New</div>
                            </div>
                         )}
                         {highlights.map((h) => (
@@ -414,8 +414,8 @@ const UserProfilePage = () => {
               ) : (
                 <div className="w-full min-h-[44%] flex flex-col justify-center items-center gap-3">
                  
-                  <h2 className="text-white text-2xl font-bold">No Posts Yet</h2>
-                  <p className="text-[#A8A8A8] text-sm">
+                  <h2 className="text-[var(--text-primary)] text-2xl font-bold">No Posts Yet</h2>
+                  <p className="text-[var(--text-muted)] text-sm">
                     When posts are shared, they'll appear here.
                   </p>
                 </div>
@@ -441,8 +441,8 @@ const UserProfilePage = () => {
               ) : (
                 <div className="w-full min-h-[44%] flex flex-col justify-center items-center gap-3">
                  
-                  <h2 className="text-white text-2xl font-bold">No Reels Yet</h2>
-                  <p className="text-[#A8A8A8] text-sm">
+                  <h2 className="text-[var(--text-primary)] text-2xl font-bold">No Reels Yet</h2>
+                  <p className="text-[var(--text-muted)] text-sm">
                     When reels are posted, they'll appear here.
                   </p>
                 </div>
@@ -457,8 +457,8 @@ const UserProfilePage = () => {
         {activeTab === "Saved" && isOwnProfile && (
           <>
             <div className="savedSectionHeader w-full h-[50px] flex justify-between items-center p-4">
-              <div className="msg text-[12px] text-[#A3A3A3]">Only you can see what you've saved</div>
-              {/* <button className="newCollection text-[14px] text-[#85a1ff] hover:text-[#a3bcff] cursor-pointer ">+ New collection</button> */}
+              <div className="msg text-[12px] text-[var(--text-muted)]">Only you can see what you've saved</div>
+              {/* <button className="newCollection text-[14px] text-[var(--link-muted)] hover:text-[var(--link-muted-hover)] cursor-pointer ">+ New collection</button> */}
             </div>
 
             {savedItems.length > 0 ? (
@@ -475,8 +475,8 @@ const UserProfilePage = () => {
               </div>
             ) : (
               <div className="w-full min-h-[44%] flex flex-col justify-center items-center gap-3">
-                <h2 className="text-white text-2xl font-bold">No Saved Posts Yet</h2>
-                <p className="text-[#A8A8A8] text-sm">
+                <h2 className="text-[var(--text-primary)] text-2xl font-bold">No Saved Posts Yet</h2>
+                <p className="text-[var(--text-muted)] text-sm">
                   When posts are saved, they'll appear here.
                 </p>
               </div>

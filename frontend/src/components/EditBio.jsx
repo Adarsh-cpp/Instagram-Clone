@@ -18,15 +18,15 @@ const EditBio = () => {
     })}
     defaultValue="I freeze moments, stealing them from time" // <-- previous bio pre-filled
     rows={3}
-    className={`w-full h-full bg-[#121212] text-[12px] resize-none outline-none placeholder-[#A8A8A8] text-[#F5F5F5] rounded-[5px] p-2 ${
+    className={`w-full h-full bg-[var(--bg-input)] text-[12px] resize-none outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px] p-2 ${
       errors.bio
-        ? "border border-[#FF3040]"
-        : "border border-[#555555]"
+        ? "border border-[var(--color-error)]"
+        : "border border-[var(--border-input)]"
     }`}
     placeholder="Write something about yourself..."
   />
   {errors.bio && (
-    <p className="text-[#FF3040] text-sm mt-1">
+    <p className="text-[var(--color-error)] text-sm mt-1">
       {errors.bio.message}
     </p>
   )}

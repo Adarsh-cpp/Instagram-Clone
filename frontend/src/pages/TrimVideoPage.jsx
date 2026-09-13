@@ -109,10 +109,10 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
   };
 
   return (
-    <div className="w-[100vw] h-[100vh] flex justify-center items-center bg-[#0c1014]">
+    <div className="w-[100vw] h-[100vh] flex justify-center items-center bg-[var(--bg-app)]">
       <div className="cropContainerOverlay w-full h-full flex justify-center items-center bg-[rgba(0,0,0,0)] px-2 sm:px-4">
-        <div className="cropContainer relative w-full max-w-[500px] md:w-[70%] lg:w-[50%] xl:w-[35%] h-[80%] rounded-2xl bg-[#212328] overflow-hidden flex flex-col">
-          <div className="header w-full h-[40px] px-3 sm:px-4 flex justify-between items-center bg-[rgb(12,16,20)] shrink-0">
+        <div className="cropContainer relative w-full max-w-[500px] md:w-[70%] lg:w-[50%] xl:w-[35%] h-[80%] rounded-2xl bg-[var(--bg-surface)] overflow-hidden flex flex-col">
+          <div className="header w-full h-[40px] px-3 sm:px-4 flex justify-between items-center bg-[var(--bg-app)] shrink-0">
             <div onClick={back} className="back cursor-pointer">
               <img
                 src="/images/arrow-back-icon.png"
@@ -120,15 +120,15 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
                 alt="Back"
               />
             </div>
-            <div className="heading text-white text-[16px] sm:text-[18px] font-semibold">
+            <div className="heading text-[var(--text-primary)] text-[16px] sm:text-[18px] font-semibold">
               Trim
             </div>
             <div
               onClick={isProcessing ? undefined : handleNext}
               className={`next text-sm sm:text-base ${
                 isProcessing
-                  ? "text-neutral-500 cursor-not-allowed"
-                  : "text-[rgb(53,121,234)] hover:text-[rgb(20,100,255)] hover:underline cursor-pointer"
+                  ? "text-[var(--text-muted)] cursor-not-allowed"
+                  : "text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] hover:underline cursor-pointer"
               }`}
             >
               {isProcessing ? "Processing..." : "Next"}
@@ -137,7 +137,7 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
 
           <hr />
 
-          <div className="relative w-full flex-1 min-h-0 bg-black flex items-center justify-center overflow-hidden">
+          <div className="relative w-full flex-1 min-h-0 bg-[var(--bg-elevated)] flex items-center justify-center overflow-hidden">
             {videoUrl && (
               <div className="relative w-full h-full flex items-center justify-center">
                 <video
@@ -174,8 +174,8 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
                 {isProcessing && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 via-red-500 to-yellow-500 animate-spin p-[3px]">
-                      <div className="w-full h-full relative bg-[#141518] rounded-full">
-                        <div className="block absolute top-[-7px] w-[20px] h-[20px] rounded-full bg-[#141518]"></div>
+                      <div className="w-full h-full relative bg-[var(--bg-loading)] rounded-full">
+                        <div className="block absolute top-[-7px] w-[20px] h-[20px] rounded-full bg-[var(--bg-loading)]"></div>
                       </div>
                     </div>
                   </div>
@@ -184,15 +184,15 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
             )}
           </div>
 
-          <div className="w-full flex justify-center gap-2 py-2 bg-[#181a1e] shrink-0">
+          <div className="w-full flex justify-center gap-2 py-2 bg-[var(--bg-panel)] shrink-0">
             {ASPECT_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => setSelectedAspect(opt)}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium ${
                   selectedAspect.value === opt.value
-                    ? "bg-[#4a5df9] text-white"
-                    : "bg-[#2a2d32] text-neutral-300"
+                    ? "bg-[var(--accent-indigo)] text-[var(--text-on-brand)]"
+                    : "bg-[var(--bg-menu)] text-[var(--text-secondary)]"
                 }`}
               >
                 {opt.label}
@@ -200,12 +200,12 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
             ))}
           </div>
 
-          <div className="w-full px-4 py-3 bg-[#181a1e] shrink-0">
-            <div className="flex justify-between text-xs text-neutral-300 mb-1">
+          <div className="w-full px-4 py-3 bg-[var(--bg-panel)] shrink-0">
+            <div className="flex justify-between text-xs text-[var(--text-secondary)] mb-1">
               <span>Start: {start.toFixed(1)}s</span>
               <span
                 className={
-                  windowLength > MAX_DURATION ? "text-red-400" : "text-neutral-300"
+                  windowLength > MAX_DURATION ? "text-[var(--color-error)]" : "text-[var(--text-secondary)]"
                 }
               >
                 Length: {windowLength.toFixed(1)}s / {MAX_DURATION}s max
@@ -213,7 +213,7 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
               <span>End: {end.toFixed(1)}s</span>
             </div>
 
-            <label className="text-[11px] text-neutral-400">Start</label>
+            <label className="text-[11px] text-[var(--text-muted)]">Start</label>
             <input
               type="range"
               min={0}
@@ -224,7 +224,7 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
               className="w-full"
             />
 
-            <label className="text-[11px] text-neutral-400">End</label>
+            <label className="text-[11px] text-[var(--text-muted)]">End</label>
             <input
               type="range"
               min={0}

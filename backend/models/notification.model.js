@@ -17,7 +17,7 @@ const notificationSchema = new mongoose.Schema(
 
     type: {
       type: String,
-      enum: ["follow", "like", "comment", "comment_like", "reply"],
+      enum: ["follow", "like", "comment", "comment_like", "reply", "tag"],
       required: true,
     },
 
@@ -84,7 +84,7 @@ notificationSchema.index(
     unique: true,
     partialFilterExpression: {
       type: {
-        $in: ["like", "follow"],
+        $in: ["like", "follow", "tag"],
       },
     },
   }

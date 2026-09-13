@@ -15,7 +15,7 @@ export const createNotification = async ({
 
   let notification;
 
-  if (type === "like" || type === "follow") {
+  if (type === "like" || type === "follow" || type === "tag") {
     notification = await Notification.findOneAndUpdate(
       { recipient: recipientId, sender: senderId, type, post: postId, reel: reelId },
       { $set: { isRead: false, activityAt: new Date() } },
@@ -37,7 +37,7 @@ export const createNotification = async ({
 
   const populated = await notification.populate([
     { path: "sender", select: "username fullName profilePic" },
-    { path: "post", select: "images" },
+    { path: "post", select: "media" },
     { path: "reel", select: "media" },
   ]);
 

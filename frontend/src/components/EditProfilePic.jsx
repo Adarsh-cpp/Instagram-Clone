@@ -97,7 +97,7 @@ const EditProfilePic = ({...props}) => {
   }, [props.user]);
 
   return (
-    <div className="editPic w-full sm:w-[80%] md:w-full lg:w-[80%] h-[15%] mt-4 flex rounded-[20px] overflow-hidden bg-[#25282c]">
+    <div className="editPic w-full sm:w-[80%] md:w-full lg:w-[80%] h-[15%] mt-4 flex rounded-[20px] overflow-hidden bg-[var(--bg-elevated)]">
       {/* --- Left Side --- */}
       <div className="picSide w-[70%] sm:w-[65%] lg:w-[50%] h-full flex justify-start items-center px-4  ">
         <div className="profilePic relative w-[80px] h-[80px] sm:w-[90px] sm:h-[90px] rounded-full overflow-hidden">
@@ -128,7 +128,7 @@ const EditProfilePic = ({...props}) => {
             className="w-full h-full object-cover"
           />
         </div>
-        <div className="username px-4 text-white text-[14px] sm:text-[16px] lg:text-[18px] font-bold">
+        <div className="username px-4 text-[var(--text-primary)] text-[14px] sm:text-[16px] lg:text-[18px] font-bold">
           {user?.username}
         </div>
       </div>
@@ -137,7 +137,7 @@ const EditProfilePic = ({...props}) => {
       <div className="btnSide w-[30%] sm:w-[35%] lg:w-[50%] h-full flex justify-end items-center px-4">
         <button
           onClick={() => setIsModalOpen(true)}
-          className="w-[130px]  sm:w-[150px] h-[50px] bg-[#4a5df9] hover:bg-[#4150f7] cursor-pointer text-white text-[12px] sm:text-[16px] font-bold rounded-xl"
+          className="w-[130px]  sm:w-[150px] h-[50px] bg-[var(--accent-indigo)] hover:bg-[var(--accent-indigo-hover)] cursor-pointer text-[var(--text-on-brand)] text-[12px] sm:text-[16px] font-bold rounded-xl"
         >
           Change Photo
         </button>
@@ -155,17 +155,17 @@ const EditProfilePic = ({...props}) => {
       {/* --- Modal Overlay --- */}
       {isModalOpen && (
         <div className="absolute h-[600px] inset-0 flex justify-center items-center bg-[rgba(0,0,0,0.8)]  bg-opacity-70 z-10">
-          <div className="modal bg-[#262626] w-[90%] sm:w-[350px] rounded-2xl overflow-hidden text-center text-white shadow-lg">
-            <div className="py-4 border-b border-gray-600 text-[18px] font-semibold">
+          <div className="modal bg-[var(--bg-panel)] w-[90%] sm:w-[350px] rounded-2xl overflow-hidden text-center text-[var(--text-primary)] shadow-lg">
+            <div className="py-4 border-b border-[var(--border-popup)] text-[18px] font-semibold">
               Change Profile Photo
             </div>
-            <button onClick={handleOpenFileDialog} className="block w-full py-3 text-[#0095F6]  hover:text-[#49adf0] font-semibold hover:bg-[#2c2c2c] cursor-pointer ">
+            <button onClick={handleOpenFileDialog} className="block w-full py-3 text-[var(--brand-blue)]  hover:text-[var(--brand-blue-hover)] font-semibold hover:bg-[var(--bg-popup-hover)] cursor-pointer ">
               Upload Photo
             </button>
-            <button onClick={handleRemovePhoto} className="block w-full py-3 text-[#ED4956] hover:text-[#ec717b] font-semibold hover:bg-[#2c2c2c] cursor-pointer ">
+            <button onClick={handleRemovePhoto} className="block w-full py-3 text-[var(--color-danger)] hover:text-[var(--color-danger-hover)] font-semibold hover:bg-[var(--bg-popup-hover)] cursor-pointer ">
               Remove Current Photo
             </button>
-            <button onClick={() => setIsModalOpen(false)} className="block w-full py-3 hover:bg-[#2c2c2c] cursor-pointer ">
+            <button onClick={() => setIsModalOpen(false)} className="block w-full py-3 hover:bg-[var(--bg-popup-hover)] cursor-pointer ">
               Cancel
             </button>
           </div>

@@ -13,13 +13,13 @@ const BioCard = ({ bioText }) => {
     : bioText.slice(0, MAX_LENGTH) + (shouldTruncate ? "..." : "");
 
   return (
-    <div className="bio w-full h-auto text-white text-[14px] sm:text-[18px]">
+    <div className="bio w-full h-auto text-[var(--text-primary)] text-[14px] sm:text-[18px]">
       <div className="bioContainer w-full px-2 sm:px-6 py-1 leading-relaxed">
         <p className="inline">{displayText}</p>
         {shouldTruncate && (
           <button
             onClick={toggleReadMore}
-            className="ml-1 text-[#8ab4ff] hover:text-[#bcd0ff] font-medium cursor-pointer focus:outline-none"
+            className="ml-1 text-[var(--link-muted)] hover:text-[var(--link-muted-hover)] font-medium cursor-pointer focus:outline-none"
           >
             {isExpanded ? "Read less" : "Read more"}
           </button>

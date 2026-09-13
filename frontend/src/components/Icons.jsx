@@ -22,8 +22,8 @@ import {
 
 const iconProps = (active) => ({
   size: 26,
-  color: "white",
-  fill: active ? "white" : "none",
+  color: "var(--text-primary)",
+  fill: active ? "var(--text-primary)" : "none",
   strokeWidth: active ? 1.5 : 2,
 });
 
@@ -38,7 +38,7 @@ export const CreateIcon = ({ active }) => <PlusSquare {...iconProps(active)} str
 export const MoreIcon = ({ active }) => <Menu {...iconProps(active)} strokeWidth={active ? 2.5 : 2} />;
 
 // ---- Settings icons (static, no active state) ----
-const settingsIconProps = { size: 26, color: "white", strokeWidth: 2 };
+const settingsIconProps = { size: 26, color: "var(--text-primary)", strokeWidth: 2 };
 
 export const EditProfileIcon = () => <UserPen {...settingsIconProps} />;
 export const SettingsNotificationsIcon = () => <Bell {...settingsIconProps} />;

@@ -25,7 +25,7 @@ const FollowersFollowingOverlay = ({
   const endpoint =
     mode === "followers"
       ? "http://localhost:4000/auth/get-followers"
-      : "http://localhost:4000/auth/get-following"
+      : "http://localhost:4000/auth/get-followings"
 
   // reset + fetch first page whenever the overlay is opened, or the target user/mode changes
   useEffect(() => {
@@ -116,14 +116,14 @@ const FollowersFollowingOverlay = ({
       onClick={onClose}
     >
       <div
-        className="FollowersFollowingOverlay relative z-[100] w-[500px] h-[500px] rounded-[12px] overflow-hidden bg-[#212328] flex flex-col"
+        className="FollowersFollowingOverlay relative z-[100] w-[500px] h-[500px] rounded-[12px] overflow-hidden bg-[var(--bg-surface)] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="heading w-full h-[10%] shrink-0 relative flex justify-center items-center text-white font-semibold text-[16px] border-b border-[#363636]">
+        <div className="heading w-full h-[10%] shrink-0 relative flex justify-center items-center text-[var(--text-primary)] font-semibold text-[16px] border-b border-[var(--border-container)]">
           {heading}
           <button
             onClick={onClose}
-            className="absolute right-4 cursor-pointer text-white"
+            className="absolute right-4 cursor-pointer text-[var(--text-primary)]"
           >
             <X size={22} />
           </button>
@@ -137,7 +137,7 @@ const FollowersFollowingOverlay = ({
             placeholder="Search"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-[95%] h-[70%] rounded-md focus:outline-none bg-[#363636] px-2 text-[#AEB0B2] placeholder:text-[#4B4D4F]"
+            className="w-[95%] h-[70%] rounded-md focus:outline-none bg-[var(--bg-secondary-btn)] px-2 text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
           />
         </div>
 
@@ -147,11 +147,11 @@ const FollowersFollowingOverlay = ({
           className="listDiv w-full flex-1 overflow-y-auto"
         >
           {isInitialLoading ? (
-            <div className="w-full h-full flex justify-center items-center text-[#AEB0B2] text-[14px]">
+            <div className="w-full h-full flex justify-center items-center text-[var(--text-muted)] text-[14px]">
               Loading...
             </div>
           ) : filteredList.length === 0 ? (
-            <div className="w-full h-full flex justify-center items-center text-[#AEB0B2] text-[14px]">
+            <div className="w-full h-full flex justify-center items-center text-[var(--text-muted)] text-[14px]">
               No results found
             </div>
           ) : (
@@ -159,7 +159,7 @@ const FollowersFollowingOverlay = ({
               {filteredList.map((user) => (
                 <FollowUserCard
                   key={user.username}
-                  profilePic={user.profilePic}
+                  profilePic={user?.profilePic ? user.profilePic : "/images/default-profile-pic.jpg"}
                   username={user.username}
                   fullName={user.fullName}
                   isFollowing={user.isFollowing}
@@ -169,7 +169,7 @@ const FollowersFollowingOverlay = ({
                 />
               ))}
               {isLoading && (
-                <div className="w-full h-[50px] flex justify-center items-center text-[#AEB0B2] text-[13px]">
+                <div className="w-full h-[50px] flex justify-center items-center text-[var(--text-muted)] text-[13px]">
                   Loading more...
                 </div>
               )}

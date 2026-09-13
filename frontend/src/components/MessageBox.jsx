@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { X, Download, ChevronLeft, ChevronRight, Video, Film, Clapperboard } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -273,7 +273,7 @@ const MessageBox = ({ message, showSeen, onDelete }) => {
         {sharedItem && (
           <div
             onClick={() => { if (shareKind !== 'story') setIsCommentsOpen(true); }}
-            className={`sharedPostCard rounded-xl overflow-hidden bg-[#1a1e23] border border-white/10 ${
+            className={`sharedPostCard rounded-xl overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-soft)] ${
               shareKind === 'post' ? 'w-[220px] cursor-pointer' : 'w-[160px]'
             } ${shareKind === 'reel' ? 'cursor-pointer' : ''}`}
           >
@@ -281,9 +281,9 @@ const MessageBox = ({ message, showSeen, onDelete }) => {
               // Story: portrait card, transparent header, no caption, expiry-aware
               <div className="relative w-full h-[280px]">
                 {isStoryExpired ? (
-                  <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-[#0f1114] text-center px-3">
-                    <Clapperboard size={26} className="text-white/30" />
-                    <span className="text-white/50 text-[12px]">Story no longer available</span>
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-[var(--bg-app)] text-center px-3">
+                    <Clapperboard size={26} className="text-[var(--text-muted)]" />
+                    <span className="text-[var(--text-muted)] text-[12px]">Story no longer available</span>
                   </div>
                 ) : sharedThumbIsVideo ? (
                   <video src={sharedThumbUrl} className="w-full h-full object-cover" muted loop playsInline />
@@ -366,7 +366,7 @@ const MessageBox = ({ message, showSeen, onDelete }) => {
                     alt=""
                     className="w-[22px] h-[22px] rounded-full object-cover"
                   />
-                  <span className="text-white text-[12px] font-medium">
+                  <span className="text-[var(--text-primary)] text-[12px] font-medium">
                     {sharedItem.author?.username}
                   </span>
                 </Link>
@@ -388,7 +388,7 @@ const MessageBox = ({ message, showSeen, onDelete }) => {
                 )}
 
                 {sharedItem.caption && (
-                  <div className="px-2.5 py-2 text-[#d0d0d0] text-[12px] leading-snug">
+                  <div className="px-2.5 py-2 text-[var(--text-secondary)] text-[12px] leading-snug">
                     {trimCaption(sharedItem.caption)}
                   </div>
                 )}
@@ -398,18 +398,18 @@ const MessageBox = ({ message, showSeen, onDelete }) => {
         )}
 
         {repliedStory && (
-          <div className="repliedStoryCard w-[130px] rounded-xl overflow-hidden bg-[#1a1e23] border border-white/10">
+          <div className="repliedStoryCard w-[130px] rounded-xl overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-soft)]">
             <div className="px-2.5 pt-2 pb-1.5">
-              <span className="text-white/70 text-[11px] leading-tight">
+              <span className="text-[var(--text-muted)] text-[11px] leading-tight">
                 {isSenderMessage ? "Replied to their story" : "Replied to your story"}
               </span>
             </div>
 
             <div className="relative w-full h-[190px]">
               {isRepliedStoryExpired ? (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-[#0f1114] text-center px-2">
-                  <Clapperboard size={20} className="text-white/30" />
-                  <span className="text-white/50 text-[10px]">Story no longer available</span>
+                <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-[var(--bg-app)] text-center px-2">
+                  <Clapperboard size={20} className="text-[var(--text-muted)]" />
+                  <span className="text-[var(--text-muted)] text-[10px]">Story no longer available</span>
                 </div>
               ) : repliedStory.mediaType === "video" ? (
                 <video
@@ -430,7 +430,7 @@ const MessageBox = ({ message, showSeen, onDelete }) => {
             </div>
 
             {message?.text && (
-              <div className="px-2.5 py-2 text-white text-[13px] leading-snug">
+              <div className="px-2.5 py-2 text-[var(--text-primary)] text-[13px] leading-snug">
                 {message.text}
               </div>
             )}
@@ -443,7 +443,7 @@ const MessageBox = ({ message, showSeen, onDelete }) => {
       </div>
 
       {showSeen && (
-        <div className="text-[#a2a3a3] text-[11px] mr-1 mb-1">
+        <div className="text-[var(--text-muted)] text-[11px] mr-1 mb-1">
           Seen {getTimeAgo(message?.updatedAt)}
         </div>
       )}
@@ -452,11 +452,11 @@ const MessageBox = ({ message, showSeen, onDelete }) => {
         <div
           ref={menuRef}
           style={{ position: "fixed", top: menuPosition.y, left: menuPosition.x }}
-          className="z-[110] bg-[#25292e] border border-white/10 rounded-xl shadow-lg overflow-hidden min-w-[140px]"
+          className="z-[110] bg-[var(--bg-panel)] border border-[var(--border-popup)] rounded-xl shadow-lg overflow-hidden min-w-[140px]"
         >
           <button
             onClick={handleUnsend}
-            className="w-full text-left px-4 py-2.5 text-red-400 text-[14px] hover:bg-white/5 cursor-pointer"
+            className="w-full text-left px-4 py-2.5 text-[var(--color-danger)] text-[14px] hover:bg-[var(--bg-popup-hover)] cursor-pointer"
           >
             Unsend
           </button>

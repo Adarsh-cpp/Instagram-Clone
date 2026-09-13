@@ -51,6 +51,19 @@ const postSchema = new mongoose.Schema(
         type: Number,
         default: 0,
       },
+
+    location: {
+      name: { type: String, default: "" },
+      lat: { type: Number, default: null },
+      lng: { type: Number, default: null },
+    },
+
+    taggedUsers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     
   },
   { timestamps: true }
@@ -64,4 +77,3 @@ postSchema.path("media").validate(function (value) {
 
 const Post = mongoose.model('Post', postSchema);
 export default Post;
-
