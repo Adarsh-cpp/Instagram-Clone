@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Cropper from "react-easy-crop";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowLeft, Crop, ZoomIn } from "lucide-react";
 import getCroppedImg, { getDefaultCroppedArea } from "../utils/cropImage";
 
 const ASPECT_OPTIONS = [
@@ -79,15 +79,11 @@ const CropImagePage = ({
   return (
     <div className="w-[100vw] h-[100vh] flex justify-center items-center bg-[var(--bg-app)]">
       <div className="cropContainerOverlay w-full h-full flex justify-center items-center bg-[rgba(0,0,0,0)] px-2 sm:px-4">
-        <div className="cropContainer relative w-full max-w-[500px] md:w-[70%] lg:w-[50%] xl:w-[30%] h-[70%] rounded-2xl bg-[var(--bg-surface)] overflow-hidden">
+        <div className="cropContainer relative w-full max-w-[500px] md:w-[70%] lg:w-[50%] xl:w-[30%] h-[70%] rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-container)] shadow-xl overflow-hidden">
           {/* Header */}
-          <div className="header w-full h-[40px] px-3 sm:px-4 flex justify-between items-center bg-[var(--bg-app)]">
+          <div className="header w-full h-[40px] px-3 sm:px-4 flex justify-between items-center bg-[var(--bg-app)] border-b border-[var(--border-soft)]">
             <div onClick={back} className="back cursor-pointer">
-              <img
-                src="/images/arrow-back-icon.png"
-                className="w-[26px] h-[26px] sm:w-[30px] sm:h-[30px]"
-                alt="Back"
-              />
+              <ArrowLeft size={24} color="var(--text-primary)" />
             </div>
 
             <div className="heading text-[var(--text-primary)] text-[16px] sm:text-[18px] font-semibold">
@@ -103,8 +99,6 @@ const CropImagePage = ({
               Next
             </div>
           </div>
-
-          <hr />
 
           {/* Crop Area */}
           <div className="relative w-full h-[calc(100%-40px)] overflow-hidden bg-[var(--bg-elevated)]">
@@ -193,21 +187,18 @@ const CropImagePage = ({
                 onClick={() => setShowAspectMenu(!showAspectMenu)}
                 className="crop w-[34px] h-[34px] rounded-full flex justify-center items-center bg-[rgba(0,0,0,0.6)] cursor-pointer flex-shrink-0"
               >
-                <img src="/images/crop1-icon.png" alt="" />
+                <Crop size={18} color="white" />
               </div>
 
               <div
                 onClick={() => setShowZoomSlider(!showZoomSlider)}
                 className="magnify w-[34px] h-[34px] rounded-full flex justify-center items-center bg-[rgba(0,0,0,0.6)] cursor-pointer flex-shrink-0"
               >
-                <img src="/images/magnify-icon.png" alt="" />
+                <ZoomIn size={18} color="white" />
               </div>
             </div>
 
-            {/* DON'T TOUCH THIS */}
-            <div className="right w-[50%] h-full px-2 flex justify-end items-center">
-              <div className="multiselect w-[34px] h-[34px] rounded-full flex justify-center items-center bg-[rgba(0,0,0,0.6)]"></div>
-            </div>
+            <div className="right w-[50%] h-full px-2 flex justify-end items-center" />
           </div>
         </div>
       </div>

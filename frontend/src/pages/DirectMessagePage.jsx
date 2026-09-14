@@ -1,3 +1,4 @@
+// DirectMessagePage.jsx
 import React, { useEffect, useState } from 'react'
 import MessageCard from '../components/MessageCard'
 import Chat from '../components/Chat'
@@ -42,7 +43,7 @@ const DirectMessagePage = () => {
   return (
     <div className="messagePage w-screen h-screen flex bg-[var(--bg-app)] overflow-hidden">
 
-      <div className="messagesList w-full md:w-[35%] lg:w-[30%] h-full border-r border-[var(--border-soft)] bg-[var(--bg-app)] ">
+      <div className={`messagesList w-full ${conversationId ? "hidden" : "block"} md:block md:w-[35%] lg:w-[30%] h-full border-r border-[var(--border-soft)] bg-[var(--bg-app)] `}>
 
         <div className="upperPart w-full h-[20%]">
 

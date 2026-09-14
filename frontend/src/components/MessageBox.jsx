@@ -1,3 +1,4 @@
+// MessageBox.jsx
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { X, Download, ChevronLeft, ChevronRight, Video, Film, Clapperboard } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -238,7 +239,7 @@ const MessageBox = ({ message, showSeen, onDelete }) => {
         onTouchStart={handleTouchStart}
         onTouchEnd={cancelLongPress}
         onTouchMove={cancelLongPress}
-        className={`messageBox max-w-[70%] w-fit min-h-[40px] rounded-3xl my-1 text-white select-none ${
+        className={`messageBox max-w-[85%] sm:max-w-[70%] w-fit min-h-[40px] rounded-3xl my-1 text-white select-none ${
           hasMedia ? "px-0 py-2 bg-transparent" : "px-4 py-2"
         } ${isSenderMessage ? "bg-[#4a5df9]" : "bg-gray-500"}`}
       >
@@ -247,7 +248,7 @@ const MessageBox = ({ message, showSeen, onDelete }) => {
             src={imageList[0]}
             alt="attachment"
             onClick={() => openOverlay(0)}
-            className="max-w-[280px] max-h-[280px] rounded-2xl object-cover cursor-pointer"
+            className="max-w-[220px] max-h-[220px] sm:max-w-[280px] sm:max-h-[280px] rounded-2xl object-cover cursor-pointer"
           />
         )}
 
@@ -256,13 +257,12 @@ const MessageBox = ({ message, showSeen, onDelete }) => {
             {imageList.map((img, idx) => (
               <div
                 key={idx}
-                onClick={() => openOverlay(idx)}
                 style={{
                   transform: `rotate(${TILT_ANGLES[idx % TILT_ANGLES.length]}deg)`,
-                  marginLeft: idx === 0 ? 0 : "-22px",
+                  marginLeft: idx === 0 ? 0 : "-16px",
                   zIndex: idx,
                 }}
-                className="relative w-[120px] h-[200px] mx-2 shrink-0 rounded-lg overflow-hidden border-2 border-white/20 shadow-md cursor-pointer hover:z-20 hover:scale-110 transition-transform"
+                className="relative w-[90px] h-[150px] sm:w-[120px] sm:h-[200px] mx-1 sm:mx-2 shrink-0 rounded-lg overflow-hidden border-2 border-white/20 shadow-md cursor-pointer hover:z-20 hover:scale-110 transition-transform"
               >
                 <img src={img} alt="attachment" className="w-full h-full object-cover" />
               </div>
@@ -273,13 +273,13 @@ const MessageBox = ({ message, showSeen, onDelete }) => {
         {sharedItem && (
           <div
             onClick={() => { if (shareKind !== 'story') setIsCommentsOpen(true); }}
-            className={`sharedPostCard rounded-xl overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-soft)] ${
-              shareKind === 'post' ? 'w-[220px] cursor-pointer' : 'w-[160px]'
+            className={`sharedPostCard rounded-xl overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-soft)] max-w-full ${
+              shareKind === 'post' ? 'w-[180px] sm:w-[220px] cursor-pointer' : 'w-[140px] sm:w-[160px]'
             } ${shareKind === 'reel' ? 'cursor-pointer' : ''}`}
           >
             {shareKind === 'story' ? (
               // Story: portrait card, transparent header, no caption, expiry-aware
-              <div className="relative w-full h-[280px]">
+              <div className="relative w-full h-[230px] sm:h-[280px]">
                 {isStoryExpired ? (
                   <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-[var(--bg-app)] text-center px-3">
                     <Clapperboard size={26} className="text-[var(--text-muted)]" />
@@ -315,7 +315,7 @@ const MessageBox = ({ message, showSeen, onDelete }) => {
               </div>
             ) : shareKind === 'reel' ? (
               // Reel: portrait card, transparent header overlay, no caption
-              <div className="relative w-full h-[280px]">
+              <div className="relative w-full h-[230px] sm:h-[280px]">
                 {sharedThumbIsVideo ? (
                   <video
                     src={sharedThumbUrl}
@@ -374,7 +374,7 @@ const MessageBox = ({ message, showSeen, onDelete }) => {
                 {sharedThumbIsVideo ? (
                   <video
                     src={sharedThumbUrl}
-                    className="w-full h-[220px] object-cover"
+                    className="w-full h-[180px] sm:h-[220px] object-cover"
                     muted
                     loop
                     playsInline
@@ -383,7 +383,7 @@ const MessageBox = ({ message, showSeen, onDelete }) => {
                   <img
                     src={sharedThumbUrl}
                     alt="shared content"
-                    className="w-full h-[220px] object-cover"
+                    className="w-full h-[180px] sm:h-[220px] object-cover"
                   />
                 )}
 
@@ -398,14 +398,14 @@ const MessageBox = ({ message, showSeen, onDelete }) => {
         )}
 
         {repliedStory && (
-          <div className="repliedStoryCard w-[130px] rounded-xl overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-soft)]">
+          <div className="repliedStoryCard w-[110px] sm:w-[130px] max-w-full rounded-xl overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-soft)]">
             <div className="px-2.5 pt-2 pb-1.5">
               <span className="text-[var(--text-muted)] text-[11px] leading-tight">
                 {isSenderMessage ? "Replied to their story" : "Replied to your story"}
               </span>
             </div>
 
-            <div className="relative w-full h-[190px]">
+            <div className="relative w-full h-[160px] sm:h-[190px]">
               {isRepliedStoryExpired ? (
                 <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-[var(--bg-app)] text-center px-2">
                   <Clapperboard size={20} className="text-[var(--text-muted)]" />

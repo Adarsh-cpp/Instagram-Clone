@@ -4,7 +4,6 @@ import {
   Heart,
   MessageCircle,
   Repeat2,
-  ListFilter,
   Bookmark,
   MoreHorizontal,
   Volume2,
@@ -43,6 +42,7 @@ const ReelsPage = () => {
   const sectionRef = useRef(null)
   const clickTimer = useRef(null)
   const isFetchingRef = useRef(false)
+  const menuRef = useRef(null)
 
   const [reels, setReels] = useState([])
   const [page, setPage] = useState(1)
@@ -63,6 +63,13 @@ const ReelsPage = () => {
 
   const [isCommentsOpen, setIsCommentsOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
+
+  // 3-dot menu / delete flow
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const isOwnReel = currentReel && user?._id?.toString() === currentReel?.author?._id?.toString()
 
   const computeDims = useCallback(() => {
     const section = sectionRef.current
@@ -180,7 +187,21 @@ const ReelsPage = () => {
   useEffect(() => {
     setIsCommentsOpen(false)
     setIsShareOpen(false)
+    setIsMenuOpen(false)
+    setIsDeleteConfirmOpen(false)
   }, [currentIndex])
+
+  // close the 3-dot menu when clicking anywhere outside it
+  useEffect(() => {
+    if (!isMenuOpen) return
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setIsMenuOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [isMenuOpen])
 
   const togglePlay = () => {
     const video = videoRef.current
@@ -279,6 +300,29 @@ const ReelsPage = () => {
         i === currentIndex ? { ...r, sharesCount: newSharesCount } : r
       )
     )
+  }
+
+  const handleDeleteReel = async () => {
+    if (!currentReel) return
+    setIsDeleting(true)
+    try {
+      await axios.delete(`${BASE_URL}/reels/${currentReel._id}/delete`, authHeaders())
+      toast.success("Reel deleted")
+
+      setIsDeleteConfirmOpen(false)
+      setIsMenuOpen(false)
+
+      setReels((prev) => {
+        const next = prev.filter((r) => r._id !== currentReel._id)
+        // keep the index in bounds once the current reel is removed
+        setCurrentIndex((idx) => Math.min(idx, Math.max(next.length - 1, 0)))
+        return next
+      })
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to delete reel")
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   const handleVideoClick = () => {
@@ -468,10 +512,6 @@ const ReelsPage = () => {
                 <span className="text-[11px] sm:text-xs">{formatCount(currentReel.sharesCount)}</span>
               </button>
 
-              <button className="hidden sm:block">
-                <ListFilter size={22} />
-              </button>
-
               <button className="cursor-pointer" onClick={triggerSave}>
                 <Bookmark
                   size={20}
@@ -479,9 +519,31 @@ const ReelsPage = () => {
                 />
               </button>
 
-              <button className="hidden sm:block">
-                <MoreHorizontal size={22} />
-              </button>
+              {isOwnReel && (
+                <div ref={menuRef} className="relative">
+                  <button
+                    className="cursor-pointer"
+                    onClick={() => setIsMenuOpen((prev) => !prev)}
+                    aria-label="Reel options"
+                  >
+                    <MoreHorizontal size={22} />
+                  </button>
+
+                  {isMenuOpen && (
+                    <div className="absolute right-0 bottom-[110%] sm:bottom-auto sm:top-[110%] w-[160px] bg-[var(--bg-surface)] border border-[var(--border-soft)] rounded-xl shadow-2xl overflow-hidden z-20">
+                      <button
+                        onClick={() => {
+                          setIsMenuOpen(false)
+                          setIsDeleteConfirmOpen(true)
+                        }}
+                        className="w-full text-left px-4 py-3 text-sm font-semibold text-[var(--color-danger)] hover:bg-[var(--bg-row-hover)] cursor-pointer transition"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -493,6 +555,34 @@ const ReelsPage = () => {
           onClose={() => setIsShareOpen(false)}
           onShared={handleShared}
         />
+      )}
+
+      {/* Delete confirmation */}
+      {isDeleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex justify-center items-center bg-black/70 p-4">
+          <div className="w-full max-w-[340px] rounded-2xl bg-[var(--bg-surface)] overflow-hidden text-center shadow-2xl">
+            <div className="px-6 py-6 border-b border-[var(--border-soft)]">
+              <h3 className="text-[var(--text-primary)] font-semibold text-base mb-2">Delete reel?</h3>
+              <p className="text-[var(--text-muted)] text-sm">
+                This action cannot be undone. This reel will be permanently removed.
+              </p>
+            </div>
+            <button
+              onClick={handleDeleteReel}
+              disabled={isDeleting}
+              className="w-full py-3 text-[var(--color-danger)] font-semibold text-sm border-b border-[var(--border-soft)] hover:bg-[var(--bg-row-hover)] transition cursor-pointer disabled:opacity-50"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </button>
+            <button
+              onClick={() => setIsDeleteConfirmOpen(false)}
+              disabled={isDeleting}
+              className="w-full py-3 text-[var(--text-primary)] font-medium text-sm hover:bg-[var(--bg-row-hover)] transition cursor-pointer disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       <style>{`

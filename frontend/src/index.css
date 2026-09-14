@@ -56,6 +56,11 @@
   --toggle-track-off: #4a4f57;
   --link-muted: #85a1ff;
   --link-muted-hover: #a3bcff;
+
+  --overlay-scrim: rgba(12, 16, 20, 0.6);
+  --overlay-blur: 10px;
+  --glass-panel-bg: rgba(37, 41, 46, 0.75);
+  --glass-panel-border: rgba(255, 255, 255, 0.08);
 }
 
 :root[data-theme="light"] {
@@ -92,7 +97,14 @@
   --toggle-track-off: #d1d1d1;
   --link-muted: #3b5bdb;
   --link-muted-hover: #2f4bc4;
+
+  
+  --overlay-scrim: rgba(255, 255, 255, 0.4);
+  --overlay-blur: 14px;
+  --glass-panel-bg: rgba(255, 255, 255, 0.65);
+  --glass-panel-border: rgba(255, 255, 255, 0.6);
 }
+
 
 /* ============================
    Utilities

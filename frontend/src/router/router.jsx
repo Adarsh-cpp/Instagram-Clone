@@ -9,7 +9,7 @@ import ConfirmationPage from "../pages/ConfirmationPage.jsx";
 import ForgotPasswordPage from "../pages/ForgotPasswordPage.jsx";
 import ResetPasswordPage from "../pages/ResetPasswordPage.jsx";
 import FollowingSetupPage from "../pages/FollowingSetupPage.jsx";
-import LogoutPage from "../pages/LogoutPage.jsx";
+import LogoutPage from "../pages/AboutPage.jsx";
 
 import HomePage from "../pages/HomePage.jsx";
 import UserProfilePage from "../pages/UserProfilePage.jsx";
@@ -28,6 +28,7 @@ import UserStoryPage from "../pages/UserStoryPage.jsx";
 import StoryPage from "../pages/StoryViewerPage.jsx";
 import StoryViewerPage from "../pages/StoryViewerPage.jsx";
 import HighlightViewerPage from "../pages/HighlightViewerPage.jsx";
+import AboutPage from "../pages/AboutPage.jsx";
 
 
 
@@ -67,7 +68,9 @@ const router = createBrowserRouter([
 
       {path: "/story/create", element: <UserStoryPage /> },
       {path: "/story/view/:userId", element: <StoryViewerPage /> },
-      {path: "/highlight/view/:highlightId", element: <HighlightViewerPage/> }
+      {path: "/highlight/view/:highlightId", element: <HighlightViewerPage/> },
+
+      {path: "/about", element: <AboutPage/> }
 
     ],
   },

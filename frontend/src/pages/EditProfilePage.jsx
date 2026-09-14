@@ -1,11 +1,8 @@
-
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import axios from "axios"
 import IconSidebar from "../components/IconSidebar";
 import EditProfilePic from "../components/EditProfilePic";
-import ProfilePermissions from "../components/ProfilePermissions";
-import HamburgerMenu from "../components/HamburgerMenu";
 import MobileFooter from "../components/MobileFooter";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -56,8 +53,6 @@ const navigate = useNavigate()
  
   const [customGender, setCustomGender] = useState("");
 
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-
   useEffect(() => {
   if(user){
     setBio(user.bio || "");
@@ -71,10 +66,6 @@ const navigate = useNavigate()
     setGender(e.target.id);
     setIsModalOpen(false);
   };
-
- const handleMenuOpen = () => {
-  setIsMenuOpen((prev) => !prev);
-};
 
   
 
@@ -122,33 +113,8 @@ const navigate = useNavigate()
       <IconSidebar />
 
       <div className="profileSection w-full md:w-[88%] 2xl:w-[80%] h-full flex justify-center items-center overflow-x-hidden ">
-       
-       <ProfilePermissions />
 
-        <div className="relative editContainer w-full md:w-[65%] lg:w-[75%] h-full flex flex-col justify-start items-center border border-red  ">
-
-        {/* Navbar for Mobile */}
-
-        <div className="mobileNav w-full h-[50px] flex justify-center items-center md:hidden border border-b-[var(--border-soft)] ">
-
-         <div className="heading w-[50%] h-full px-4 flex justify-start items-center text-[18px] text-[var(--text-primary)] font-bold ">
-          Edit Profile
-         </div>
-
-        <div className="menuIcon w-[50%] h-full px-4 flex justify-end items-center ">
-          <img
-            src={isMenuOpen ? "/images/close-icon.png" : "/images/more-icon.png"}
-            alt=""
-            onClick={handleMenuOpen}
-            className="w-[40px] h-[34px] cursor-pointer"
-          />
-        </div>
-
-        </div>
-
-         {/* Hamburger Menu */}
-
-         {isMenuOpen && <HamburgerMenu /> }
+        <div className="relative editContainer w-full md:w-[95%] lg:w-[92%] h-full flex flex-col justify-start items-center">
 
           <div className="heading w-[80%] h-[15%] flex justify-start items-center text-[20px] text-[var(--text-primary)] font-bold">
             Edit Profile
@@ -233,11 +199,11 @@ const navigate = useNavigate()
               {/* --- Gender Modal --- */}
               {isModalOpen && (
                 <div
-                  className="absolute top-0 left-0 h-[600px] inset-0 flex justify-center items-center bg-black/70 z-10"
+                  className="absolute top-0 left-0 h-[600px] inset-0 flex justify-center items-center bg-[var(--overlay-scrim)] backdrop-blur-[var(--overlay-blur)] z-10"
                   onClick={() => setIsModalOpen(false)}
                 >
                   <div
-                    className="modal bg-[var(--bg-menu)] w-[90%] sm:w-[350px] rounded-2xl overflow-hidden text-center text-[var(--text-primary)] shadow-lg"
+                    className="modal bg-[var(--bg-menu)] w-[90%] sm:w-[350px] rounded-2xl overflow-hidden text-center text-[var(--text-primary)] border border-[var(--border-container)] shadow-xl"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="py-4 border-b border-[var(--border-popup)] text-[18px] font-semibold">

@@ -61,6 +61,12 @@ const IconSidebar = () => {
     setIsConfirmingLogout(false);
   };
 
+  const handleAboutClick = () => {
+    setIsLogoutPopupOpen(false);
+    setIsConfirmingLogout(false);
+    navigate("/about");
+  };
+
   return (
     <div className="iconSection hidden md:block md:w-[12%] 2xl:w-[20%] h-full border-r border-r-[var(--border-soft)] overflow-visible">
       
@@ -285,6 +291,46 @@ const IconSidebar = () => {
                       </div>
                     </div>
                   </div>
+
+                  <div className="h-[1px] bg-[var(--border-popup)] my-1 mx-1" />
+
+                  {/* About row */}
+                  <button
+                    onClick={handleAboutClick}
+                    className="
+                      w-full
+                      h-[48px]
+                      px-3
+                      flex
+                      items-center
+                      gap-3
+                      rounded-lg
+                      text-[var(--text-primary)]
+                      text-[14px]
+                      font-medium
+                      transition-all
+                      duration-200
+                      hover:bg-[var(--bg-popup-hover)]
+                      active:scale-[0.98]
+                    "
+                  >
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="shrink-0"
+                    >
+                      <circle cx="12" cy="12" r="9" />
+                      <line x1="12" y1="16" x2="12" y2="11.5" />
+                      <circle cx="12" cy="8" r="0.6" fill="currentColor" stroke="none" />
+                    </svg>
+                    <span>About this project</span>
+                  </button>
 
                   <div className="h-[1px] bg-[var(--border-popup)] my-1 mx-1" />
 

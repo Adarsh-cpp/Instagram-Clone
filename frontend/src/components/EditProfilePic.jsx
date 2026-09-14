@@ -97,25 +97,25 @@ const EditProfilePic = ({...props}) => {
   }, [props.user]);
 
   return (
-    <div className="editPic w-full sm:w-[80%] md:w-full lg:w-[80%] h-[15%] mt-4 flex rounded-[20px] overflow-hidden bg-[var(--bg-elevated)]">
+    <div className="editPic w-full sm:w-[80%] md:w-full lg:w-[80%] h-[15%] mt-4 flex rounded-[20px] overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-container)]">
       {/* --- Left Side --- */}
       <div className="picSide w-[70%] sm:w-[65%] lg:w-[50%] h-full flex justify-start items-center px-4  ">
         <div className="profilePic relative w-[80px] h-[80px] sm:w-[90px] sm:h-[90px] rounded-full overflow-hidden">
 
         {/* //Loader  */}
           {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white  ">
+            <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-surface)]">
               <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 via-red-500 to-yellow-500 animate-spin p-[3px]">
-              <div className="w-full h-full bg-white rounded-full"></div>
-              <div className="block w-[20px] h-[20px] absolute top-[20px] bg-white "></div>
+              <div className="w-full h-full bg-[var(--bg-surface)] rounded-full"></div>
+              <div className="block w-[20px] h-[20px] absolute top-[20px] bg-[var(--bg-surface)]"></div>
               </div>
             </div>
           )}
          
           {imgLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white ">
+            <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-surface)]">
               <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 via-red-500 to-yellow-500 animate-spin p-[3px]">
-              <div className="w-full h-full bg-white rounded-full"></div>
+              <div className="w-full h-full bg-[var(--bg-surface)] rounded-full"></div>
               </div>
             </div>
           )}
@@ -153,9 +153,12 @@ const EditProfilePic = ({...props}) => {
       />
 
       {/* --- Modal Overlay --- */}
+        {/* --- Modal Overlay --- */}
       {isModalOpen && (
-        <div className="absolute h-[600px] inset-0 flex justify-center items-center bg-[rgba(0,0,0,0.8)]  bg-opacity-70 z-10">
-          <div className="modal bg-[var(--bg-panel)] w-[90%] sm:w-[350px] rounded-2xl overflow-hidden text-center text-[var(--text-primary)] shadow-lg">
+        <div
+          className="absolute h-[600px] inset-0 flex justify-center items-center bg-[var(--overlay-scrim)] backdrop-blur-[var(--overlay-blur)] z-10"
+        >
+          <div className="modal bg-[var(--glass-panel-bg)] backdrop-blur-xl w-[90%] sm:w-[350px] rounded-2xl overflow-hidden text-center text-[var(--text-primary)] border border-[var(--glass-panel-border)] shadow-2xl">
             <div className="py-4 border-b border-[var(--border-popup)] text-[18px] font-semibold">
               Change Profile Photo
             </div>

@@ -67,7 +67,7 @@ const TagPeoplePicker = ({ selected, onChange, onClose }) => {
 
   return (
     <div className="absolute inset-0 z-40 bg-[var(--bg-surface)] flex flex-col">
-      <div className="flex items-center gap-3 px-4 h-[50px] flex-shrink-0 border-b border-[rgba(128,128,128,0.2)]">
+      <div className="flex items-center gap-3 px-4 h-[50px] flex-shrink-0 border-b border-[var(--border-soft)]">
         <button onClick={onClose} type="button" className="text-[var(--text-primary)]">
           <X size={20} />
         </button>
@@ -85,13 +85,13 @@ const TagPeoplePicker = ({ selected, onChange, onClose }) => {
 
       <div className="px-4 py-3 flex-shrink-0">
         <div className="flex items-center gap-2 bg-[var(--bg-elevated)] rounded-lg px-3 h-[38px]">
-          <Search size={16} className="text-[#8e8e8e]" />
+          <Search size={16} className="text-[var(--text-muted)]" />
           <input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search"
-            className="flex-1 bg-transparent outline-none text-sm text-[var(--text-primary)] placeholder:text-[#8e8e8e]"
+            className="flex-1 bg-transparent outline-none text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
           />
         </div>
       </div>
@@ -111,7 +111,7 @@ const TagPeoplePicker = ({ selected, onChange, onClose }) => {
               <span className="text-xs text-[var(--text-primary)]">{u.username}</span>
               <X
                 size={12}
-                className="text-[#8e8e8e] cursor-pointer"
+                className="text-[var(--text-muted)] cursor-pointer"
                 onClick={() => toggleUser(u)}
               />
             </div>
@@ -120,14 +120,14 @@ const TagPeoplePicker = ({ selected, onChange, onClose }) => {
       )}
 
       {!query.trim() && suggested.length > 0 && (
-        <div className="px-4 pt-1 pb-1 text-xs font-semibold text-[#8e8e8e] flex-shrink-0">
+        <div className="px-4 pt-1 pb-1 text-xs font-semibold text-[var(--text-muted)] flex-shrink-0">
           Suggested
         </div>
       )}
 
       <div className="flex-1 overflow-y-auto px-2 min-h-0">
         {loading && (
-          <div className="text-center text-xs text-[#8e8e8e] py-3">Searching...</div>
+          <div className="text-center text-xs text-[var(--text-muted)] py-3">Searching...</div>
         )}
         {!loading &&
           list.map((u) => (
@@ -147,7 +147,7 @@ const TagPeoplePicker = ({ selected, onChange, onClose }) => {
                     {u.username}
                   </div>
                   {u.fullname && (
-                    <div className="text-xs text-[#8e8e8e] truncate">{u.fullname}</div>
+                    <div className="text-xs text-[var(--text-muted)] truncate">{u.fullname}</div>
                   )}
                 </div>
               </div>
@@ -159,7 +159,7 @@ const TagPeoplePicker = ({ selected, onChange, onClose }) => {
             </div>
           ))}
         {!loading && query.trim() && list.length === 0 && (
-          <div className="text-center text-xs text-[#8e8e8e] py-6">No users found</div>
+          <div className="text-center text-xs text-[var(--text-muted)] py-6">No users found</div>
         )}
       </div>
     </div>

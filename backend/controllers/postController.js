@@ -1,10 +1,12 @@
 import cloudinary from "../config/cloudinary.js";
 import postModel from "../models/post.model.js";
 import userModel from "../models/user.model.js";
+import reelModel from "../models/reel.model.js";
 import messageModel from "../models/message.model.js";
 import commentModel from "../models/comment.model.js";
 import { createNotification, removeNotification } from "../services/notification.service.js";
 import { uploadMultipleMedia } from "../services/upload.service.js";
+import { deleteCloudinaryAssetWithRetry } from "../utils/cloudinaryRetry.js";
 
 const MAX_IMAGES = 5;
 
@@ -419,13 +421,15 @@ export const deletePost = async (req, res) => {
       return res.status(403).json({ success: false, message: "Not authorized to delete this post" });
     }
 
-    await Promise.all(
-      post.media.map((m) =>
-        cloudinary.uploader.destroy(m.publicId, {
-          resource_type: m.mediaType === "video" ? "video" : "image",
-        })
-      )
-    );
+    post.media.forEach((m) => {
+        deleteCloudinaryAssetWithRetry(
+          m.publicId,
+          m.mediaType === "video" ? "video" : "image",
+          1,
+          5,
+          cloudinary
+        );
+      });
 
     await commentModel.deleteMany({ post: post._id });
 
@@ -570,5 +574,34 @@ export const getSuggestedTagUsers = async (req, res) => {
   } catch (error) {
     console.error("Suggested Tag Users Error:", error);
     return res.status(500).json({ success: false, message: "Failed to fetch suggestions" });
+  }
+};
+
+export const getTaggedItems = async (req, res) => {
+  try {
+    const targetUserId = req.params.userId || req.user._id;
+
+    const [posts, reels] = await Promise.all([
+      postModel
+        .find({ taggedUsers: targetUserId })
+        .populate("author", "username profilePic")
+        .sort({ createdAt: -1 })
+        .lean(),
+      reelModel
+        .find({ taggedUsers: targetUserId })
+        .populate("author", "username profilePic")
+        .sort({ createdAt: -1 })
+        .lean(),
+    ]);
+
+    const merged = [
+      ...posts.map((p) => ({ ...p, type: "Post" })),
+      ...reels.map((r) => ({ ...r, type: "Reel" })),
+    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    return res.status(200).json({ success: true, taggedItems: merged });
+  } catch (error) {
+    console.error("Get Tagged Items Error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };

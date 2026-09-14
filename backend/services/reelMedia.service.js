@@ -24,7 +24,6 @@ export const uploadReelVideo = (fileBuffer, folder = "reels", trim = {}) => {
       chunk_size: 6_000_000,
     };
 
-    // only apply a trim transformation if the client actually sent a valid window
     if (dur > 0) {
       uploadOptions.transformation = [
         { start_offset: start, end_offset: start + dur },
@@ -85,5 +84,8 @@ export const uploadReelVideo = (fileBuffer, folder = "reels", trim = {}) => {
 
 export const deleteReelVideo = async (publicId) => {
   if (!publicId) return;
-  await cloudinary.uploader.destroy(publicId, { resource_type: "video" });
+  await cloudinary.uploader.destroy(publicId, {
+    resource_type: "video",
+    timeout: 120000, // 120s — free tier can be slow; give it more room before giving up
+  });
 };

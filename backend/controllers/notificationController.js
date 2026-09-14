@@ -13,8 +13,19 @@ export const getNotifications = async (req, res) => {
         .skip((page - 1) * limit)
         .limit(limit)
         .populate("sender", "username fullName profilePic")
-        .populate("post", "media")
-        .populate("reel", "media")
+        // include everything CommentsOverlay needs to render the post: author info,
+        // likes (for the like button state), caption/createdAt for the pseudo-comment
+        // header, and commentsCount for the comment count.
+        .populate({
+          path: "post",
+          select: "media author likes commentsCount caption createdAt",
+          populate: { path: "author", select: "username profilePic isVerified" },
+        })
+        .populate({
+          path: "reel",
+          select: "media author likes commentsCount caption createdAt",
+          populate: { path: "author", select: "username profilePic isVerified" },
+        })
         .lean(),
       notificationModel.countDocuments({ recipient: userId }),
       userModel.findById(userId).select("following").lean(),

@@ -1,8 +1,10 @@
 import Reel from "../models/reel.model.js";
 import userModel from "../models/user.model.js"
 import ReelComment from "../models/reelComment.model.js";
+import cloudinary from "../config/cloudinary.js";
 import { createNotification, removeNotification } from "../services/notification.service.js";
-import { uploadReelVideo, deleteReelVideo } from "../services/reelMedia.service.js";
+import { uploadReelVideo } from "../services/reelMedia.service.js";
+import { deleteCloudinaryAssetWithRetry } from "../utils/cloudinaryRetry.js";
 
 export const createReel = async (req, res) => {
   try {
@@ -10,14 +12,42 @@ export const createReel = async (req, res) => {
       return res.status(400).json({ message: "A video file is required" });
     }
 
-     const media = await uploadReelVideo(req.file.buffer, "reels", {
+    const media = await uploadReelVideo(req.file.buffer, "reels", {
       trimStart: req.body.trimStart,
       trimDuration: req.body.trimDuration,
     });
 
+    // location arrives as a JSON string ({ name, lat, lng }) from the frontend's
+    // FormData — Reel.location is just a plain string, so we only keep the name
+    let locationName = "";
+    if (req.body.location) {
+      try {
+        const loc = JSON.parse(req.body.location);
+        if (loc?.name) locationName = loc.name;
+      } catch {
+        locationName = req.body.location;
+      }
+    }
+
+    // taggedUsers arrives as a JSON-stringified array of user ids
+    let taggedUserIds = [];
+    if (req.body.taggedUsers) {
+      try {
+        const ids = JSON.parse(req.body.taggedUsers);
+        if (Array.isArray(ids) && ids.length > 0) {
+          const existing = await userModel.find({ _id: { $in: ids } }).select("_id");
+          taggedUserIds = existing
+            .map((u) => u._id.toString())
+            .filter((id) => id !== req.user._id.toString());
+        }
+      } catch {
+        // malformed tag payload — skip it, don't fail the whole upload
+      }
+    }
+
     const reel = await Reel.create({
       caption: req.body.caption || "",
-      location: req.body.location || "",
+      location: locationName,
       media: {
         url: media.url,
         publicId: media.publicId,
@@ -28,7 +58,19 @@ export const createReel = async (req, res) => {
       },
       aspectRatio: media.aspectRatio,
       author: req.user._id,
+      taggedUsers: taggedUserIds,
     });
+
+    await Promise.all(
+      taggedUserIds.map((tid) =>
+        createNotification({
+          recipientId: tid,
+          senderId: req.user._id,
+          type: "tag",
+          reelId: reel._id,
+        }).catch(() => {})
+      )
+    );
 
     const populated = await reel.populate("author", "username avatar isVerified");
     return res.status(201).json({ reel: populated });
@@ -85,12 +127,30 @@ export const deleteReel = async (req, res) => {
       return res.status(403).json({ message: "Not authorized to delete this reel" });
     }
 
-    await deleteReelVideo(reel.media.publicId);
+    // fire-and-forget with retry — doesn't block the response, but keeps
+    // trying in the background until Cloudinary actually confirms deletion
+    deleteCloudinaryAssetWithRetry(reel.media.publicId, "video", 1, 5, cloudinary);
+
     await ReelComment.deleteMany({ reel: reel._id });
+
+    await userModel.updateMany(
+      {},
+      {
+        $pull: {
+          savedReels: reel._id,
+          savedItems: { itemType: "Reel", itemId: reel._id },
+        },
+      }
+    );
+
+    await userModel.findByIdAndUpdate(reel.author, { $inc: { reelsCount: -1 } });
+
+
     await reel.deleteOne();
 
     return res.status(200).json({ message: "Reel deleted" });
   } catch (err) {
+    console.error("Delete Reel Error:", err);
     return res.status(500).json({ message: "Failed to delete reel" });
   }
 };

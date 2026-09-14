@@ -1,10 +1,11 @@
-
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import { useNotifications } from "../context/NotificationContext";
+import { useAuth } from "../context/AuthContext";
 import IconSidebar from "../components/IconSidebar";
 import MobileFooter from "../components/MobileFooter";
+import CommentsOverlay from "../components/CommentsOverlay";
 import { toast } from "react-toastify";
 import { notificationText } from "../utils/notificationText";
 
@@ -28,11 +29,16 @@ function timeAgo(date) {
 
 const NotificationsPage = () => {
   const { markAllAsRead } = useNotifications();
+  const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [followBackState, setFollowBackState] = useState({});
+
+  // which post/reel's CommentsOverlay is currently open, if any —
+  // { type: "post" | "reel", data: <post or reel object>, authorId }
+  const [activeOverlay, setActiveOverlay] = useState(null);
 
   const loadNotifications = useCallback(async (pageNum) => {
     setLoading(true);
@@ -69,6 +75,25 @@ const NotificationsPage = () => {
     } catch (err) {
       console.error("Follow back failed", err);
     }
+  };
+
+  // opens the CommentsOverlay for whichever post/reel this notification points to
+  const openOverlayFor = (n) => {
+    if (n.reel) {
+      setActiveOverlay({ type: "reel", data: n.reel, authorId: n.reel.author?._id });
+    } else if (n.post) {
+      setActiveOverlay({ type: "post", data: n.post, authorId: n.post.author?._id });
+    }
+  };
+
+  const isItemLiked = (item) =>
+    item?.likes?.some((like) => (like?._id || like)?.toString() === user?._id?.toString()) || false;
+
+  const isItemSaved = (type, item) => {
+    if (!item?._id) return false;
+    return type === "post"
+      ? user?.savedPosts?.some((id) => id.toString() === item._id.toString()) || false
+      : user?.savedReels?.some((id) => id.toString() === item._id.toString()) || false;
   };
 
   return (
@@ -109,24 +134,22 @@ const NotificationsPage = () => {
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                   <Link
-                      to={
-                        isFollow
-                          ? `/user/get-profile/${n.sender._id}`
-                          : n.reel
-                          ? `/reel/${n.reel._id}`
-                          : `/post/${n.post?._id}`
-                      }
-                      className="shrink-0"
-                    >
+                   {isFollow ? (
+                      <Link to={`/user/get-profile/${n.sender._id}`} className="shrink-0">
+                        <div className="w-[48px] h-[48px] overflow-hidden border border-[var(--border-soft)] rounded-full">
+                          <img src={thumbSrc} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      </Link>
+                    ) : (
                       <div
-                        className={`w-[48px] h-[48px] overflow-hidden border border-[var(--border-soft)] ${
-                          isFollow ? "rounded-full" : "rounded-md"
-                        }`}
+                        onClick={() => openOverlayFor(n)}
+                        className="shrink-0 cursor-pointer"
                       >
-                        <img src={thumbSrc} alt="" className="w-full h-full object-cover" />
+                        <div className="w-[48px] h-[48px] overflow-hidden border border-[var(--border-soft)] rounded-md">
+                          <img src={thumbSrc} alt="" className="w-full h-full object-cover" />
+                        </div>
                       </div>
-                    </Link>
+                    )}
 
                     <div className="notifText min-w-0 text-[14px] text-[var(--text-primary)] leading-tight">
                       <span className="truncate">
@@ -175,6 +198,17 @@ const NotificationsPage = () => {
           <MobileFooter />
         </div>
       </div>
+
+      {activeOverlay && (
+        <CommentsOverlay
+          post={activeOverlay.type === "post" ? activeOverlay.data : undefined}
+          reel={activeOverlay.type === "reel" ? activeOverlay.data : undefined}
+          authorId={activeOverlay.authorId}
+          onClose={() => setActiveOverlay(null)}
+          initialIsLiked={isItemLiked(activeOverlay.data)}
+          initialIsSaved={isItemSaved(activeOverlay.type, activeOverlay.data)}
+        />
+      )}
     </div>
   );
 };

@@ -17,7 +17,7 @@ const UploadIndicator = () => {
       {visible.map((u) => (
         <div
           key={u.id}
-          className="bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 shadow-lg text-white text-sm"
+          className="bg-[var(--bg-panel)] border border-[var(--border-popup)] rounded-lg px-3 py-2 shadow-lg text-[var(--text-primary)] text-sm"
         >
           <div className="flex items-center justify-between">
             <span>
@@ -39,9 +39,9 @@ const UploadIndicator = () => {
           </div>
 
           {u.status === "uploading" && (
-            <div className="mt-2 w-full h-1 bg-neutral-700 rounded-full overflow-hidden">
+            <div className="mt-2 w-full h-1 bg-[var(--border-popup)] rounded-full overflow-hidden">
               <div
-                className="h-full bg-[#4a5df9] transition-all"
+                className="h-full bg-[var(--accent-indigo)] transition-all"
                 style={{ width: `${u.progress}%` }}
               />
             </div>

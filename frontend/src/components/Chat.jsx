@@ -1,11 +1,12 @@
+// Chat.jsx
 import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Image, Send, Smile, X } from "lucide-react";
+import { Image, Send, Smile, X, ArrowLeft } from "lucide-react";
 import socket from '../socket';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import MessageBox from './MessageBox';
 import { useSocket } from '../context/SocketContext';
 import { getTimeAgo } from '../utils/timeAgo';
@@ -53,6 +54,8 @@ const Chat = () => {
 
   const { user } = useAuth();
   const { conversationId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const friend = conversation?.participants.find(
     (participant) => participant?._id !== user?._id
@@ -66,6 +69,20 @@ const Chat = () => {
     : friendLastSeen
     ? `Active ${getTimeAgo(friendLastSeen)} ago`
     : null;
+
+  // Mobile back arrow: pop the history entry that opening this chat
+  // pushed (see MessageCard's `replace={isDesktop}`), so we land back on
+  // the list instead of stacking yet another "list" entry on top of it.
+  // `location.key === "default"` means there's no in-app history behind
+  // this screen (direct load/refresh) — popping there would exit the
+  // app entirely, so fall back to a plain replace to the list instead.
+  const handleBack = () => {
+    if (location.key && location.key !== "default") {
+      navigate(-1);
+    } else {
+      navigate("/user/messages", { replace: true });
+    }
+  };
 
   const handleImageSelect = (e) => {
     const files = Array.from(e.target.files || []);
@@ -518,11 +535,19 @@ const Chat = () => {
   };
 
   return (
-    <div className="messageDisplay hidden md:block relative md:w-[65%] lg:w-[70%] h-full bg-[var(--bg-app)]">
+    <div className={`messageDisplay ${conversationId ? "block" : "hidden"} md:block relative w-full md:w-[65%] lg:w-[70%] h-full bg-[var(--bg-app)]`}>
 
       <div className="reciverDetails w-full h-[85px] flex border-b border-[var(--border-soft)]">
 
-        <div className="messageCard w-[70%] lg:w-[50%] h-full flex justify-center items-center cursor-pointer">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="backBtn md:hidden w-[50px] h-full flex-shrink-0 flex justify-center items-center"
+        >
+          <ArrowLeft size={24} color="var(--text-primary)" />
+        </button>
+
+        <div className="messageCard w-[60%] sm:w-[70%] lg:w-[50%] h-full flex justify-center items-center cursor-pointer">
 
           <div className="profilePicSection w-[20%] h-full flex justify-center items-center">
             <div className="profilePic w-[50px] h-[50px] lg:w-[70px] lg:h-[70px] rounded-full overflow-hidden">

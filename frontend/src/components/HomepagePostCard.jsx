@@ -5,7 +5,15 @@ import ShareOverlay from "./ShareOverlay";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import { NavLink } from "react-router-dom";
-import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  Heart,
+  MessageCircle,
+  Send,
+  Bookmark,
+} from "lucide-react";
 import { getTimeAgo } from "../utils/timeAgo";
 
 const BASE_URL = "http://localhost:4000";
@@ -246,12 +254,13 @@ const HomepagePostCard = ({ ...props }) => {
         onTouchStart={isCarousel ? handleTouchStart : undefined}
         onTouchEnd={isCarousel ? handleTouchEnd : undefined}
       >
-        <div
+        <Heart
           ref={animatedLikeRef}
-          className="likeAnimation absolute top-[50%] left-[50%] -translate-x-[50%] -translate-y-[50%] w-[0px] h-[150px] rounded-full flex justify-center items-center transition-all ease-in-out duration-[3s]"
-        >
-          <img src="/images/gradient-like-icon.png" alt="" className="w-full" />
-        </div>
+          fill="var(--text-on-brand)"
+          color="var(--text-on-brand)"
+          strokeWidth={0}
+          className="likeAnimation absolute top-[50%] left-[50%] -translate-x-[50%] -translate-y-[50%] w-[0px] h-[150px] opacity-0 pointer-events-none transition-all ease-in-out duration-[3s] drop-shadow-[0_0_12px_rgba(0,0,0,0.35)]"
+        />
 
         {mediaList[activeSlide]?.mediaType === "video" ? (
           <video
@@ -308,39 +317,45 @@ const HomepagePostCard = ({ ...props }) => {
         <div className="iconSection w-full h-[35px] flex">
           <div className="left flex items-center gap-5 px-2">
             <div className="like flex items-center gap-1">
-              <img
-                src={isLiked ? "/images/redlike-icon.png" : "/images/postlike-icon.png"}
-                alt=""
+              <Heart
+                size={26}
                 onClick={toggleLike}
-                className="w-[35px] h-[30px] cursor-pointer"
+                className="cursor-pointer transition-colors"
+                color={isLiked ? "var(--color-danger)" : "var(--text-primary)"}
+                fill={isLiked ? "var(--color-danger)" : "none"}
+                strokeWidth={isLiked ? 0 : 2}
               />
               <span className="text-sm font-semibold">{likesCount}</span>
             </div>
 
             <div onClick={() => setIsCommentsOpen(true)} className="cmnt flex items-center gap-1">
-              <img
-                src="/images/postcmnt-icon.png"
-                alt=""
-                className="w-[30px] h-[30px] cursor-pointer"
+              <MessageCircle
+                size={25}
+                className="cursor-pointer -scale-x-100"
+                color="var(--text-primary)"
+                strokeWidth={2}
               />
               <span className="text-sm font-semibold">{props.commentsCount}</span>
             </div>
 
             <div onClick={() => setIsShareOpen(true)} className="share flex items-center">
-              <img
-                src="/images/postshare-icon.png"
-                alt=""
-                className="w-[30px] h-[30px] cursor-pointer"
+              <Send
+                size={24}
+                className="cursor-pointer"
+                color="var(--text-primary)"
+                strokeWidth={2}
               />
             </div>
           </div>
 
           <div className="right flex-1 flex justify-end items-center pr-2">
-            <img
-              src={isSaved ? "/images/filledsave-icon.png" : "/images/postsave-icon.png"}
-              alt=""
+            <Bookmark
+              size={24}
               onClick={handleSave}
-              className="w-[30px] h-[30px] cursor-pointer"
+              className="cursor-pointer transition-colors"
+              color="var(--text-primary)"
+              fill={isSaved ? "var(--text-primary)" : "none"}
+              strokeWidth={2}
             />
           </div>
         </div>

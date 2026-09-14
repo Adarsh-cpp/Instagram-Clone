@@ -39,6 +39,12 @@ const reelSchema = new mongoose.Schema(
     isArchived: { type: Boolean, default: false },
     saves: [{ type: mongoose.Schema.Types.ObjectId, ref: "User", default: [] }],
     savesCount: { type: Number, default: 0 },
+    taggedUsers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
   },
   { timestamps: true }
 );

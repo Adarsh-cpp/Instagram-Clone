@@ -1,12 +1,38 @@
-import React from 'react'
+// MessageCard.jsx
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
 import { useSocket } from '../context/SocketContext'
 import { getTimeAgo } from '../utils/timeAgo'
 
+// Desktop shows both panes at once, so opening a chat there is just a
+// "change selection", not a real navigation — it should replace the
+// current history entry rather than push a new one. Otherwise clicking
+// through several chats fills the history stack and back has to step
+// through each one before reaching /home. Mobile is a real full-screen
+// navigation, so it still pushes (see MessageCard usage below).
+const useIsDesktop = () => {
+  const [isDesktop, setIsDesktop] = useState(
+    typeof window !== "undefined"
+      ? window.matchMedia("(min-width: 768px)").matches
+      : true
+  );
+
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 768px)");
+    const handleChange = (e) => setIsDesktop(e.matches);
+
+    mql.addEventListener("change", handleChange);
+    return () => mql.removeEventListener("change", handleChange);
+  }, []);
+
+  return isDesktop;
+};
+
 const MessageCard = ({ ...props }) => {
   const { user } = useAuth()
   const { onlineUsers } = useSocket()
+  const isDesktop = useIsDesktop()
 
   const friend = props.conversation?.participants.find(
     (participant) => participant?._id !== user?._id
@@ -37,7 +63,10 @@ const MessageCard = ({ ...props }) => {
   const timeAgo = getTimeAgo(props.conversation?.lastMessageTime);
 
   return (
-    <Link to={`/user/messages/${props.conversation?._id}`}>
+    <Link
+      to={`/user/messages/${props.conversation?._id}`}
+      replace={isDesktop}
+    >
       <div className="messageCard w-full h-[80px] sm:h-[85px] flex justify-center items-center rounded-xl hover:bg-[var(--bg-row-hover)] cursor-pointer px-2">
 
         <div className="profilePicSection w-[20%] h-full flex justify-center items-center">

@@ -17,7 +17,7 @@ const router = express.Router();
 router.get("/get-reels", authUser, getReels);
 router.get("/:id", authUser, getReelById);
 router.post("/create-reel", authUser, uploadReel.single("video"), createReel);
-router.delete("/:id", authUser, deleteReel);
+router.delete("/:id/delete", authUser, deleteReel);
 router.post("/:id/like", authUser, toggleLikeReel);
 router.post("/:id/share", authUser, shareReel);
 router.post("/:id/toggle-save", authUser, toggleSaveReel)

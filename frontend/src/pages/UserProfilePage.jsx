@@ -32,6 +32,7 @@ const UserProfilePage = () => {
   const [followers, setFollowers] = useState(user.followers?.length)
   const [reels, setReels] = useState([])
   const [savedItems, setSavedItems] = useState([])
+  const [taggedItems, setTaggedItems] = useState([])
 
    //for switching between post types
    const [activeTab, setActiveTab] = useState("Posts");
@@ -222,6 +223,21 @@ const UserProfilePage = () => {
     getHighlights()
   }, [user._id])
 
+  // fetch this profile's tagged posts + reels (merged, sorted by recency) —
+  // like highlights, this isn't owner-gated, so it works for any profile
+  useEffect(() => {
+    const getTaggedItems = async () => {
+      if (!user._id) return
+      try {
+        const res = await axiosInstance.get(`/post/tagged-items/${user._id}`)
+        setTaggedItems(res.data.taggedItems || [])
+      } catch (error) {
+        console.log(error)
+      }
+    }
+    getTaggedItems()
+  }, [user._id])
+
   const handleHighlightCreated = (highlight) => {
     setHighlights((prev) => [highlight, ...prev])
     setShowNewHighlightModal(false)
@@ -243,6 +259,11 @@ const UserProfilePage = () => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  // hide the highlights row entirely when viewing someone else's profile
+  // and they have zero highlights — on your own profile it always shows
+  // because of the "New" tile
+  const showHighlightSection = isOwnProfile || highlights.length > 0
 
   return (
     <div className="UserProfilePage w-[100vw] h-[100vh] flex justify-between items-center bg-[var(--bg-app)]">
@@ -285,8 +306,8 @@ const UserProfilePage = () => {
         )}
 
         <div className="profileContainer w-full 2xl:w-[80%] h-full relative ">
-            <div className="profileInfo w-full h-[46%]  ">
-                <div className="personalInfoSection w-full h-[75%] sm:h-[62%] flex justify-start items-center ">
+            <div className={`profileInfo w-full ${showHighlightSection ? "h-[46%]" : "h-[34.5%] sm:h-[28.5%]"}`}>
+                <div className={`personalInfoSection w-full flex justify-start items-center ${showHighlightSection ? "h-[75%] sm:h-[62%]" : "h-full"}`}>
                     <div className="profilePicSection w-[30%] md:w-[25%] lg:w-[20%] h-full flex justify-center items-center ">
                         <div
                           onClick={() => setIsDpOverlayOpen(true)}
@@ -356,32 +377,34 @@ const UserProfilePage = () => {
                     </div>
                 </div>
 
-                <div ref={scrollRef}
-                     onMouseDown={handleMouseDown}
-                     onMouseLeave={handleMouseLeave}
-                     onMouseUp={handleMouseUp}
-                     onMouseMove={handleMouseMove}
-                     className="highlightSection w-full h-[30%] sm:h-[43%] p-2 flex justify-start items-center sm:items-start gap-10 overflow-x-auto scrollbar-hide select-none cursor-grab ">
-                        {isOwnProfile && (
-                          <div
-                            onClick={() => setShowNewHighlightModal(true)}
-                            className="newHighlightsection h-full w-[100px] flex flex-col justify-center sm:justify-start items-center cursor-pointer"
-                          >
-                             <div className="newHighLightCircle w-[70px] h-[70px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-full object-fit object-center border-[4px] border-[var(--border-container)] overflow-hidden flex justify-center items-center bg-[var(--bg-input)]">
-                               <img src="/images/plus-icon.png" alt="" draggable="false" className='w-[60%] h-[60%] select-none' />
-                            </div>
-                            <div className="newtext text-[var(--text-primary)] text-[12px]">New</div>
-                           </div>
-                        )}
-                        {highlights.map((h) => (
-                          <HighlightCircle
-                            key={h._id}
-                            title={h.title}
-                            coverImage={h.coverImage}
-                            onClick={() => navigate(`/highlight/view/${h._id}`)}
-                          />
-                        ))}
-                </div>
+                {showHighlightSection && (
+                  <div ref={scrollRef}
+                       onMouseDown={handleMouseDown}
+                       onMouseLeave={handleMouseLeave}
+                       onMouseUp={handleMouseUp}
+                       onMouseMove={handleMouseMove}
+                       className="highlightSection w-full h-[30%] sm:h-[43%] p-2 flex justify-start items-center sm:items-start gap-10 overflow-x-auto scrollbar-hide select-none cursor-grab ">
+                          {isOwnProfile && (
+                            <div
+                              onClick={() => setShowNewHighlightModal(true)}
+                              className="newHighlightsection h-full w-[100px] flex flex-col justify-center sm:justify-start items-center cursor-pointer"
+                            >
+                               <div className="newHighLightCircle w-[70px] h-[70px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-full object-fit object-center border-[4px] border-[var(--border-container)] overflow-hidden flex justify-center items-center bg-[var(--bg-input)]">
+                                 <img src="/images/plus-icon.png" alt="" draggable="false" className='w-[60%] h-[60%] select-none' />
+                              </div>
+                              <div className="newtext text-[var(--text-primary)] text-[12px]">New</div>
+                             </div>
+                          )}
+                          {highlights.map((h) => (
+                            <HighlightCircle
+                              key={h._id}
+                              title={h.title}
+                              coverImage={h.coverImage}
+                              onClick={() => navigate(`/highlight/view/${h._id}`)}
+                            />
+                          ))}
+                  </div>
+                )}
 
             </div>
 
@@ -450,9 +473,24 @@ const UserProfilePage = () => {
             </>
           )}
 
-         {activeTab === "Tagged" && <div className="tagSection w-full min-h-[44%]  grid grid-cols-3" >
-          <TagCard imgSrc={"/images/profile-pic.JPG"} />
-        </div>}
+        {activeTab === "Tagged" && (
+          <>
+            {taggedItems.length > 0 ? (
+              <div className="tagSection w-full min-h-[44%] grid grid-cols-3">
+                {taggedItems.map((item) => (
+                  <TagCard key={`${item.type}-${item._id}`} item={item} />
+                ))}
+              </div>
+            ) : (
+              <div className="w-full min-h-[44%] flex flex-col justify-center items-center gap-3">
+                <h2 className="text-[var(--text-primary)] text-2xl font-bold">No Tagged Posts</h2>
+                <p className="text-[var(--text-muted)] text-sm">
+                  When people tag {isOwnProfile ? "you" : "them"} in photos and videos, they'll appear here.
+                </p>
+              </div>
+            )}
+          </>
+        )}
         
         {activeTab === "Saved" && isOwnProfile && (
           <>

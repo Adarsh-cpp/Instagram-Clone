@@ -1,5 +1,6 @@
 import React, { useRef } from 'react'
 import { toast } from 'react-toastify'
+import { ImagePlus } from 'lucide-react'
 
 const MAX_IMAGES = 5
 
@@ -44,19 +45,18 @@ const SelectImagePage = ({ setOriginalMedia, setMediaType, next }) => {
   return (
     <div className="w-[100vw] h-[100vh] flex justify-center items-center bg-[var(--bg-app)]">
       <div className="selectContainerOverlay w-full h-full flex justify-center items-center bg-[rgba(0,0,0,0)] px-4">
-        <div className="selectContainer w-full max-w-[500px] md:w-[70%] lg:w-[50%] xl:w-[30%] h-[70%] rounded-2xl bg-[var(--bg-surface)] overflow-hidden">
-          <div className="heading w-full h-[40px] text-[var(--text-primary)] text-[16px] sm:text-[18px] font-semibold flex justify-center items-center bg-[var(--bg-app)]">
+        <div className="selectContainer w-full max-w-[500px] md:w-[70%] lg:w-[50%] xl:w-[30%] h-[70%] rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-container)] shadow-xl overflow-hidden">
+          <div className="heading w-full h-[40px] text-[var(--text-primary)] text-[16px] sm:text-[18px] font-semibold flex justify-center items-center bg-[var(--bg-app)] border-b border-[var(--border-soft)]">
             Create new post
           </div>
 
-          <hr />
-
           <div className="bottom w-full h-[calc(100%-40px)] flex flex-col justify-center px-4">
             <div className="icon w-full h-[120px] flex justify-center items-center">
-              <img
-                src="/images/create-post-icon.png"
-                className="w-[100px] h-[80px] sm:w-[130px] sm:h-[100px]"
-                alt=""
+              <ImagePlus
+                size={72}
+                strokeWidth={1.25}
+                color="var(--text-muted)"
+                className="sm:w-[90px] sm:h-[90px]"
               />
             </div>
 
