@@ -286,7 +286,7 @@ const AboutPage = () => {
 
               {/* LinkedIn */}
               <a
-                href="https://www.linkedin.com/in/adarsh-pattanayak"
+                href="https://www.linkedin.com/in/adarshpattanayak"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 flex items-center justify-between px-4 py-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-soft)] hover:bg-[var(--bg-row-hover)] transition-colors duration-200"

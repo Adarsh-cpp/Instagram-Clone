@@ -1,9 +1,26 @@
 // FollowUserCard.jsx
 import React from 'react'
+import { Link } from 'react-router-dom'
 
-const FollowUserCard = ({ profilePic, username, fullName, isFollowing, onToggleFollow }) => {
+const FollowUserCard = ({ userId, profilePic, username, fullName, isFollowing, onToggleFollow, onCardClick }) => {
+
+  const handleFollowClick = (e) => {
+    // Prevent the click from bubbling up to the Link and navigating away
+    e.preventDefault()
+    e.stopPropagation()
+    onToggleFollow(username)
+  }
+
+  const handleCardClick = () => {
+    if (onCardClick) onCardClick()
+  }
+
   return (
-    <div className="profileCard w-full h-[60px] px-4 flex items-center justify-between hover:bg-[var(--bg-row-hover)]">
+    <Link
+      to={`/user/get-profile/${userId}`}
+      onClick={handleCardClick}
+      className="profileCard w-full h-[60px] px-4 flex items-center justify-between hover:bg-[var(--bg-row-hover)]"
+    >
       <div className="detailsSide flex items-center gap-3">
         <div className="profilePic w-[45px] h-[45px] flex justify-center items-center rounded-full overflow-hidden shrink-0">
           <img src={profilePic} alt="" className="w-full h-full object-cover" />
@@ -16,7 +33,7 @@ const FollowUserCard = ({ profilePic, username, fullName, isFollowing, onToggleF
 
       <div className="removeSide">
         <button
-          onClick={() => onToggleFollow(username)}
+          onClick={handleFollowClick}
           className={`px-4 py-1.5 rounded-lg text-[13px] font-semibold cursor-pointer ${
             isFollowing
               ? "bg-[var(--bg-secondary-btn)] text-[var(--text-primary)] hover:bg-[var(--bg-secondary-btn-hover)]"
@@ -26,7 +43,7 @@ const FollowUserCard = ({ profilePic, username, fullName, isFollowing, onToggleF
           {isFollowing ? "Following" : "Follow"}
         </button>
       </div>
-    </div>
+    </Link>
   )
 }
 

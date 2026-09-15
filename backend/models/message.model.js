@@ -35,6 +35,28 @@ const messageSchema = new mongoose.Schema(
       default: [],
     },
 
+    // Sticker / animated sticker / GIF sent as a standalone message.
+    // - "sticker": static emoji sticker — no external asset, just `emoji`
+    // - "animated_sticker": Lottie JSON animation — `url` points at the JSON
+    // - "gif": GIF from GIPHY — `url` points at the GIF image
+    // Only one of `url` / `emoji` will be set depending on `type`.
+    sticker: {
+      type: new mongoose.Schema(
+        {
+          type: {
+            type: String,
+            enum: ["sticker", "animated_sticker", "gif"],
+            required: true,
+          },
+          url: String,
+          emoji: String,
+          name: String,
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
+
     sharedPost: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Post",

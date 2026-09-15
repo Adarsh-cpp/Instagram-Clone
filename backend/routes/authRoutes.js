@@ -1,7 +1,20 @@
 import express from "express";
-import {login, signup, logout, sendOTP, verifyOTP, sendResetOTP, resetPassword, addDOB, getFollowings, getFollowers} from "../controllers/authController.js"
+import {
+  login,
+  signup,
+  logout,
+  sendOTP,
+  verifyOTP,
+  sendResetOTP,
+  resetPassword,
+  addDOB,
+  getFollowings,
+  getFollowers,
+  googleCallback,
+  addUsername,
+} from "../controllers/authController.js"
 import { authUser } from "../middlewares/authMiddleware.js";
-import passport from "../config/passport-facebook.js";
+import passportGoogle from "../config/passport-google.js";
 
 
 const router = express.Router();
@@ -22,6 +35,8 @@ router.post("/reset-password", resetPassword);
 
 router.post("/add-dob", authUser, addDOB);
 
+router.patch("/add-username", authUser, addUsername);
+
 router.get("/get-followers", authUser, getFollowers)
 
 router.get("/get-followings", authUser, getFollowings)
@@ -29,16 +44,19 @@ router.get("/me", authUser, (req, res) => {
   res.json(req.user);
 });
 
-// Login with Facebook
-router.get("/facebook", passport.authenticate("facebook", { scope: ["email"] }));
 
-// Callback after Facebook login
+
+// Login with Google
 router.get(
-  "/facebook/callback",
-  passport.authenticate("facebook", {
-    failureRedirect: "http://localhost:5173/",
-    successRedirect: "http://localhost:5173/home",
-  })
+  "/google",
+  passportGoogle.authenticate("google", { scope: ["profile", "email"], session: false })
+);
+
+// Callback after Google login
+router.get(
+  "/google/callback",
+  passportGoogle.authenticate("google", { session: false, failureRedirect: "http://localhost:5173/" }),
+  googleCallback
 );
 
 export default router;

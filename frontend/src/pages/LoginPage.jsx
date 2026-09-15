@@ -1,10 +1,9 @@
-
 import axios from 'axios';
 import React, { useState } from 'react'
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from "react-toastify";
-
+import { GoogleIcon, PasswordVisibleIcon, PasswordHiddenIcon } from '../components/Icons';
 
 const LoginPage = () => {
 
@@ -12,7 +11,7 @@ const LoginPage = () => {
    const navigate = useNavigate()
 
   const onSubmit = async (data) => {
-    
+
      try {
       const response = await axios.post("http://localhost:4000/auth/login", {
         contact: data.contact,
@@ -43,11 +42,11 @@ const LoginPage = () => {
      setPwVisibility((prev) => !prev);
    }
 
-   const handleFacebookLogin = () => {
-      window.location.href = "http://localhost:4000/auth/facebook";
+   const handleGoogleLogin = () => {
+      window.location.href = "http://localhost:4000/auth/google";
    }
-   
-   
+
+
 
   return (
    <div className="loginPage h-[100vh] w-[100vw] bg-[var(--bg-app)] flex justify-center">
@@ -87,11 +86,7 @@ const LoginPage = () => {
         {/* Password Field */}
         <div className="passwordContainer relative">
           <button type="button" onClick={handlePwVisibility} className="visibility absolute right-[10px] top-[25%] cursor-pointer z-10 ">
-            <img
-              src={pwVisibility ? "/images/visibility-off.png" : "/images/visibility-on.png"}
-              alt=""
-              className="w-[20px] h-[20px] "
-            />
+            {pwVisibility ? <PasswordHiddenIcon /> : <PasswordVisibleIcon />}
             </button>
           <input
             type={pwVisibility ? "text" : "password"}
@@ -129,14 +124,20 @@ const LoginPage = () => {
                 <div className="line2 h-full w-[40%] flex items-center"><hr className="inline-block w-full border border-[var(--border-select)]" /></div>
               </div>
             </div>
-          
-          <div className="facebook w-full h-[80px] ">
-            <div className="top h-[50%] w-full flex justify-center items-center text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] text-[14px] font-bold cursor-pointer ">
-              <img src="/images/facebook-logo.png" alt="" className="w-[30px] h-[20px]" /> <span onClick={handleFacebookLogin}>Log in with Facebook</span>
+
+          <div className="google w-full flex flex-col items-center">
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              className="googleBtn w-[270px] h-[36px] my-[10px] rounded-[8px] border border-[var(--border-input)] bg-[var(--bg-input)] hover:brightness-110 transition flex items-center justify-center gap-2 text-[var(--text-primary)] text-[14px] font-semibold cursor-pointer"
+            >
+              <GoogleIcon size={18} /> Continue with Google
+            </button>
+            <div className="forgotPassword w-full flex justify-center items-center text-[var(--text-primary)] text-[14px] hover:text-[var(--text-muted)] cursor-pointer font-bold ">
+              <Link to="/user/forgot-password">Forgotten your password?</Link>
             </div>
-            <div className="bottom h-[50%] w-full flex justify-center items-center text-[var(--text-primary)] text-[14px] hover:text-[var(--text-muted)] cursor-pointer font-bold "><Link to="/user/forgot-password">Forgotten your password?</Link></div>
           </div>
-          
+
           <div className="signup w-full h-[100px] text-[var(--text-primary)] text-[14px] flex justify-center items-center ">Don't have an account? <span className="text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)]  font-bold cursor-pointer"> &nbsp;<Link to="/user/signup"> Sign up</Link></span></div>
             </div>
           </div>

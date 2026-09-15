@@ -29,6 +29,8 @@ import StoryPage from "../pages/StoryViewerPage.jsx";
 import StoryViewerPage from "../pages/StoryViewerPage.jsx";
 import HighlightViewerPage from "../pages/HighlightViewerPage.jsx";
 import AboutPage from "../pages/AboutPage.jsx";
+import GoogleAuthCallback from "../pages/GoogleAuthCallback.jsx";
+import CompleteProfile from "../pages/CompleteProfile.jsx";
 
 
 
@@ -43,8 +45,10 @@ const router = createBrowserRouter([
       { path: "/user/confirm-otp", element: <ConfirmationPage /> },
       { path: "/user/forgot-password", element: <ForgotPasswordPage /> },
       { path: "/user/reset-password", element: <ResetPasswordPage /> },
+      { path: "/auth/callback", element: <GoogleAuthCallback /> },
+      { path: "/user/complete-profile", element: <CompleteProfile /> },
       { path: "/user/recommendations", element: <FollowingSetupPage /> },
-      { path: "/user/logout", element: <LogoutPage /> },
+
 
       { path: "/home", element: <HomePage /> },
       { path: "/user/get-profile", element: <UserProfilePage /> },

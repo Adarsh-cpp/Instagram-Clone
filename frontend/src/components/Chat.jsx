@@ -1,15 +1,18 @@
 // Chat.jsx
 import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Image, Send, Smile, X, ArrowLeft } from "lucide-react";
+import { Image, Send, Smile, X, ArrowLeft, Sticker } from "lucide-react";
 import socket from '../socket';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import MessageBox from './MessageBox';
+import StickerPicker from './StickerPicker';
+import ThemeOverlay from './ThemeOverlay';
 import { useSocket } from '../context/SocketContext';
 import { getTimeAgo } from '../utils/timeAgo';
+import { CHAT_THEMES, getFontById, loadChatFont } from "../data/chatTheme";
 
 const MAX_IMAGES = 4;
 const MESSAGE_PAGE_SIZE = 30;
@@ -35,6 +38,13 @@ const Chat = () => {
   const fileInputRef = useRef(null);
 
   const [sendingImage, setSendingImage] = useState(false);
+
+  // sticker/animated-sticker/GIF picker overlay
+  const [isStickerPickerOpen, setIsStickerPickerOpen] = useState(false);
+
+  // info ("i") popup menu + chat customization overlay
+  const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false);
+  const [isThemeOverlayOpen, setIsThemeOverlayOpen] = useState(false);
 
   const typingTimeoutRef = useRef(null);
   const containerRef = useRef(null);
@@ -70,12 +80,41 @@ const Chat = () => {
     ? `Active ${getTimeAgo(friendLastSeen)} ago`
     : null;
 
+  // The theme actually applied to this conversation. ThemeOverlay's
+  // preview is fully self-contained (see ThemePreviewPanel) and never
+  // reaches into this component's state.
+  const currentThemeId = conversation?.chatTheme || "default";
+  const activeTheme =
+    CHAT_THEMES.find((theme) => theme.id === currentThemeId) ||
+    CHAT_THEMES.find((theme) => theme.id === "default");
+
+  // The font applied to this conversation. Only the id is persisted; the
+  // stack + stylesheet are resolved client-side from the catalog.
+  const currentFontId = conversation?.chatFont || "default";
+  const activeFont = getFontById(currentFontId);
+
+  const chatFontStyle = {
+    fontFamily: activeFont.stack,
+    ...(activeFont.sizeAdjust ? { fontSize: `${activeFont.sizeAdjust}em` } : {}),
+  };
+
+  // pull the webfont only when a conversation actually uses it
+  useEffect(() => {
+    loadChatFont(currentFontId);
+  }, [currentFontId]);
+
+  // The input pill itself always renders as flat black or white
+  // depending on the theme's mode, regardless of the theme's actual
+  // background/gradient — that gradient is reserved for the area
+  // *around* the pill (chat container + footer).
+  const isLightTheme = activeTheme?.mode === "light";
+  const inputBarBg = isLightTheme ? "#FFFFFF" : "#000000";
+  const inputBarText = isLightTheme ? "#111111" : "#FFFFFF";
+  const inputBarBorder = isLightTheme ? "#E0E0E0" : "#2A2A2A";
+
   // Mobile back arrow: pop the history entry that opening this chat
   // pushed (see MessageCard's `replace={isDesktop}`), so we land back on
   // the list instead of stacking yet another "list" entry on top of it.
-  // `location.key === "default"` means there's no in-app history behind
-  // this screen (direct load/refresh) — popping there would exit the
-  // app entirely, so fall back to a plain replace to the list instead.
   const handleBack = () => {
     if (location.key && location.key !== "default") {
       navigate(-1);
@@ -147,8 +186,7 @@ const Chat = () => {
 
   // Shared helper — called on new incoming visible messages and on tab
   // refocus. Always fire-and-forget: a failure here shouldn't block or
-  // delay anything else in the chat (see getInitialMessages below for why
-  // that matters beyond just UX polish).
+  // delay anything else in the chat.
   const markConversationSeen = async () => {
     try {
       const token = localStorage.getItem("authToken");
@@ -219,10 +257,7 @@ const Chat = () => {
           pendingActionRef.current = "initial";
           setMessages(initialMessages);
 
-          // fire-and-forget, deliberately NOT awaited: awaiting this here
-          // used to delay `setInitialLoading(false)` below into a separate
-          // commit, which meant the "scroll to bottom" effect ran while the
-          // real message list was still hidden behind the loading state.
+          // fire-and-forget, deliberately NOT awaited
           markConversationSeen();
         }
       } catch (error) {
@@ -289,12 +324,26 @@ const Chat = () => {
   }, [loadOlderMessages]);
 
   // measure where the virtualized list starts inside the scroll container
-  // (profile header + the fixed-height "loading older" slot sit above it)
+  // (profile header + the fixed-height "loading older" slot sit above it).
+  // Re-measured on font change too: a different typeface can change the
+  // header block's height, which would otherwise desync every row offset.
   useLayoutEffect(() => {
     if (listStartRef.current) {
       setScrollMargin(listStartRef.current.offsetTop);
     }
-  }, [initialLoading, friend?._id]);
+  }, [initialLoading, friend?._id, currentFontId]);
+
+  // keep offsets correct when the viewport is resized / rotated
+  useEffect(() => {
+    const handleResize = () => {
+      if (listStartRef.current) {
+        setScrollMargin(listStartRef.current.offsetTop);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const virtualizer = useVirtualizer({
     count: messages.length,
@@ -303,15 +352,13 @@ const Chat = () => {
     overscan: 8,
     scrollMargin,
     getItemKey: (index) => messages[index]?._id ?? index,
+    useFlushSync: false,
   });
 
   const virtualItems = virtualizer.getVirtualItems();
 
   // resolves the scroll position AFTER messages actually re-render, based
-  // on what kind of change just happened. Guarded on `initialLoading` too
-  // (not just `messages`) — the real message list only exists in the DOM
-  // once initialLoading is false, so acting on the pending action any
-  // earlier would compute against the wrong content height.
+  // on what kind of change just happened.
   useLayoutEffect(() => {
     if (initialLoading) return;
 
@@ -414,6 +461,27 @@ const Chat = () => {
     return () => socket.off("messagesSeen", handleMessagesSeen);
   }, [conversationId, user?._id]);
 
+  // listen for the friend (or another one of our own tabs/devices)
+  // changing the chat theme/font, so both sides stay in sync
+  useEffect(() => {
+    const handleThemeChanged = ({ conversationId: convId, chatTheme, chatFont }) => {
+      if (convId !== conversationId) return;
+
+      setConversation((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...(chatTheme ? { chatTheme } : {}),
+              ...(chatFont ? { chatFont } : {}),
+            }
+          : prev
+      );
+    };
+
+    socket.on("themeChanged", handleThemeChanged);
+    return () => socket.off("themeChanged", handleThemeChanged);
+  }, [conversationId]);
+
   // derive which message gets the "Seen X ago" label
   const lastSeenMessageId = [...messages]
     .reverse()
@@ -515,9 +583,37 @@ const Chat = () => {
     }
   };
 
-  // unsend a message — sender-only, enforced again server-side. Removes it
-  // outright from local state; the server recomputes the conversation's
-  // preview and notifies the friend over the socket.
+  // send a sticker / animated sticker / GIF as its own message — plain
+  // JSON POST (no file upload involved, it's just a reference/emoji)
+  const handleSendSticker = async (sticker) => {
+    setIsStickerPickerOpen(false);
+
+    try {
+      const token = localStorage.getItem("authToken");
+      const url = `http://localhost:4000/message/${conversationId}`;
+
+      clearTimeout(typingTimeoutRef.current);
+      socket.emit("stopTyping", { senderId: user._id, receiverId: friend?._id, conversationId });
+
+      const response = await axios.post(
+        url,
+        { sticker },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.status === 201) {
+        pendingActionRef.current = "append";
+        setMessages((prev) => [...prev, response.data.data]);
+        messageInputRef.current?.focus();
+      } else {
+        toast.error("Error sending sticker");
+      }
+    } catch (error) {
+      toast.error("Something went wrong");
+    }
+  };
+
+  // unsend a message — sender-only, enforced again server-side.
   const handleDeleteMessage = async (messageId) => {
     // optimistic — remove immediately, roll back if the request fails
     const previousMessages = messages;
@@ -534,33 +630,71 @@ const Chat = () => {
     }
   };
 
-  return (
-    <div className={`messageDisplay ${conversationId ? "block" : "hidden"} md:block relative w-full md:w-[65%] lg:w-[70%] h-full bg-[var(--bg-app)]`}>
+  // apply a new chat theme + font — optimistic local update, persisted via
+  // one PATCH, broadcast over the socket so the friend's open chat updates too
+  const handleApplyCustomization = async (themeId, fontId) => {
+    if (!conversationId) return;
 
-      <div className="reciverDetails w-full h-[85px] flex border-b border-[var(--border-soft)]">
+    const previousThemeId = conversation?.chatTheme;
+    const previousFontId = conversation?.chatFont;
+
+    setConversation((prev) =>
+      prev ? { ...prev, chatTheme: themeId, chatFont: fontId } : prev
+    );
+
+    try {
+      const token = localStorage.getItem("authToken");
+      await axios.patch(
+        `http://localhost:4000/conversation/${conversationId}/theme`,
+        { chatTheme: themeId, chatFont: fontId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      socket.emit("themeChanged", {
+        conversationId,
+        chatTheme: themeId,
+        chatFont: fontId,
+      });
+    } catch (error) {
+      setConversation((prev) =>
+        prev
+          ? { ...prev, chatTheme: previousThemeId, chatFont: previousFontId }
+          : prev
+      );
+      toast.error("Could not update chat appearance");
+    }
+  };
+
+    return (
+    <div className={`messageDisplay ${conversationId ? "flex" : "hidden"} md:flex flex-col relative w-full md:w-[65%] lg:w-[70%] h-[100dvh] md:h-full bg-[var(--bg-app)] overflow-hidden`}>
+
+      <div className="reciverDetails w-full h-[64px] md:h-[85px] shrink-0 flex items-center border-b border-[var(--border-soft)]">
 
         <button
           type="button"
           onClick={handleBack}
-          className="backBtn md:hidden w-[50px] h-full flex-shrink-0 flex justify-center items-center"
+          aria-label="Back to messages"
+          className="backBtn md:hidden w-[44px] h-full flex-shrink-0 flex justify-center items-center"
         >
-          <ArrowLeft size={24} color="var(--text-primary)" />
+          <ArrowLeft size={22} color="var(--text-primary)" />
         </button>
 
-        <div className="messageCard w-[60%] sm:w-[70%] lg:w-[50%] h-full flex justify-center items-center cursor-pointer">
+        <div className="messageCard flex-1 min-w-0 h-full flex items-center gap-2 px-2 cursor-pointer">
 
-          <div className="profilePicSection w-[20%] h-full flex justify-center items-center">
-            <div className="profilePic w-[50px] h-[50px] lg:w-[70px] lg:h-[70px] rounded-full overflow-hidden">
+          <div className="profilePicSection shrink-0 flex justify-center items-center">
+            <div className="profilePic w-[40px] h-[40px] md:w-[52px] md:h-[52px] lg:w-[64px] lg:h-[64px] rounded-full overflow-hidden">
               <img src={friend?.profilePic ? friend.profilePic : "/images/default-profile-pic.jpg" } alt="" className="w-full h-full object-cover" />
             </div>
           </div>
 
-          <div className="messageDetails w-[80%] h-full">
-            <div className="fullname w-full h-[50%] flex justify-start items-end text-[var(--text-primary)] text-[15px] lg:text-[18px]">
-              <span className="ml-2">{friend?.fullname}</span>
+          <div className="messageDetails min-w-0 flex flex-col justify-center">
+            <div className="fullname text-[var(--text-primary)] text-[15px] lg:text-[18px] truncate">
+              <Link to={`/user/get-profile/${friend?._id}`} className="truncate">
+                {friend?.fullname}
+              </Link>
             </div>
-            <div className="lastMsg w-full h-[50%] flex justify-start items-start text-[12px] lg:text-[14px]">
-              <span className={`ml-2 ${isFriendOnline ? "text-green-500" : "text-[var(--text-muted)]"}`}>
+            <div className="lastMsg text-[12px] lg:text-[14px] truncate">
+              <span className={isFriendOnline ? "text-green-500" : "text-[var(--text-muted)]"}>
                 {activeStatusText}
               </span>
             </div>
@@ -568,202 +702,295 @@ const Chat = () => {
 
         </div>
 
-        <div className="profileInfoBtnSection flex-1 h-full flex justify-end items-center">
-          <div className="btn w-[35px] h-[35px] mr-4 overflow-hidden">
+        <div className="profileInfoBtnSection shrink-0 h-full flex justify-end items-center relative">
+          <button
+            type="button"
+            aria-label="Chat options"
+            onClick={() => setIsInfoMenuOpen((prev) => !prev)}
+            className="btn w-[30px] h-[30px] md:w-[35px] md:h-[35px] mr-3 md:mr-4 overflow-hidden cursor-pointer"
+          >
             <img src="/images/info-icon.png" alt="" className="w-full h-full" />
-          </div>
+          </button>
+
+          {isInfoMenuOpen && (
+            <>
+              {/* backdrop — closes the popup on outside click without
+                  stealing clicks from the rest of the page */}
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIsInfoMenuOpen(false)}
+              />
+              <div className="absolute right-3 md:right-4 top-[52px] md:top-[60px] z-50 w-[200px] rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-soft)] shadow-lg py-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsInfoMenuOpen(false);
+                    setIsThemeOverlayOpen(true);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-[14px] text-[var(--text-primary)] hover:bg-[var(--bg-menu-hover)] cursor-pointer"
+                >
+                  Change theme and font
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
       </div>
 
+      {/* The ONLY element carrying the theme. It owns both the scrolling
+          message area and the footer, so a gradient is painted once across
+          the whole region and runs continuously behind the input pill —
+          no second background to keep in sync, no seam where the scroll
+          area ends. The font lives here too, so the input inherits it. */}
       <div
-        ref={containerRef}
-        onScroll={handleScroll}
-        className="chatContainer no-scrollbar w-full h-[calc(100vh-165px)] transition-all duration-1000 ease-in-out overflow-y-auto"
+        className="themedArea flex-1 min-h-0 w-full flex flex-col transition-[background] duration-700 ease-in-out"
+        style={{
+          ...(activeTheme?.bg ? { background: activeTheme.bg } : {}),
+          ...chatFontStyle,
+        }}
       >
 
-        <div className="viewProfileSection w-full h-[250px] flex flex-col justify-center items-center">
+        <div
+          ref={containerRef}
+          onScroll={handleScroll}
+          className="chatContainer no-scrollbar flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden"
+        >
 
-          <div className="profilePicSection w-full h-[120px] flex justify-center items-center">
-            <div className="profilePic w-[80px] h-[80px] lg:w-[100px] lg:h-[100px] rounded-full overflow-hidden">
-              <img src={friend?.profilePic ? friend.profilePic : "/images/default-profile-pic.jpg"} alt="" className="w-full h-full object-cover" />
+          <div className="viewProfileSection w-full h-[220px] sm:h-[250px] flex flex-col justify-center items-center">
+
+            <div className="profilePicSection w-full h-[100px] sm:h-[120px] flex justify-center items-center">
+              <div className="profilePic w-[72px] h-[72px] sm:w-[80px] sm:h-[80px] lg:w-[100px] lg:h-[100px] rounded-full overflow-hidden">
+                <img src={friend?.profilePic ? friend.profilePic : "/images/default-profile-pic.jpg"} alt="" className="w-full h-full object-cover" />
+              </div>
             </div>
-          </div>
 
-          <div className="namesSection w-full h-[60px]">
-            <div className="fullname w-full h-[50%] flex justify-center items-center text-[var(--text-primary)] text-[20px] lg:text-[24px]">
-              <span>{friend?.fullname}</span>
+            <div className="namesSection w-full px-4 text-center">
+              <div className="fullname w-full flex justify-center items-center text-[var(--text-primary)] text-[18px] sm:text-[20px] lg:text-[24px]">
+                <span className="truncate">{friend?.fullname}</span>
+              </div>
+              <div className="username w-full flex justify-center items-center text-[var(--text-muted)] text-[13px] sm:text-[14px] lg:text-[18px]">
+                <span className="truncate">{friend?.username}</span>
+              </div>
             </div>
-            <div className="username w-full h-[50%] flex justify-center items-center text-[var(--text-muted)] text-[14px] lg:text-[18px]">
-              <span>{friend?.username}</span>
+
+            <div className="viewProfileBtn mt-3 flex justify-center items-center">
+              <Link to={`/user/get-profile/${friend?._id}`}>
+                <button className='w-[130px] sm:w-[150px] h-[38px] sm:h-[40px] bg-[var(--bg-elevated)] hover:bg-[var(--bg-menu-hover)] cursor-pointer text-[var(--text-primary)] text-[14px] sm:text-[16px] font-bold rounded-xl'>
+                  View Profile
+                </button>
+              </Link>
             </div>
+
           </div>
 
-          <div className="viewProfileBtn mt-2 w-[150px] h-[40px] flex justify-center items-center">
-            <Link to={`/user/get-profile/${friend?._id}`}>
-              <button className='w-[100px] sm:w-[150px] h-[40px] bg-[var(--bg-elevated)] hover:bg-[var(--bg-menu-hover)] cursor-pointer text-[var(--text-primary)] text-[14px] sm:text-[16px] font-bold rounded-xl'>
-                View Profile
-              </button>
-            </Link>
+          {/* fixed height regardless of loading state, so it never shifts
+              the measured offset of the virtualized list below it */}
+          <div className="h-[32px] w-full flex items-center justify-center text-[var(--text-muted)] text-xs">
+            {isLoadingOlder && "Loading earlier messages..."}
           </div>
 
-        </div>
+          {initialLoading ? (
+            <div className="w-full h-[100px] flex items-center justify-center text-[var(--text-muted)] text-sm">
+              Loading conversation...
+            </div>
+          ) : (
+            <div
+              ref={listStartRef}
+              className="Chat w-full"
+              style={{ position: "relative", height: `${virtualizer.getTotalSize()}px` }}
+            >
+              {virtualItems.map((virtualRow) => {
+                const msg = messages[virtualRow.index];
+                if (!msg) return null;
 
-        {/* fixed height regardless of loading state, so it never shifts
-            the measured offset of the virtualized list below it */}
-        <div className="h-[32px] w-full flex items-center justify-center text-[var(--text-muted)] text-xs">
-          {isLoadingOlder && "Loading earlier messages..."}
-        </div>
-
-        {initialLoading ? (
-          <div className="w-full h-[100px] flex items-center justify-center text-[var(--text-muted)] text-sm">
-            Loading conversation...
-          </div>
-        ) : (
-          <div
-            ref={listStartRef}
-            className="Chat w-full"
-            style={{ position: "relative", height: `${virtualizer.getTotalSize()}px` }}
-          >
-            {virtualItems.map((virtualRow) => {
-              const msg = messages[virtualRow.index];
-              if (!msg) return null;
-
-              return (
-                <div
-                  key={msg._id}
-                  data-index={virtualRow.index}
-                  ref={virtualizer.measureElement}
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: "100%",
-                    transform: `translateY(${virtualRow.start - scrollMargin}px)`,
-                  }}
-                >
-                  <MessageBox
-                    message={msg}
-                    showSeen={msg._id === lastSeenMessageId}
-                    onDelete={handleDeleteMessage}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {isFriendTyping && (
-          <div className=" w-full h-[30px] px-4 pb-1 my-4 text-[var(--text-muted)] text-[18px]">
-            Typing...
-          </div>
-        )}
-
-      </div>
-
-      <div className="footer absolute bottom-0 left-0 w-full flex flex-col justify-center px-2 pb-2">
-
-        {selectedImages.length > 0 && (
-          <div className="imagePreview w-[98%] mx-auto mb-2 flex items-center gap-4 bg-[var(--bg-elevated)] rounded-2xl p-3">
-
-            {/* tilted fanned stack of selected images */}
-            <div className="flex items-center pl-3">
-              {selectedImages.map((img, idx) => {
-                const rotations = [-8, 5, -4, 7]; // fixed tilt per slot, alternating
                 return (
                   <div
-                    key={img.id}
+                    key={msg._id}
+                    data-index={virtualRow.index}
+                    ref={virtualizer.measureElement}
                     style={{
-                      transform: `rotate(${rotations[idx % rotations.length]}deg)`,
-                      marginLeft: idx === 0 ? 0 : "-18px",
-                      zIndex: idx,
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      transform: `translateY(${virtualRow.start - scrollMargin}px)`,
                     }}
-                    className="relative w-[56px] h-[56px] shrink-0 rounded-lg overflow-hidden border-2 border-[var(--bg-elevated)] shadow-md hover:z-10 hover:scale-105 transition-transform"
                   >
-                    <img src={img.preview} alt="" className="w-full h-full object-cover" />
-
-                    {sendingImage && (
-                      <div className="absolute inset-0 bg-black/50 flex justify-center items-center">
-                        <div className="w-[16px] h-[16px] border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      </div>
-                    )}
-
-                    {!sendingImage && (
-                      <button
-                        onClick={() => removeSelectedImage(img.id)}
-                        className="absolute -top-1 -right-1 w-[18px] h-[18px] bg-black/80 rounded-full flex justify-center items-center text-white text-[12px] cursor-pointer hover:bg-black"
-                      >
-                        <X size={12} />
-                      </button>
-                    )}
+                    <MessageBox
+                      message={msg}
+                      showSeen={msg._id === lastSeenMessageId}
+                      onDelete={handleDeleteMessage}
+                      senderBubbleColor={activeTheme?.senderBubble}
+                      receiverBubbleColor={activeTheme?.receiverBubble}
+                      senderTextColor={activeTheme?.senderText}
+                      receiverTextColor={activeTheme?.receiverText}
+                    />
                   </div>
                 );
               })}
             </div>
+          )}
 
-            <span className="text-[var(--text-muted)] text-[13px]">
-              {selectedImages.length}/{MAX_IMAGES} selected
-            </span>
-
-            <button
-              onClick={clearSelectedImages}
-              disabled={sendingImage}
-              className="ml-auto text-[var(--text-primary)] text-[13px] px-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer hover:text-[var(--text-muted)]"
-            >
-              Clear all
-            </button>
-          </div>
-        )}
-
-        <div className="messageBar w-[98%] mx-auto h-[55px] rounded-3xl flex border border-[var(--border-input)] overflow-hidden">
-
-          <div className="emojiSection w-[12%] sm:w-[8%] md:w-[6%] flex justify-center items-center">
-            <Smile size={28} className="text-[var(--text-primary)] cursor-pointer" />
-          </div>
-
-          <div className="messageInput flex-1 h-full">
-            <input
-              type="text"
-              name="message"
-              id="message"
-              value={message}
-              onChange={handleTyping}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  handleSendMessage();
-                }
-              }}
-              ref={messageInputRef}
-              className="w-full h-full outline-none text-[var(--text-primary)] text-[16px] lg:text-[18px] px-4 bg-transparent"
-              placeholder="Message..."
-            />
-          </div>
-
-          <div className="gllerySection w-[15%] sm:w-[12%] md:w-[10%] h-full flex justify-center items-center gap-2">
-            <div onClick={handleSendMessage} className="send w-[40%] h-[80%] flex justify-center items-center ">
-              <Send size={24} fill='' className="cursor-pointer text-[var(--text-primary)]" />
+          {isFriendTyping && (
+            <div className="w-full px-4 py-3 text-[var(--text-muted)] text-[15px] sm:text-[18px]">
+              Typing...
             </div>
-            <div
-              onClick={() => selectedImages.length < MAX_IMAGES && fileInputRef.current?.click()}
-              className={`gallery w-[30%] h-full flex justify-center items-center ${
-                selectedImages.length >= MAX_IMAGES ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
-              }`}
-            >
-              <Image size={24} fill='' className="cursor-pointer text-[var(--text-primary)]" />
+          )}
+
+        </div>
+
+        {/* last flex child of themedArea, so it's pinned to the bottom and
+            sits ON the theme — it needs no background of its own */}
+        <div className="footer shrink-0 relative w-full flex flex-col justify-center px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+
+          {selectedImages.length > 0 && (
+            <div className="imagePreview w-[98%] mx-auto mb-2 flex flex-wrap items-center gap-3 sm:gap-4 bg-[var(--bg-elevated)] rounded-2xl p-3">
+
+              {/* tilted fanned stack of selected images */}
+              <div className="flex items-center pl-3">
+                {selectedImages.map((img, idx) => {
+                  const rotations = [-8, 5, -4, 7]; // fixed tilt per slot, alternating
+                  return (
+                    <div
+                      key={img.id}
+                      style={{
+                        transform: `rotate(${rotations[idx % rotations.length]}deg)`,
+                        marginLeft: idx === 0 ? 0 : "-18px",
+                        zIndex: idx,
+                      }}
+                      className="relative w-[48px] h-[48px] sm:w-[56px] sm:h-[56px] shrink-0 rounded-lg overflow-hidden border-2 border-[var(--bg-elevated)] shadow-md hover:z-10 hover:scale-105 transition-transform"
+                    >
+                      <img src={img.preview} alt="" className="w-full h-full object-cover" />
+
+                      {sendingImage && (
+                        <div className="absolute inset-0 bg-black/50 flex justify-center items-center">
+                          <div className="w-[16px] h-[16px] border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        </div>
+                      )}
+
+                      {!sendingImage && (
+                        <button
+                          onClick={() => removeSelectedImage(img.id)}
+                          aria-label="Remove image"
+                          className="absolute -top-1 -right-1 w-[18px] h-[18px] bg-black/80 rounded-full flex justify-center items-center text-white text-[12px] cursor-pointer hover:bg-black"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <span className="text-[var(--text-muted)] text-[13px]">
+                {selectedImages.length}/{MAX_IMAGES} selected
+              </span>
+
+              <button
+                onClick={clearSelectedImages}
+                disabled={sendingImage}
+                className="ml-auto text-[var(--text-primary)] text-[13px] px-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer hover:text-[var(--text-muted)]"
+              >
+                Clear all
+              </button>
             </div>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              ref={fileInputRef}
-              onChange={handleImageSelect}
-              className="hidden"
-            />
+          )}
+
+          <div
+            style={{ background: inputBarBg, borderColor: inputBarBorder }}
+            className="messageBar relative w-[98%] mx-auto h-[48px] sm:h-[55px] rounded-3xl flex items-center border overflow-hidden"
+          >
+
+            <div className="emojiSection w-[42px] sm:w-[48px] shrink-0 flex justify-center items-center">
+              <Smile size={24} style={{ color: inputBarText }} className="cursor-pointer" />
+            </div>
+
+            <div className="messageInput flex-1 min-w-0 h-full">
+              <input
+                type="text"
+                name="message"
+                id="message"
+                value={message}
+                onChange={handleTyping}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    handleSendMessage();
+                  }
+                }}
+                ref={messageInputRef}
+                style={{ color: inputBarText, fontFamily: activeFont.stack }}
+                className="w-full h-full outline-none text-[16px] lg:text-[18px] px-2 sm:px-4 bg-transparent placeholder-current placeholder:opacity-50"
+                placeholder="Message..."
+              />
+            </div>
+
+            <div className="gllerySection shrink-0 h-full flex justify-center items-center gap-1 sm:gap-2 pr-2 sm:pr-3">
+              <button
+                type="button"
+                onClick={handleSendMessage}
+                aria-label="Send message"
+                className="send w-[36px] h-[36px] flex justify-center items-center cursor-pointer"
+              >
+                <Send size={22} style={{ color: inputBarText }} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsStickerPickerOpen((prev) => !prev)}
+                aria-label="Stickers and GIFs"
+                className="sticker w-[36px] h-[36px] flex justify-center items-center cursor-pointer"
+              >
+                <Sticker size={22} style={{ color: inputBarText }} />
+              </button>
+              <button
+                type="button"
+                aria-label="Attach images"
+                onClick={() => {
+                  if (selectedImages.length < MAX_IMAGES) {
+                    setIsStickerPickerOpen(false);
+                    fileInputRef.current?.click();
+                  }
+                }}
+                className={`gallery w-[36px] h-[36px] flex justify-center items-center ${
+                  selectedImages.length >= MAX_IMAGES ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+                }`}
+              >
+                <Image size={22} style={{ color: inputBarText }} />
+              </button>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                ref={fileInputRef}
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+            </div>
+
           </div>
+
+          {/* sibling of messageBar (not a child of it) — messageBar has
+              overflow-hidden for its rounded corners, which would clip this
+              overlay to nothing. footer keeps `relative` so it stays the
+              containing block for the picker's absolute positioning. */}
+          {isStickerPickerOpen && (
+            <StickerPicker
+              onSelectSticker={handleSendSticker}
+              onClose={() => setIsStickerPickerOpen(false)}
+            />
+          )}
 
         </div>
 
       </div>
+
+      <ThemeOverlay
+        isOpen={isThemeOverlayOpen}
+        onClose={() => setIsThemeOverlayOpen(false)}
+        currentThemeId={currentThemeId}
+        currentFontId={currentFontId}
+        onApply={handleApplyCustomization}
+      />
 
     </div>
   )

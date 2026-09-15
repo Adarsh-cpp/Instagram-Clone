@@ -159,6 +159,7 @@ const FollowersFollowingOverlay = ({
               {filteredList.map((user) => (
                 <FollowUserCard
                   key={user.username}
+                  userId={user._id}
                   profilePic={user?.profilePic ? user.profilePic : "/images/default-profile-pic.jpg"}
                   username={user.username}
                   fullName={user.fullName}
@@ -166,6 +167,7 @@ const FollowersFollowingOverlay = ({
                   onToggleFollow={() => {
                     console.log("toggle follow:", user.username)
                   }}
+                  onCardClick={onClose}
                 />
               ))}
               {isLoading && (

@@ -78,7 +78,7 @@ export const signup = async (req, res) => {
 export const login = async (req, res) => {
 
     const {contact, password } = req.body;
-    console.log(req.body)
+    
 
     if(!contact || !password) {
         return res.status(400).json({ message: 'All fields are required. lala' });
@@ -92,7 +92,7 @@ export const login = async (req, res) => {
   if (!isPhone && !isEmail && !isUsername) {
     return res.status(400).json({ message: 'Invalid Credentials' });
   }
-  console.log(isPhone,isEmail,isUsername);
+  
 
     try {
 
@@ -100,14 +100,14 @@ export const login = async (req, res) => {
         if (isEmail) query = { email: contact };
         if (isPhone) query = { phone: contact };
 
-        console.log(query);
+        
 
         // �� Search for user in database
         const user = await userModel.findOne(query).select('+password');
         if(!user)
             return res.status(404).json({ message: 'User not found.' });
 
-        console.log(user);
+        
 
         // �� Verify password
         const isMatch = await bcrypt.compare(password, user.password);
@@ -139,12 +139,13 @@ export const logout = (req, res) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: "None",
       path: "/",
-    })
-    res.status(200).redirect("http://localhost:5173/");
+    });
+
+    return res.status(200).json({ success: true, message: "Logged out successfully" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ success: false, message: error.message });
   }
-}
+};
 
 export const sendOTP = async (req, res) => {
 
@@ -369,6 +370,48 @@ export const resetPassword = async (req, res) => {
 
 }
 
+export const googleCallback = async (req, res) => {
+  try {
+    const user = req.user; // attached by passport
+    const token = generateToken(user);
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "None",
+      path: "/",
+      maxAge: 3600000,
+    });
+
+    const needsUsername = !user.username;
+    res.redirect(
+      `${process.env.CLIENT_URL}/auth/callback?token=${token}&newUser=${needsUsername}`
+    );
+  } catch (error) {
+    res.redirect(`${process.env.CLIENT_URL}/?error=google_auth_failed`);
+  }
+};
+
+export const addUsername = async (req, res) => {
+  const { username } = req.body;
+  if (!username) return res.status(400).json({ message: "Username is required." });
+
+  try {
+    const existing = await userModel.findOne({ username });
+    if (existing) return res.status(409).json({ message: "Username already exists." });
+
+    const user = await userModel.findByIdAndUpdate(
+      req.user._id, // set by authUser middleware
+      { username },
+      { new: true, runValidators: true }
+    );
+
+    res.status(200).json({ success: true, message: "Profile updated", user });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 export const addDOB = async (req, res) => {
   
   let {dob} = req.body;
@@ -396,8 +439,6 @@ export const addDOB = async (req, res) => {
   }
 
 }
-
-
 
 export const getFollowers = async (req, res) => {
   try {

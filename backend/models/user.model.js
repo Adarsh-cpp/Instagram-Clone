@@ -5,11 +5,12 @@ const userSchema = new mongoose.Schema(
     username: {
       type: String,
       unique: true,
+      sparse: true,
       trim: true,
-      required: true,
+      required: function () { return !this.googleId; }, // Google users set it later
       minLength: [3, 'Username must be at least 3 characters'],
       maxLength: [30, 'Username must be at most 30 characters'],
-    },
+  },
 
     fullname: {
       type: String,
@@ -97,6 +98,12 @@ const userSchema = new mongoose.Schema(
 
     signupExpiresAt: {
       type: Date,
+    },
+
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
     },
 
     bio: {

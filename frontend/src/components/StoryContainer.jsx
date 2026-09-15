@@ -216,7 +216,7 @@ const StoryContainer = () => {
         {/* own story is ALWAYS the first slide — same swiper, same alignment as everyone else */}
         <SwiperSlide className="!w-auto relative">
           <StoryCircle
-            imgSrc={user?.profilePic?user.profilePic:"/images/default-profile-pic.jpg"}
+            imgSrc={user.profilePic ? user.profilePic : "images/default-profile-pic.jpg"}
             username="Your story"
             isOwn={true}
             hasStory={hasOwnStory}
@@ -234,7 +234,7 @@ const StoryContainer = () => {
         {feed.map((group) => (
           <SwiperSlide key={group.author._id} className="!w-auto">
             <StoryCircle
-              imgSrc={group.author.profilePic}
+              imgSrc={group.author.profilePic ? group.author.profilePic : "images/default-profile-pic.jpg" }
               username={group.author.username}
               hasStory={true}
               isSeen={isGroupSeen(group, user?._id)}

@@ -1,4 +1,8 @@
 import mongoose from "mongoose";
+import {
+  VALID_THEME_IDS,
+  VALID_FONT_IDS,
+} from "../constants/chatAppearance.js";
 
 const conversationSchema = new mongoose.Schema(
   {
@@ -27,7 +31,7 @@ const conversationSchema = new mongoose.Schema(
     // the raw reply text)
     lastMessageType: {
       type: String,
-      enum: ["text", "image", "post_share", "reel_share", "story_share", "story_reply"],
+      enum: ["text", "image", "post_share", "reel_share", "story_share", "story_reply", "sticker"],
       default: "text",
     },
 
@@ -36,11 +40,25 @@ const conversationSchema = new mongoose.Schema(
       default: Date.now,
     },
 
+    // only the catalog id is stored — colors/stacks live client-side in
+    // data/chatTheme.js, so restyling a theme never touches the DB
+    chatTheme: {
+      type: String,
+      enum: VALID_THEME_IDS,
+      default: "default",
+    },
+
+    chatFont: {
+      type: String,
+      enum: VALID_FONT_IDS,
+      default: "default",
+    },
+
     seenBy: {
       type: Map,
       of: Date,
-      default: {}
-  }
+      default: {},
+    },
   },
   {
     timestamps: true,

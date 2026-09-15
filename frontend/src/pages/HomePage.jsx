@@ -115,6 +115,7 @@ const HomePage = () => {
     estimateSize: () => 640, // rough guess; real height is measured per-card below
     overscan: 4,
     scrollMargin,
+    useFlushSync: false,
   });
 
   const virtualItems = virtualizer.getVirtualItems();

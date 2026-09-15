@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import { useNotifications } from "../context/NotificationContext";
@@ -25,7 +25,8 @@ function timeAgo(date) {
   return "now";
 }
 
-
+const CONTEXT_MENU_WIDTH = 180;
+const CONTEXT_MENU_HEIGHT = 44;
 
 const NotificationsPage = () => {
   const { markAllAsRead } = useNotifications();
@@ -40,6 +41,13 @@ const NotificationsPage = () => {
   // { type: "post" | "reel", data: <post or reel object>, authorId }
   const [activeOverlay, setActiveOverlay] = useState(null);
 
+  // right-click context menu: { x, y, notificationId }
+  const [contextMenu, setContextMenu] = useState(null);
+  // id of the notification pending delete confirmation
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const menuRef = useRef(null);
+
   const loadNotifications = useCallback(async (pageNum) => {
     setLoading(true);
     try {
@@ -47,7 +55,6 @@ const NotificationsPage = () => {
         `${BASE_URL}/api/notifications?page=${pageNum}&limit=20`,
         authHeaders()
       );
-      console.log(data.notifications.map(n => ({ type: n.type, reel: n.reel })));
       setItems((prev) => (pageNum === 1 ? data.notifications : [...prev, ...data.notifications]));
       setHasMore(data.hasMore);
     } catch (err) {
@@ -61,6 +68,25 @@ const NotificationsPage = () => {
     loadNotifications(1);
     markAllAsRead();
   }, [loadNotifications, markAllAsRead]);
+
+  // close the context menu on outside click or scroll
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setContextMenu(null);
+      }
+    };
+    const handleScroll = () => setContextMenu(null);
+
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [contextMenu]);
 
   const handleFollowBack = async (senderId) => {
     try {
@@ -96,6 +122,26 @@ const NotificationsPage = () => {
       : user?.savedReels?.some((id) => id.toString() === item._id.toString()) || false;
   };
 
+  const handleContextMenu = (e, notificationId) => {
+    e.preventDefault();
+    const x = Math.min(e.clientX, window.innerWidth - CONTEXT_MENU_WIDTH - 8);
+    const y = Math.min(e.clientY, window.innerHeight - CONTEXT_MENU_HEIGHT - 8);
+    setContextMenu({ x, y, notificationId });
+  };
+
+  const handleDeleteNotification = async (id) => {
+    setDeletingId(id);
+    try {
+      await axios.delete(`${BASE_URL}/api/notifications/${id}`, authHeaders());
+      setItems((prev) => prev.filter((item) => item._id !== id));
+    } catch (err) {
+      toast.error("Failed to delete notification");
+    } finally {
+      setDeletingId(null);
+      setConfirmDeleteId(null);
+    }
+  };
+
   return (
     <div className="NotificationsPage w-[100vw] h-[100vh] flex justify-between items-center bg-[var(--bg-app)]">
       <IconSidebar />
@@ -118,23 +164,23 @@ const NotificationsPage = () => {
 
             {items.map((n) => {
               const isFollow = n.type === "follow";
-               
-                const isFollowingBack = followBackState[n.sender._id] ?? n.isFollowingSender ?? false;
+              const isFollowingBack = followBackState[n.sender._id] ?? n.isFollowingSender ?? false;
               const thumbSrc = isFollow
-                  ? n.sender.profilePic || "/images/default-profile-pic.jpg"
-                  : n.reel
-                  ? n.reel.media?.thumbnailUrl || "/images/default-profile-pic.jpg"
-                  : n.post?.media?.[0]?.url || "/images/default-profile-pic.jpg";
+                ? n.sender.profilePic || "/images/default-profile-pic.jpg"
+                : n.reel
+                ? n.reel.media?.thumbnailUrl || "/images/default-profile-pic.jpg"
+                : n.post?.media?.[0]?.url || "/images/default-profile-pic.jpg";
 
               return (
                 <div
                   key={n._id}
+                  onContextMenu={(e) => handleContextMenu(e, n._id)}
                   className={`notifItem w-full px-4 sm:px-8 py-3 flex items-center justify-between gap-3 hover:bg-[var(--bg-row-hover)] transition-colors ${
                     !n.isRead ? "bg-[var(--bg-unread)]" : ""
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                   {isFollow ? (
+                    {isFollow ? (
                       <Link to={`/user/get-profile/${n.sender._id}`} className="shrink-0">
                         <div className="w-[48px] h-[48px] overflow-hidden border border-[var(--border-soft)] rounded-full">
                           <img src={thumbSrc} alt="" className="w-full h-full object-cover" />
@@ -208,6 +254,55 @@ const NotificationsPage = () => {
           initialIsLiked={isItemLiked(activeOverlay.data)}
           initialIsSaved={isItemSaved(activeOverlay.type, activeOverlay.data)}
         />
+      )}
+
+      {/* Right-click context menu */}
+      {contextMenu && (
+        <div
+          ref={menuRef}
+          style={{ top: contextMenu.y, left: contextMenu.x, width: CONTEXT_MENU_WIDTH }}
+          className="fixed z-50 bg-[var(--bg-app)] border border-[var(--border-soft)] rounded-lg shadow-lg py-1"
+        >
+          <button
+            onClick={() => {
+              setConfirmDeleteId(contextMenu.notificationId);
+              setContextMenu(null);
+            }}
+            className="w-full text-left px-4 py-2 text-[14px] font-medium text-red-500 hover:bg-[var(--bg-row-hover)] cursor-pointer"
+          >
+            Delete notification
+          </button>
+        </div>
+      )}
+
+      {/* Delete confirmation popup */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex justify-center items-center px-4">
+          <div className="w-full max-w-[320px] bg-[var(--bg-app)] border border-[var(--border-soft)] rounded-xl p-5 flex flex-col gap-4">
+            <div>
+              <h3 className="text-[var(--text-primary)] text-[16px] font-bold">Delete notification?</h3>
+              <p className="text-[var(--text-muted)] text-[13px] mt-1">
+                This action can't be undone.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                disabled={deletingId === confirmDeleteId}
+                className="px-4 py-2 text-[13px] font-bold rounded-lg bg-[var(--bg-secondary-btn)] hover:bg-[var(--bg-secondary-btn-hover)] text-[var(--text-primary)] cursor-pointer disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteNotification(confirmDeleteId)}
+                disabled={deletingId === confirmDeleteId}
+                className="px-4 py-2 text-[13px] font-bold rounded-lg bg-red-500 hover:bg-red-600 text-white cursor-pointer disabled:opacity-60"
+              >
+                {deletingId === confirmDeleteId ? "Deleting..." : "Yes, delete"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

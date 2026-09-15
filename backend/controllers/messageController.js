@@ -19,6 +19,27 @@ const SHARED_MEDIA_POPULATE = [
   // message document automatically, no populate needed.
 ];
 
+const STICKER_TYPES = ["sticker", "animated_sticker", "gif"];
+
+// Validates and narrows a client-supplied sticker payload down to just the
+// fields we trust/store. Returns undefined if the payload doesn't look like
+// a real sticker (missing type, or missing both url and emoji).
+const sanitizeStickerPayload = (sticker) => {
+  if (!sticker || typeof sticker !== "object") return undefined;
+
+  const { type, url, emoji, name } = sticker;
+
+  if (!STICKER_TYPES.includes(type)) return undefined;
+  if (!url && !emoji) return undefined;
+
+  return {
+    type,
+    url: typeof url === "string" ? url : undefined,
+    emoji: typeof emoji === "string" ? emoji : undefined,
+    name: typeof name === "string" ? name : undefined,
+  };
+};
+
 // Builds the conversation-preview fields (lastMessage/lastMessageType/etc.)
 // from a single message document. Shared by postMessage (new message) and
 // deleteMessage (recomputing the preview after an unsend) so the "what
@@ -49,6 +70,15 @@ const buildLastMessagePreview = (msg) => {
   } else if (msg.sharedStory) {
     lastMessageType = "story_share";
     lastMessageText = msg.text?.trim() ? msg.text.trim() : "📖 Shared a story";
+  } else if (msg.sticker) {
+    lastMessageType = "sticker";
+    if (msg.sticker.type === "gif") {
+      lastMessageText = "🎬 GIF";
+    } else if (msg.sticker.type === "animated_sticker") {
+      lastMessageText = "✨ Sticker";
+    } else {
+      lastMessageText = msg.sticker.emoji ? `${msg.sticker.emoji} Sticker` : "Sticker";
+    }
   } else if (msg.images?.length > 1) {
     lastMessageType = "image";
     lastMessageText = `📷 ${msg.images.length} Photos`;
@@ -156,7 +186,7 @@ export const postMessage = async (req, res) => {
   try {
     const senderId = req.user._id;
     const conversationId = req.params.conversationId;
-    const { message, sharedPost, sharedReel, sharedStoryId } = req.body;
+    const { message, sharedPost, sharedReel, sharedStoryId, sticker } = req.body;
     const files = req.files || []; // now an array (upload.array), not req.file
 
     const conversation = await conversationModel.findById(conversationId);
@@ -173,12 +203,15 @@ export const postMessage = async (req, res) => {
       return res.status(400).json({ success: false, message: "Conversation not found" });
     }
 
+    const stickerPayload = sanitizeStickerPayload(sticker);
+
     if (
       (!message || !message.trim()) &&
       files.length === 0 &&
       !sharedPost &&
       !sharedReel &&
-      !sharedStoryId
+      !sharedStoryId &&
+      !stickerPayload
     ) {
       return res.status(400).json({ success: false, message: "Message cannot be empty" });
     }
@@ -214,7 +247,8 @@ export const postMessage = async (req, res) => {
           (!message || !message.trim()) &&
           files.length === 0 &&
           !sharedPost &&
-          !sharedReel
+          !sharedReel &&
+          !stickerPayload
         ) {
           return res.status(404).json({ success: false, message: "Story is no longer available" });
         }
@@ -240,6 +274,7 @@ export const postMessage = async (req, res) => {
       receiverId,
       text: message?.trim() || "",
       images: imageUrls,
+      sticker: stickerPayload || undefined,
       sharedPost: sharedPost || undefined,
       sharedReel: sharedReel || undefined,
       sharedStory: sharedStorySnapshot || undefined,
@@ -301,18 +336,24 @@ export const deleteMessage = async (req, res) => {
         .findOne({ conversationId })
         .sort({ createdAt: -1 });
 
-      const preview = buildLastMessagePreview(newLastMessage);
-      conversation.lastMessage = preview.lastMessage;
-      conversation.lastMessageType = preview.lastMessageType;
-      conversation.lastMessageSenderId = preview.lastMessageSenderId;
-      conversation.lastMessageTime = preview.lastMessageTime;
+      if (newLastMessage) {
+        const preview = buildLastMessagePreview(newLastMessage);
+        conversation.lastMessage = preview.lastMessage;
+        conversation.lastMessageType = preview.lastMessageType;
+        conversation.lastMessageSenderId = preview.lastMessageSenderId;
+        conversation.lastMessageTime = preview.lastMessageTime;
+      } else {
+        // no messages left at all — reset the preview instead of
+        // calling buildLastMessagePreview(null)
+        conversation.lastMessage = "";
+        conversation.lastMessageType = "text";
+        conversation.lastMessageSenderId = null;
+        conversation.lastMessageTime = conversation.createdAt;
+      }
+
       await conversation.save();
     }
 
-    // let the other participant's open chat drop the message live too.
-    // Handles onlineUsers storing either a single socketId (as in
-    // postMessage above) or a Set of socketIds (as in replyToStory) —
-    // worth reconciling those to one shape in socket.js.
     const receiverSocketEntry = onlineUsers.get(receiverId.toString());
     if (receiverSocketEntry) {
       const io = getIO();
