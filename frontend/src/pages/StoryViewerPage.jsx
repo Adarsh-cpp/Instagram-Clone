@@ -15,6 +15,9 @@ const DEFAULT_IMAGE_SECONDS = 5;
 const HOLD_THRESHOLD_MS = 200;
 const DOUBLE_TAP_MS = 300;
 const DEFAULT_AVATAR = "/images/default-profile-pic.jpg";
+// how long a story's attached song clip plays before looping back to its
+// start — matches the 15s clip length picked in UserStoryPage's trimmer
+const SONG_CLIP_SECONDS = 15;
 
 // ---- carousel geometry ----
 const CARD_WIDTH = 300;   // px, base width before scale is applied
@@ -43,7 +46,7 @@ const StoryViewerPage = () => {
   const [loading, setLoading] = useState(true);
 
   const [playing, setPlaying] = useState(true);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [reply, setReply] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
@@ -59,6 +62,7 @@ const StoryViewerPage = () => {
   const [burst, setBurst] = useState(null); // { x, y, key }
 
   const videoRef = useRef(null);
+  const audioRef = useRef(null);
   const playingRef = useRef(true);
   const holdTimerRef = useRef(null);
   const wasHeldRef = useRef(false);
@@ -121,6 +125,7 @@ const StoryViewerPage = () => {
   const currentAccount = accounts[accountIndex];
   const currentStory = currentAccount?.stories?.[storyIndex];
   const isOwnAccount = currentAccount?.author?._id === user?._id;
+  const currentSong = currentStory?.song?.songId || null;
 
   // init liked/likesCount maps once we have data
   useEffect(() => {
@@ -256,6 +261,109 @@ const StoryViewerPage = () => {
     else video.pause();
   }, [playing, currentStory?.mediaType]);
 
+  // ---- story song: load the selected track, seek to the saved clip start,
+  // and attempt playback. The loadedmetadata listener matters for remote
+  // Jamendo/Cloudinary audio because duration/seek state may not be ready
+  // when the effect first runs. ----
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !currentSong) return;
+
+    const start = Math.max(0, Number(currentStory?.song?.startTime) || 0);
+
+    const startPlayback = () => {
+      audio.muted = muted;
+      try {
+        audio.currentTime = start;
+      } catch (_) {
+        // The media may not be seekable yet; loadedmetadata can run again.
+      }
+
+      if (playingRef.current) {
+        audio.play().catch(() => {
+          // Browsers can block unmuted autoplay. A user interaction inside
+          // the story viewer retries playback through ensureAudioPlayback().
+        });
+      }
+    };
+
+    if (audio.readyState >= 1) {
+      startPlayback();
+    } else {
+      audio.addEventListener("loadedmetadata", startPlayback, { once: true });
+      audio.load();
+    }
+
+    return () => {
+      audio.removeEventListener("loadedmetadata", startPlayback);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountIndex, storyIndex, currentSong?._id]);
+
+  // ---- story song: mirror play/pause with the rest of the story ----
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !currentSong) return;
+
+    audio.muted = muted;
+
+    if (playing) {
+      audio.play().catch(() => {
+        // If unmuted autoplay was blocked, the next user interaction retries it.
+      });
+    } else {
+      audio.pause();
+    }
+  }, [playing, muted, currentSong?._id]);
+
+  // ---- story song: loop just the saved clip window (songStartTime to
+  // songStartTime + 15s) instead of playing the whole track ----
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !currentSong) return;
+
+    const start = Math.max(0, Number(currentStory?.song?.startTime) || 0);
+
+    const handleTimeUpdate = () => {
+      if (audio.currentTime >= start + SONG_CLIP_SECONDS) {
+        try {
+          audio.currentTime = start;
+        } catch (_) {}
+
+        if (playingRef.current) {
+          audio.play().catch(() => {});
+        }
+      }
+    };
+
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    return () => audio.removeEventListener("timeupdate", handleTimeUpdate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountIndex, storyIndex, currentSong?._id]);
+
+  // ---- story song: keep muted state in sync ----
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) audio.muted = muted;
+  }, [muted]);
+
+  // A real user gesture is allowed to start unmuted media in browsers.
+  // Story navigation/tapping is therefore also used as a safe retry point
+  // when the browser rejected the initial autoplay attempt.
+  const ensureAudioPlayback = () => {
+    const audio = audioRef.current;
+    if (!audio || !currentSong || !playingRef.current) return;
+
+    audio.muted = muted;
+    audio.play().catch(() => {});
+  };
+
+  useEffect(() => {
+    return () => {
+      audioRef.current?.pause();
+    };
+  }, []);
+
   // ---- like ----
   const handleLikeToggle = async () => {
     if (!currentStory) return;
@@ -388,6 +496,10 @@ const StoryViewerPage = () => {
 
   // ---- tap-to-navigate (within account only) / hold-to-pause / double-tap-to-like ----
   const onPointerDown = () => {
+    // Retry unmuted story audio from a genuine user interaction if the
+    // browser blocked the initial autoplay attempt.
+    ensureAudioPlayback();
+
     wasHeldRef.current = false;
     holdTimerRef.current = setTimeout(() => {
       wasHeldRef.current = true;
@@ -462,6 +574,18 @@ const StoryViewerPage = () => {
         }
         .heartBurst { animation: heartBurstAnim 0.8s ease forwards; }
       `}</style>
+
+      {/* story song — hidden audio element, driven entirely by the effects
+          above; nothing else in the tree needs to know it's here */}
+      {currentSong && (
+        <audio
+          ref={audioRef}
+          src={currentSong.audioUrl}
+          muted={muted}
+          preload="auto"
+          className="hidden"
+        />
+      )}
 
       {/* desktop chevrons — the only way to cross accounts */}
       <button
@@ -562,9 +686,42 @@ const StoryViewerPage = () => {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 text-white/90">
-                  {currentStory.mediaType === "video" && (
-                    <button onClick={() => setMuted((m) => !m)}>
+                <div className="flex items-center gap-2 text-white/90">
+                  {currentSong && (
+                    <div
+                      className="w-7 h-7 rounded-md overflow-hidden shrink-0 ring-1 ring-white/20 bg-neutral-800"
+                      title={`${currentSong.title} · ${currentSong.artist || "Unknown"}`}
+                    >
+                      {currentSong.thumbnail ? (
+                        <img
+                          src={currentSong.thumbnail}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-white/70 text-[10px]">
+                          ♪
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {(currentStory.mediaType === "video" || currentSong) && (
+                    <button
+                      onClick={() => {
+                        const nextMuted = !muted;
+                        setMuted(nextMuted);
+
+                        const audio = audioRef.current;
+                        if (audio) {
+                          audio.muted = nextMuted;
+                          if (!nextMuted && playingRef.current) {
+                            audio.play().catch(() => {});
+                          }
+                        }
+                      }}
+                      aria-label={muted ? "Unmute" : "Mute"}
+                    >
                       {muted ? <VolumeX size={19} /> : <Volume2 size={19} />}
                     </button>
                   )}
@@ -612,6 +769,10 @@ const StoryViewerPage = () => {
                   style={{ backgroundColor: currentStory.bgColor || "#000" }}
                 />
               )}
+
+              {/* The song is represented only by its small cover square in
+                  the header, next to the sound control. */}
+
 
               {/* tap zones — within-account story nav / double-tap like */}
               <button

@@ -14,8 +14,8 @@ const BioCard = ({ bioText }) => {
 
   return (
     <div className="bio w-full h-auto text-[var(--text-primary)] text-[14px] sm:text-[18px]">
-      <div className="bioContainer w-full px-2 sm:px-6 py-1 leading-relaxed">
-        <p className="inline">{displayText}</p>
+      <div className="bioContainer w-full px-1 sm:px-6 py-1 leading-relaxed break-words">
+        <p className="inline break-words">{displayText}</p>
         {shouldTruncate && (
           <button
             onClick={toggleReadMore}

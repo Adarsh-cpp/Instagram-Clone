@@ -69,14 +69,18 @@ useEffect(() => {
 
    
     return (
-    <div className="explorePage w-screen min-h-screen md:h-screen bg-[var(--bg-app)] flex flex-col md:flex-row text-[var(--text-primary)] overflow-y-auto md:overflow-hidden">
+    <div className="explorePage w-screen h-screen bg-[var(--bg-app)] flex flex-col md:flex-row text-[var(--text-primary)] overflow-hidden">
       <IconSidebar />
 
 
-      <div className="exploreSection w-full md:w-[80%] h-auto md:h-full flex flex-col md:flex-row ">
+      {/* On mobile this section is a fixed-height flex column so its two children
+          (post grid + suggestions) can each scroll independently, instead of the
+          page just growing until every post has rendered before you ever reach
+          the suggestions list. Desktop (md:flex-row) is untouched. */}
+      <div className="exploreSection w-full md:w-[80%] flex-1 min-h-0 md:flex-none md:h-full flex flex-col md:flex-row overflow-hidden md:overflow-visible">
 
 
-       <div className="exploreContainer w-full md:w-[70%] lg:w-[65%] md:min-h-full grid grid-cols-3 auto-rows-[110px] xs:auto-rows-[130px] sm:auto-rows-[160px] md:auto-rows-[200px] lg:auto-rows-[250px] gap-[2px] md:overflow-y-auto hide-scrollbar bg-[var(--bg-app)]">
+       <div className="exploreContainer w-full md:w-[70%] lg:w-[65%] h-[50vh] md:h-full md:min-h-full grid grid-cols-3 auto-rows-[110px] xs:auto-rows-[130px] sm:auto-rows-[160px] md:auto-rows-[200px] lg:auto-rows-[250px] gap-[2px] overflow-y-auto hide-scrollbar bg-[var(--bg-app)]">
   {posts.map((post, index) => {
     const group = Math.floor(index / 5);
     const position = index % 5;
@@ -102,16 +106,16 @@ useEffect(() => {
 </div>
 
 
-<div className="followingSuggestions w-full md:w-[30%] lg:w-[35%] h-auto md:h-full flex flex-col md:overflow-y-auto bg-[var(--bg-app)] border-l border-[var(--border-soft)]">
+<div className="followingSuggestions w-full md:w-[30%] lg:w-[35%] flex-1 min-h-0 md:flex-none md:h-full flex flex-col overflow-y-auto bg-[var(--bg-app)] border-t md:border-t-0 md:border-l border-[var(--border-soft)]">
 
 
-  <div className="heading w-full h-[60px] flex justify-center items-center text-[14px] font-semibold text-center px-2">
+  <div className="heading w-full h-[60px] shrink-0 flex justify-center items-center text-[14px] font-semibold text-center px-2">
     Find friends and accounts that you like
   </div>
 
 
   {/* Search Bar */}
-  <div className="searchSection w-full px-3 py-2">
+  <div className="searchSection w-full shrink-0 px-3 py-2">
     <div className="searchContainer w-full h-[40px] bg-[var(--bg-elevated)] rounded-lg flex items-center px-3 border border-[var(--border-soft)] focus-within:border-[var(--brand-blue)] transition-colors">
       <svg 
         className="w-5 h-5 text-[var(--text-muted)] mr-2" 

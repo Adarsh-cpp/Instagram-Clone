@@ -232,9 +232,7 @@ export const postMessage = async (req, res) => {
       imageUrls = uploads.map((u) => u.url);
     }
 
-    // Story is ephemeral (TTL-deleted after 24h) — snapshot its media/author
-    // now, server-side, straight from the real Story doc. Never trust a
-    // client-supplied media URL/author for this.
+
     let sharedStorySnapshot;
     if (sharedStoryId) {
       const storyDoc = await storyModel
@@ -287,9 +285,7 @@ export const postMessage = async (req, res) => {
     conversation.lastMessageTime = preview.lastMessageTime;
     await conversation.save();
 
-    // populate shared post/reel before emitting/returning, so both sender's
-    // optimistic UI update and the receiver's socket event have full data
-    // without needing a separate refetch. sharedStory is already embedded.
+
     await newMessage.populate(SHARED_MEDIA_POPULATE);
 
     const receiverSocketId = onlineUsers.get(receiverId.toString());
@@ -308,10 +304,7 @@ export const postMessage = async (req, res) => {
   }
 };
 
-// Unsend a message — sender only. Deletes it outright (no "this message
-// was deleted" placeholder), then recomputes the conversation's preview
-// fields from whatever message is now the most recent one, so the chat
-// list falls back correctly instead of showing stale/wrong info.
+
 export const deleteMessage = async (req, res) => {
   try {
     const userId = req.user._id;

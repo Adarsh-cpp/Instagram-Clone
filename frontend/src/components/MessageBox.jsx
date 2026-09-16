@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 // lottie-react exports Lottie as a DEFAULT export — the named import was
 // resolving to undefined, which throws the moment an animated sticker renders.
-import { Lottie } from "lottie-react";
+import {Lottie} from "lottie-react";
 import {
   X,
   Download,
@@ -323,7 +323,7 @@ const MessageBox = ({
             {/* lottie-react forwards unknown props to lottie-web's config,
                 so `path` loads a remote .json animation */}
             <Lottie
-              path={sticker.url}
+              src={sticker.url}
               autoplay
               loop
               style={{ width: "100%", height: "100%" }}

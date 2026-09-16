@@ -211,54 +211,126 @@ export const followToggle = async (req, res) => {
     const targetedUserId = req.params.id;
     const loggedInUserId = req.user._id;
 
+    if (String(targetedUserId) === String(loggedInUserId)) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot follow yourself",
+      });
+    }
+
     const targetedUser = await userModel.findById(targetedUserId);
     const loggedInUser = await userModel.findById(loggedInUserId);
 
     if (!loggedInUser) {
-      return res.status(404).json({ success: false, message: "User should be logged in" });
+      return res.status(404).json({
+        success: false,
+        message: "User should be logged in",
+      });
     }
+
     if (!targetedUser) {
-      return res.status(404).json({ success: false, message: "Targeted user not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Targeted user not found",
+      });
     }
 
     const isCurrentlyFollowing = targetedUser.followers.some(
-      id => id.toString() === loggedInUserId.toString()
+      (id) => String(id) === String(loggedInUserId)
     );
 
     if (isCurrentlyFollowing) {
-      await userModel.findByIdAndUpdate(targetedUserId, { $pull: { followers: loggedInUserId } });
-      await userModel.findByIdAndUpdate(loggedInUserId, { $pull: { following: targetedUserId } });
+      await Promise.all([
+        userModel.findByIdAndUpdate(targetedUserId, {
+          $pull: {
+            followers: loggedInUserId,
+          },
+        }),
 
-      await removeNotification({ recipientId: targetedUserId, senderId: loggedInUserId, type: "follow" });
+        userModel.findByIdAndUpdate(loggedInUserId, {
+          $pull: {
+            following: targetedUserId,
+          },
+        }),
+
+        removeNotification({
+          recipientId: targetedUserId,
+          senderId: loggedInUserId,
+          type: "follow",
+        }),
+      ]);
+
+      const [updatedTargetedUser, updatedLoggedInUser] =
+        await Promise.all([
+          userModel
+            .findById(targetedUserId)
+            .select("followers")
+            .lean(),
+
+          userModel
+            .findById(loggedInUserId)
+            .select("following")
+            .lean(),
+        ]);
 
       return res.status(200).json({
         success: true,
         message: "User unfollowed",
         isFollowing: false,
-        updatedFollowers: targetedUser.followers.length - 1,
-        updatedFollowing: loggedInUser.following.length - 1
+        updatedFollowers: updatedTargetedUser?.followers?.length || 0,
+        updatedFollowing: updatedLoggedInUser?.following?.length || 0,
       });
     }
 
-    await userModel.findByIdAndUpdate(targetedUserId, { $addToSet: { followers: loggedInUserId } });
-    await userModel.findByIdAndUpdate(loggedInUserId, { $addToSet: { following: targetedUserId } });
+    await Promise.all([
+      userModel.findByIdAndUpdate(targetedUserId, {
+        $addToSet: {
+          followers: loggedInUserId,
+        },
+      }),
 
-    await createNotification({ recipientId: targetedUserId, senderId: loggedInUserId, type: "follow" });
+      userModel.findByIdAndUpdate(loggedInUserId, {
+        $addToSet: {
+          following: targetedUserId,
+        },
+      }),
+
+      createNotification({
+        recipientId: targetedUserId,
+        senderId: loggedInUserId,
+        type: "follow",
+      }),
+    ]);
+
+    const [updatedTargetedUser, updatedLoggedInUser] =
+      await Promise.all([
+        userModel
+          .findById(targetedUserId)
+          .select("followers")
+          .lean(),
+
+        userModel
+          .findById(loggedInUserId)
+          .select("following")
+          .lean(),
+      ]);
 
     return res.status(200).json({
       success: true,
       message: "User followed",
       isFollowing: true,
-      updatedFollowers: targetedUser.followers.length + 1,
-      updatedFollowing: loggedInUser.following.length + 1
+      updatedFollowers: updatedTargetedUser?.followers?.length || 0,
+      updatedFollowing: updatedLoggedInUser?.following?.length || 0,
     });
-
   } catch (error) {
-    console.log(error);
-    return res.status(500).json({ success: false, message: "Internal server error" });
+    console.error("followToggle error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
   }
 };
-
 export const getSavedItems = async (req, res) => {
   try {
     const user = await userModel.findById(req.user._id).populate({

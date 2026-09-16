@@ -72,7 +72,7 @@ export const getStoryFeed = async (req, res) => {
     const stories = await storyModel
       .find({ author: { $in: authorIds }, expiresAt: { $gt: new Date() } })
       .populate("author", "username profilePic")
-      .populate("song.songId", "title artist audioUrl")
+      .populate("song.songId", "title artist audioUrl thumbnail duration")
       .sort({ createdAt: 1 });
 
     // group by author so the frontend can render one circle per user
@@ -99,7 +99,7 @@ export const getUserStories = async (req, res) => {
     const stories = await storyModel
       .find({ author: userId, expiresAt: { $gt: new Date() } })
       .populate("author", "username profilePic")
-      .populate("song.songId", "title artist audioUrl")
+      .populate("song.songId", "title artist audioUrl thumbnail duration")
       .sort({ createdAt: 1 });
 
     res.status(200).json({ success: true, stories });

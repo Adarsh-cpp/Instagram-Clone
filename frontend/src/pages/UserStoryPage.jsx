@@ -1,5 +1,5 @@
 // UserStoryPage.jsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fabric } from "fabric";
 import { Rnd } from "react-rnd";
@@ -7,7 +7,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import {
   X, Type, Pencil, Palette, Music, Check, Undo2, SlidersHorizontal,
-  CaseSensitive, Baseline, ChevronLeft,
+  CaseSensitive, Baseline, ChevronLeft, Loader2,
 } from "lucide-react";
 import { getImageFilterPreset, VIDEO_FILTER_CSS, FILTER_NAMES } from "../utils/storyFilters";
 import SongTrimClipper from "../components/SongTrimClipper";
@@ -26,6 +26,27 @@ const FONT_OPTIONS = [
   "Oswald", "Pacifico", "Dancing Script", "Bebas Neue", "Caveat", "Anton",
 ];
 
+// Human-friendly labels for the filter grid
+const FILTER_META = {
+  none: { label: "Original" },
+  vintage: { label: "Vintage" },
+  retro: { label: "Retro" },
+  modern: { label: "Modern" },
+  noir: { label: "Noir" },
+  warm: { label: "Warm" },
+  cool: { label: "Cool" },
+  dramatic: { label: "Dramatic" },
+  fade: { label: "Fade" },
+};
+
+const PANEL_TITLES = {
+  "pen-color": "Pen color",
+  "bg-color": "Background",
+  "text-color": "Text color",
+  "font": "Font",
+  "filters": "Filters",
+};
+
 fabric.Object.prototype.set({
   transparentCorners: false,
   cornerColor: "#4a5df9",
@@ -36,18 +57,62 @@ fabric.Object.prototype.set({
   padding: 6,
 });
 
+// Visible, easy-to-grab corner handle for the video frame (mirrors the
+// fabric.js text-corner styling above so the whole editor feels consistent)
+const cornerHandle = (offset, cursor) => ({
+  width: 18,
+  height: 18,
+  background: "#ffffff",
+  border: "2px solid #4a5df9",
+  borderRadius: "9999px",
+  boxShadow: "0 1px 4px rgba(0,0,0,0.45)",
+  zIndex: 20,
+  cursor,
+  ...offset,
+});
+
+// Larger (but invisible) hit-area for edges so "squeezing" the frame from
+// the sides is easy on both trackpad/mouse and touch screens
+const edgeHandle = (offset, cursor) => ({
+  background: "transparent",
+  zIndex: 15,
+  cursor,
+  ...offset,
+});
+
+const RND_HANDLE_STYLES = {
+  top: edgeHandle({ height: 16, top: -8 }, "ns-resize"),
+  bottom: edgeHandle({ height: 16, bottom: -8 }, "ns-resize"),
+  left: edgeHandle({ width: 16, left: -8 }, "ew-resize"),
+  right: edgeHandle({ width: 16, right: -8 }, "ew-resize"),
+  topLeft: cornerHandle({ top: -9, left: -9 }, "nwse-resize"),
+  topRight: cornerHandle({ top: -9, right: -9 }, "nesw-resize"),
+  bottomLeft: cornerHandle({ bottom: -9, left: -9 }, "nesw-resize"),
+  bottomRight: cornerHandle({ bottom: -9, right: -9 }, "nwse-resize"),
+};
+
+// Injected once — small keyframes for panel/backdrop/page entrance so
+// nothing feels like it just "pops" into existence
+const STORY_PAGE_STYLES = `
+@keyframes storyFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes storyPanelIn { from { opacity: 0; transform: scale(0.96) translateY(4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes storyPop { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+`;
+
 const ColorPickerRow = ({ colors, value, onChange }) => {
   const nativeRef = useRef(null);
   return (
-    <div className="flex items-center gap-2 flex-wrap p-3">
+    <div className="flex items-center gap-3 flex-wrap p-4 pt-2">
       {colors.map((c) => (
         <button
           key={c}
           type="button"
           onClick={() => onChange(c)}
           style={{ backgroundColor: c }}
-          className={`w-8 h-8 rounded-full border-2 shrink-0 transition-transform ${
-            value === c ? "border-[#4a5df9] scale-110" : "border-white/40"
+          className={`w-9 h-9 rounded-full border-2 shrink-0 transition-all duration-150 hover:scale-110 active:scale-95 ${
+            value === c
+              ? "border-[#4a5df9] scale-110 shadow-[0_0_0_3px_rgba(74,93,249,0.35)]"
+              : "border-white/30 hover:border-white/60"
           }`}
           aria-label={`Choose ${c}`}
         />
@@ -55,7 +120,8 @@ const ColorPickerRow = ({ colors, value, onChange }) => {
       <button
         type="button"
         onClick={() => nativeRef.current?.click()}
-        className="w-8 h-8 rounded-full border-2 border-white/60 shrink-0 relative"
+        title="Custom color"
+        className="w-9 h-9 rounded-full border-2 border-white/50 shrink-0 relative transition-transform duration-150 hover:scale-110 active:scale-95"
         style={{ background: "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)" }}
         aria-label="Custom color wheel"
       />
@@ -97,6 +163,17 @@ const UserStoryPage = () => {
   const [isTextSelected, setIsTextSelected] = useState(false);
 
   const [videoBox, setVideoBox] = useState({ x: 0, y: 0, width: 0, height: 0 });
+
+  // Purely cosmetic: a small preview URL used only for the filter-thumbnail
+  // grid. Independent of the canvas/video loading logic below so it can't
+  // affect any existing behavior.
+  const [previewUrl, setPreviewUrl] = useState(null);
+  useEffect(() => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   useEffect(() => {
     if (!file) {
@@ -315,6 +392,7 @@ const UserStoryPage = () => {
   };
 
   const togglePanel = (name) => setPanel((p) => (p === name ? null : name));
+  const closePanel = () => setPanel(null);
 
   const removeSong = () => {
     audioRef.current?.pause();
@@ -439,16 +517,28 @@ const UserStoryPage = () => {
 
   if (!file) return null;
 
+  const toolbarBtnBase =
+    "w-10 h-10 rounded-full flex items-center justify-center text-white backdrop-blur-md " +
+    "bg-black/40 ring-1 ring-white/10 shadow-lg shadow-black/30 transition-all duration-150 " +
+    "hover:bg-black/55 hover:ring-white/20 hover:scale-105 active:scale-95";
+  const toolbarBtnActive =
+    "bg-[#4a5df9] ring-[#4a5df9]/50 shadow-[0_0_14px_rgba(74,93,249,0.55)] hover:bg-[#4a5df9]";
+
   return (
-    <div className="userStoryPage fixed inset-0 bg-[#0c1014] z-50 flex items-center justify-center">
+    <div
+      className="userStoryPage fixed inset-0 bg-[#0c1014] z-50 flex items-center justify-center"
+      style={{ animation: "storyFadeIn 0.18s ease-out" }}
+    >
+      <style>{STORY_PAGE_STYLES}</style>
+
       {selectedSong && (
-        <audio ref={audioRef} src={selectedSong.audioUrl} className="hidden" />
+        <audio ref={audioRef} src={selectedSong.audioUrl} className="hidden" crossOrigin="anonymous" />
       )}
 
       {dims.width > 0 && (
         <div className="relative flex items-center gap-3">
           <div
-            className="relative rounded-2xl overflow-hidden bg-black shadow-2xl"
+            className="relative rounded-2xl overflow-hidden bg-black shadow-2xl shadow-black/60 ring-1 ring-white/10"
             style={{ width: dims.width, height: dims.height }}
           >
             {mediaType === "video" && (
@@ -457,6 +547,8 @@ const UserStoryPage = () => {
                 position={{ x: videoBox.x, y: videoBox.y }}
                 bounds="parent"
                 style={{ zIndex: 10 }}
+                className="cursor-move ring-1 ring-white/20 hover:ring-[#4a5df9]/70 focus-within:ring-[#4a5df9] transition-all duration-150"
+                resizeHandleStyles={RND_HANDLE_STYLES}
                 onDragStop={(e, d) => setVideoBox((b) => ({ ...b, x: d.x, y: d.y }))}
                 onResizeStop={(e, dir, ref, delta, position) => {
                   setVideoBox({
@@ -490,7 +582,10 @@ const UserStoryPage = () => {
             </div>
 
             {selectedSong && (
-              <div className="absolute top-14 left-4 right-4 z-30 flex items-center gap-2 bg-black/50 rounded-full px-3 py-2 backdrop-blur-sm">
+              <div
+                className="absolute top-14 left-4 right-4 z-30 flex items-center gap-2 bg-black/45 rounded-full px-3 py-2 backdrop-blur-md ring-1 ring-white/10 shadow-lg shadow-black/30"
+                style={{ animation: "storyPop 0.2s ease-out" }}
+              >
                 <div
                   className="w-6 h-6 rounded-full shrink-0"
                   style={{ background: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)" }}
@@ -501,33 +596,51 @@ const UserStoryPage = () => {
               </div>
             )}
 
-            <div className="absolute top-0 left-0 right-0 flex justify-between items-center px-4 py-3 z-30 bg-gradient-to-b from-black/50 to-transparent">
-              <button onClick={handleDiscard} className="text-white" aria-label="Discard">
+            <div
+              className="absolute top-0 left-0 right-0 flex justify-between items-center px-4 z-30 bg-gradient-to-b from-black/60 via-black/25 to-transparent backdrop-blur-[2px]"
+              style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))", paddingBottom: "0.75rem" }}
+            >
+              <button
+                onClick={handleDiscard}
+                className="text-white/90 hover:text-white p-1.5 -ml-1.5 rounded-full hover:bg-white/10 active:scale-90 transition-all"
+                aria-label="Discard"
+              >
                 <X size={24} />
               </button>
-              <button onClick={undoLast} className="text-white" aria-label="Undo">
+              <button
+                onClick={undoLast}
+                className="text-white/90 hover:text-white p-1.5 -mr-1.5 rounded-full hover:bg-white/10 active:scale-90 transition-all"
+                aria-label="Undo"
+              >
                 <Undo2 size={20} />
               </button>
             </div>
 
-            <div className="absolute bottom-0 left-0 right-0 flex justify-between items-center px-4 py-4 z-30 bg-gradient-to-t from-black/60 to-transparent">
-              <button onClick={handleDiscard} className="text-white text-sm font-medium">
+            <div
+              className="absolute bottom-0 left-0 right-0 flex justify-between items-center px-4 z-30 bg-gradient-to-t from-black/70 via-black/30 to-transparent backdrop-blur-[2px]"
+              style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))", paddingTop: "1rem" }}
+            >
+              <button
+                onClick={handleDiscard}
+                className="text-white/90 hover:text-white text-sm font-medium px-2 py-1 rounded-lg hover:bg-white/10 transition-all"
+              >
                 Discard
               </button>
               <button
                 onClick={handleAddToStory}
                 disabled={exporting}
-                className="bg-[#4a5df9] hover:bg-[#4150f7] disabled:opacity-50 text-white text-sm font-bold px-6 py-2 rounded-full"
+                className="bg-[#4a5df9] hover:bg-[#4150f7] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold px-6 py-2.5 rounded-full shadow-lg shadow-[#4a5df9]/30 transition-all duration-150 hover:scale-[1.03] active:scale-95 flex items-center gap-2"
               >
+                {exporting && <Loader2 size={16} className="animate-spin" />}
                 {exporting ? "Posting..." : "Add to Story"}
               </button>
             </div>
           </div>
 
-          <div className="flex flex-col items-center gap-4 z-20">
+          <div className="flex flex-col items-center gap-4 z-40">
             <button
               onClick={addText}
-              className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white"
+              className={toolbarBtnBase}
               aria-label="Add text"
             >
               <Type size={20} />
@@ -537,9 +650,8 @@ const UserStoryPage = () => {
               <>
                 <button
                   onClick={() => togglePanel("text-color")}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-white relative ${
-                    panel === "text-color" ? "bg-[#4a5df9]" : "bg-black/50"
-                  }`}
+                  className={`${toolbarBtnBase} relative ${panel === "text-color" ? toolbarBtnActive : ""}`}
+                  style={{ animation: "storyPop 0.15s ease-out" }}
                   aria-label="Text color"
                 >
                   <Baseline size={20} />
@@ -550,9 +662,8 @@ const UserStoryPage = () => {
                 </button>
                 <button
                   onClick={() => togglePanel("font")}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${
-                    panel === "font" ? "bg-[#4a5df9]" : "bg-black/50"
-                  }`}
+                  className={`${toolbarBtnBase} ${panel === "font" ? toolbarBtnActive : ""}`}
+                  style={{ animation: "storyPop 0.15s ease-out" }}
                   aria-label="Font"
                 >
                   <CaseSensitive size={20} />
@@ -565,9 +676,7 @@ const UserStoryPage = () => {
                 setMode((m) => (m === "draw" ? "select" : "draw"));
                 setPanel(mode === "draw" ? null : "pen-color");
               }}
-              className={`w-10 h-10 rounded-full flex items-center justify-center text-white relative ${
-                mode === "draw" ? "bg-[#4a5df9]" : "bg-black/50"
-              }`}
+              className={`${toolbarBtnBase} relative ${mode === "draw" ? toolbarBtnActive : ""}`}
               aria-label="Doodle"
             >
               <Pencil size={20} />
@@ -580,9 +689,7 @@ const UserStoryPage = () => {
             {mediaType === "image" && (
               <button
                 onClick={() => togglePanel("bg-color")}
-                className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${
-                  panel === "bg-color" ? "bg-[#4a5df9]" : "bg-black/50"
-                }`}
+                className={`${toolbarBtnBase} ${panel === "bg-color" ? toolbarBtnActive : ""}`}
                 aria-label="Background color"
               >
                 <Palette size={20} />
@@ -591,9 +698,7 @@ const UserStoryPage = () => {
 
             <button
               onClick={() => togglePanel("filters")}
-              className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${
-                panel === "filters" ? "bg-[#4a5df9]" : "bg-black/50"
-              }`}
+              className={`${toolbarBtnBase} ${panel === "filters" ? toolbarBtnActive : ""}`}
               aria-label="Filters"
             >
               <SlidersHorizontal size={20} />
@@ -601,11 +706,11 @@ const UserStoryPage = () => {
 
             <button
               onClick={() => togglePanel("songs")}
-              className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${
-                selectedSong ? "" : "bg-black/50"
-              }`}
+              className={`${toolbarBtnBase} ${
+                selectedSong ? "ring-white/20" : ""
+              } ${panel === "songs" ? toolbarBtnActive : ""}`}
               style={
-                selectedSong
+                selectedSong && panel !== "songs"
                   ? { background: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)" }
                   : undefined
               }
@@ -616,124 +721,219 @@ const UserStoryPage = () => {
           </div>
 
           {panel && (
-            <div className="absolute right-[64px] top-1/2 -translate-y-1/2 z-30 bg-[#161616] rounded-xl shadow-2xl border border-white/10 max-h-[70vh] overflow-y-auto">
-              {panel === "pen-color" && (
-                <div className="w-[220px]">
-                  <div className="text-white text-xs font-semibold px-3 pt-3">Pen color</div>
-                  <ColorPickerRow colors={PEN_SWATCHES} value={penColor} onChange={setPenColor} />
-                </div>
-              )}
+            <>
+              {/* Tap-outside-to-close backdrop. Sits above the canvas/top/bottom
+                  bars but below the toolbar, so toolbar icons stay clickable
+                  while a single tap anywhere else dismisses the panel. */}
+              <div
+                onClick={closePanel}
+                className="fixed inset-0 z-[35] bg-black/30 backdrop-blur-[2px]"
+                style={{ animation: "storyFadeIn 0.15s ease-out" }}
+                aria-hidden="true"
+              />
 
-              {panel === "bg-color" && (
-                <div className="w-[220px]">
-                  <div className="text-white text-xs font-semibold px-3 pt-3">Background color</div>
-                  <ColorPickerRow colors={BG_SWATCHES} value={bgColor} onChange={setBgColor} />
-                </div>
-              )}
-
-              {panel === "text-color" && (
-                <div className="w-[220px]">
-                  <div className="text-white text-xs font-semibold px-3 pt-3">Text color</div>
-                  <ColorPickerRow colors={TEXT_SWATCHES} value={textColor} onChange={applyTextColor} />
-                </div>
-              )}
-
-              {panel === "font" && (
-                <div className="w-[180px] py-2 max-h-[300px] overflow-y-auto">
-                  {FONT_OPTIONS.map((f) => (
+              <div
+                className="fixed inset-x-0 bottom-0 z-50 bg-[#161616]/95 backdrop-blur-xl border-t border-white/10 rounded-t-3xl shadow-2xl max-h-[65vh] overflow-hidden flex flex-col md:absolute md:inset-x-auto md:bottom-auto md:right-[84px] md:top-1/2 md:-translate-y-1/2 md:rounded-2xl md:border md:border-white/10 md:border-t-white/10 md:max-h-[70vh] md:w-auto"
+                style={{
+                  animation: "storyPanelIn 0.2s ease-out",
+                  paddingBottom: "env(safe-area-inset-bottom)",
+                }}
+              >
+                {panel !== "songs" && PANEL_TITLES[panel] && (
+                  <div className="flex items-center justify-between px-4 pt-3 pb-1 shrink-0">
+                    <span className="text-white text-sm font-semibold">{PANEL_TITLES[panel]}</span>
                     <button
-                      key={f}
-                      onClick={() => applyFont(f)}
-                      style={{ fontFamily: f }}
-                      className="w-full flex items-center justify-between px-4 py-2 text-sm text-white hover:bg-white/5"
+                      onClick={closePanel}
+                      className="text-white/50 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors"
+                      aria-label="Close"
                     >
-                      {f}
-                      {textFont === f && <Check size={14} className="text-[#4a5df9] shrink-0" />}
+                      <X size={16} />
                     </button>
-                  ))}
-                </div>
-              )}
+                  </div>
+                )}
 
-              {panel === "filters" && (
-                <div className="w-[160px] py-2">
-                  {FILTER_NAMES.map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setActiveFilter(f)}
-                      className="w-full flex items-center justify-between px-4 py-2 text-sm capitalize text-white hover:bg-white/5"
-                    >
-                      {f}
-                      {activeFilter === f && <Check size={14} className="text-[#4a5df9]" />}
-                    </button>
-                  ))}
-                </div>
-              )}
+                <div className="overflow-y-auto no-scrollbar">
+                  {panel === "pen-color" && (
+                    <div className="w-full sm:w-[260px]">
+                      <ColorPickerRow colors={PEN_SWATCHES} value={penColor} onChange={setPenColor} />
+                    </div>
+                  )}
 
-              {panel === "songs" && (
-                <div className="w-[260px] p-3">
-                  {!selectedSong ? (
-                    <>
-                      <div className="text-white text-xs font-semibold mb-2">Choose a song</div>
-                      {songs.length === 0 && (
-                        <div className="text-[#888] text-xs py-2">No songs available yet.</div>
-                      )}
-                      {songs.map((song) => (
-                        <div
-                          key={song._id}
-                          onClick={() => {
-                            setSelectedSong(song);
-                            setSongStartTime(0);
-                          }}
-                          className="flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:bg-white/5"
+                  {panel === "bg-color" && (
+                    <div className="w-full sm:w-[260px]">
+                      <ColorPickerRow colors={BG_SWATCHES} value={bgColor} onChange={setBgColor} />
+                    </div>
+                  )}
+
+                  {panel === "text-color" && (
+                    <div className="w-full sm:w-[260px]">
+                      <ColorPickerRow colors={TEXT_SWATCHES} value={textColor} onChange={applyTextColor} />
+                    </div>
+                  )}
+
+                  {panel === "font" && (
+                    <div className="w-full sm:w-[220px] py-1 max-h-[300px] overflow-y-auto no-scrollbar">
+                      {FONT_OPTIONS.map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => applyFont(f)}
+                          style={{ fontFamily: f }}
+                          className={`w-full flex items-center justify-between px-4 py-2.5 text-base transition-colors ${
+                            textFont === f ? "text-white bg-[#4a5df9]/15" : "text-white/90 hover:bg-white/5"
+                          }`}
                         >
-                          <img
-                            src={song.thumbnail || "/images/song-placeholder.png"}
-                            alt=""
-                            className="w-9 h-9 rounded object-cover shrink-0"
-                          />
-                          <div className="text-white text-xs min-w-0">
-                            <div className="truncate">{song.title}</div>
-                            <div className="text-[#888] truncate">{song.artist}</div>
-                          </div>
-                        </div>
+                          {f}
+                          {textFont === f && <Check size={14} className="text-[#4a5df9] shrink-0" />}
+                        </button>
                       ))}
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between mb-3">
-                        <button
-                          onClick={removeSong}
-                          className="text-white text-xs flex items-center gap-1"
-                        >
-                          <ChevronLeft size={14} /> Back
-                        </button>
-                        <button
-                          onClick={() => setPanel(null)}
-                          className="text-[#4a5df9] text-xs font-semibold"
-                        >
-                          Done
-                        </button>
+                    </div>
+                  )}
+
+                  {/* Filters — a wrapping grid (4 per row, rows grow with the
+                      filter count) instead of a horizontal scroller, so mouse
+                      users never need to "scroll right" to see every option. */}
+                  {panel === "filters" && (
+                    <div className="w-full sm:w-[360px] px-4 py-3">
+                      <div className="grid grid-cols-4 gap-3">
+                        {FILTER_NAMES.map((f) => {
+                          const meta = FILTER_META[f] || { label: f };
+                          const isActive = activeFilter === f;
+                          return (
+                            <button
+                              key={f}
+                              onClick={() => setActiveFilter(f)}
+                              className="flex flex-col items-center gap-1.5"
+                              aria-label={meta.label}
+                            >
+                              <div
+                                className={`relative w-full aspect-square rounded-xl overflow-hidden bg-black/40 ring-2 transition-all duration-150 ${
+                                  isActive
+                                    ? "ring-[#4a5df9] scale-[1.04] shadow-[0_0_10px_rgba(74,93,249,0.5)]"
+                                    : "ring-white/15 hover:ring-white/40"
+                                }`}
+                              >
+                                {previewUrl && mediaType === "image" && (
+                                  <img
+                                    src={previewUrl}
+                                    alt=""
+                                    className="w-full h-full object-cover"
+                                    style={{ filter: VIDEO_FILTER_CSS[f] }}
+                                  />
+                                )}
+                                {previewUrl && mediaType === "video" && (
+                                  <video
+                                    src={previewUrl}
+                                    muted
+                                    loop
+                                    autoPlay
+                                    playsInline
+                                    className="w-full h-full object-cover"
+                                    style={{ filter: VIDEO_FILTER_CSS[f] }}
+                                  />
+                                )}
+                                {isActive && (
+                                  <span className="absolute top-1 right-1 bg-[#4a5df9] rounded-full p-0.5 ring-2 ring-[#161616]">
+                                    <Check size={9} className="text-white" />
+                                  </span>
+                                )}
+                              </div>
+                              <span
+                                className={`text-[11px] w-full text-center truncate ${
+                                  isActive ? "text-white font-semibold" : "text-white/70"
+                                }`}
+                              >
+                                {meta.label}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
-                      <div className="text-white text-xs font-semibold truncate mb-1">
-                        {selectedSong.title}
-                      </div>
-                      <div className="text-[#888] text-[11px] mb-3 truncate">
-                        {selectedSong.artist}
-                      </div>
-                      <SongTrimClipper
-                        duration={selectedSong.duration}
-                        startTime={songStartTime}
-                        onChange={setSongStartTime}
-                        trackWidth={220}
-                      />
-                      <div className="text-[#888] text-[10px] mt-2 text-center">
-                        Drag to choose your 15s clip
-                      </div>
-                    </>
+                    </div>
+                  )}
+
+                  {panel === "songs" && (
+                    <div className="w-full sm:w-[300px] p-4">
+                      {!selectedSong ? (
+                        <>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-white text-sm font-semibold">Choose a song</span>
+                            <button
+                              onClick={closePanel}
+                              className="text-white/50 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors"
+                              aria-label="Close"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                          <div className="max-h-[280px] overflow-y-auto no-scrollbar -mx-1">
+                            {songs.length === 0 && (
+                              <div className="text-[#888] text-xs py-4 text-center">No songs available yet.</div>
+                            )}
+                            {songs.map((song) => (
+                              <div
+                                key={song._id}
+                                onClick={() => {
+                                  setSelectedSong(song);
+                                  setSongStartTime(0);
+                                }}
+                                className="flex items-center gap-3 p-2 mx-1 rounded-xl cursor-pointer hover:bg-white/5 active:bg-white/10 transition-colors"
+                              >
+                                <img
+                                  src={song.thumbnail || "/images/song-placeholder.png"}
+                                  alt=""
+                                  className="w-10 h-10 rounded-lg object-cover shrink-0 ring-1 ring-white/10"
+                                />
+                                <div className="text-white text-xs min-w-0">
+                                  <div className="truncate font-medium">{song.title}</div>
+                                  <div className="text-[#888] truncate">{song.artist}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          {songs.some((s) => s.source === "jamendo") && (
+                            <div className="text-[#666] text-[10px] text-center pt-3 mt-1 border-t border-white/5">
+                              Music via Jamendo · Creative Commons
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between mb-3">
+                            <button
+                              onClick={removeSong}
+                              className="text-white/90 hover:text-white text-xs flex items-center gap-1 -ml-1 px-1.5 py-1 rounded-lg hover:bg-white/10 transition-colors"
+                            >
+                              <ChevronLeft size={14} /> Back
+                            </button>
+                            <button
+                              onClick={closePanel}
+                              className="text-[#4a5df9] hover:text-[#6b7bff] text-xs font-semibold px-1.5 py-1 rounded-lg hover:bg-[#4a5df9]/10 transition-colors"
+                            >
+                              Done
+                            </button>
+                          </div>
+                          <div className="text-white text-xs font-semibold truncate mb-1">
+                            {selectedSong.title}
+                          </div>
+                          <div className="text-[#888] text-[11px] mb-3 truncate">
+                            {selectedSong.artist}
+                          </div>
+                          <SongTrimClipper
+                            duration={selectedSong.duration}
+                            startTime={songStartTime}
+                            onChange={setSongStartTime}
+                            trackWidth={220}
+                          />
+                          <div className="text-[#888] text-[10px] mt-2 text-center">
+                            Drag to choose your 15s clip
+                          </div>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
+              </div>
+            </>
           )}
         </div>
       )}

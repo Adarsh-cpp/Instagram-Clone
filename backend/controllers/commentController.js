@@ -215,6 +215,15 @@ export const replyToComment = async (req, res) => {
   }
 };
 
+// A user can delete a comment if either:
+// 1. They wrote the comment themselves (existing behavior), OR
+// 2. They are the author of the post the comment belongs to
+//    (new: post owners can moderate/remove any comment on their post).
+//
+// We now always look up the post (previously this only happened for
+// top-level comments, to decrement commentsCount) because we need
+// post.author for the ownership check regardless of whether this is
+// a top-level comment or a reply.
 export const deleteComment = async (req, res) => {
   try {
     const userId = req.user?._id;
@@ -229,8 +238,20 @@ export const deleteComment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Comment not found" });
     }
 
-    // ownership check — a user can only delete their own comment
-    if (comment.author.toString() !== userId.toString()) {
+    // comment.post is always set (top-level comments AND replies both
+    // store it — see postComment and replyToComment above), so this
+    // works even when the route doesn't pass a :postId param.
+    const post = await postModel.findById(postId || comment.post);
+    if (!post) {
+      return res.status(404).json({ success: false, message: "Post not found" });
+    }
+
+    const isCommentAuthor =
+      comment.author.toString() === userId.toString();
+    const isPostAuthor =
+      post.author.toString() === userId.toString();
+
+    if (!isCommentAuthor && !isPostAuthor) {
       return res.status(403).json({
         success: false,
         message: "You can only delete your own comments",
@@ -252,11 +273,8 @@ export const deleteComment = async (req, res) => {
 
       // replies never incremented commentsCount (see replyToComment),
       // so only decrement when a top-level comment is removed
-      const post = await postModel.findById(postId || comment.post);
-      if (post) {
-        post.commentsCount = Math.max(0, post.commentsCount - 1);
-        await post.save();
-      }
+      post.commentsCount = Math.max(0, post.commentsCount - 1);
+      await post.save();
     }
 
     await commentModel.findByIdAndDelete(commentId);

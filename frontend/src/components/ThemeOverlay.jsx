@@ -43,16 +43,18 @@ export default function ThemeOverlay({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+      style={{ background: "var(--overlay-scrim)" }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-t-3xl bg-[#121212] pb-6 text-white shadow-2xl animate-slide-up sm:rounded-3xl"
+        className="w-full max-w-md rounded-t-3xl pb-6 shadow-2xl animate-slide-up sm:rounded-3xl"
+        style={{ background: "var(--bg-panel)", color: "var(--text-primary)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* drag handle */}
         <div className="flex justify-center pt-3 sm:hidden">
-          <div className="h-1 w-10 rounded-full bg-white/30" />
+          <div className="h-1 w-10 rounded-full" style={{ background: "var(--border-input)" }} />
         </div>
 
         {/* header */}
@@ -60,7 +62,8 @@ export default function ThemeOverlay({
           <h2 className="text-base font-medium">Customize</h2>
           <button
             onClick={onClose}
-            className="absolute right-4 rounded-full p-1 text-white/70 hover:bg-white/10"
+            className="absolute right-4 rounded-full p-1 hover:bg-[var(--bg-menu-hover)]"
+            style={{ color: "var(--text-muted)" }}
             aria-label="Close"
           >
             <X size={20} />
@@ -68,31 +71,31 @@ export default function ThemeOverlay({
         </div>
 
         {/* tabs */}
-        <div className="mt-1 flex border-b border-white/10 px-4">
+        <div className="mt-1 flex border-b border-[var(--border-soft)] px-4">
           <button
             onClick={() => setActiveTab("theme")}
             className={`relative px-3 pb-3 text-sm transition ${
               activeTab === "theme"
-                ? "font-semibold text-white"
-                : "text-white/50 hover:text-white/80"
+                ? "font-semibold text-[var(--text-primary)]"
+                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
             }`}
           >
             Theme
             {activeTab === "theme" && (
-              <span className="absolute inset-x-0 -bottom-px h-[2px] rounded bg-white" />
+              <span className="absolute inset-x-0 -bottom-px h-[2px] rounded bg-[var(--text-primary)]" />
             )}
           </button>
           <button
             onClick={() => setActiveTab("font")}
             className={`relative px-3 pb-3 text-sm transition ${
               activeTab === "font"
-                ? "font-semibold text-white"
-                : "text-white/50 hover:text-white/80"
+                ? "font-semibold text-[var(--text-primary)]"
+                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
             }`}
           >
             Font
             {activeTab === "font" && (
-              <span className="absolute inset-x-0 -bottom-px h-[2px] rounded bg-white" />
+              <span className="absolute inset-x-0 -bottom-px h-[2px] rounded bg-[var(--text-primary)]" />
             )}
           </button>
         </div>
@@ -111,6 +114,12 @@ export default function ThemeOverlay({
             <div className="grid max-h-[46vh] grid-cols-3 gap-3 overflow-y-auto px-4 py-4 sm:max-h-[52vh]">
               {CHAT_THEMES.map((theme) => {
                 const isSelected = theme.id === selectedThemeId;
+                // the "default" swatch mirrors the app-wide light/dark
+                // vars instead of a fixed color, so it previews black in
+                // dark mode and white in light mode, matching the real
+                // chat's behavior for this theme.
+                const isDefault = theme.id === "default";
+
                 return (
                   <button
                     key={theme.id}
@@ -121,17 +130,17 @@ export default function ThemeOverlay({
                       className={`relative aspect-[3/4] w-full overflow-hidden rounded-xl ring-2 transition ${
                         isSelected ? "ring-blue-500" : "ring-transparent"
                       }`}
-                      style={{ background: theme.bg }}
+                      style={{ background: isDefault ? "var(--bg-app)" : theme.bg }}
                     >
                       {/* mini bubble preview so the swatch reads as "a chat", not just a color */}
                       <div className="absolute inset-x-2 bottom-2 flex flex-col gap-1">
                         <div
                           className="ml-auto h-2.5 w-2/3 rounded-full"
-                          style={{ background: theme.senderBubble }}
+                          style={{ background: isDefault ? "var(--bg-elevated)" : theme.senderBubble }}
                         />
                         <div
                           className="h-2.5 w-1/2 rounded-full"
-                          style={{ background: theme.receiverBubble }}
+                          style={{ background: isDefault ? "var(--border-soft)" : theme.receiverBubble }}
                         />
                       </div>
 
@@ -141,7 +150,7 @@ export default function ThemeOverlay({
                         </div>
                       )}
                     </div>
-                    <span className="w-full truncate text-xs text-white/90">
+                    <span className="w-full truncate text-xs" style={{ color: "var(--text-primary)" }}>
                       {theme.name}
                     </span>
                   </button>
@@ -162,14 +171,14 @@ export default function ThemeOverlay({
                   className={`mb-2 flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${
                     isSelected
                       ? "border-blue-500 bg-blue-500/10"
-                      : "border-white/10 bg-white/[0.03] hover:bg-white/[0.07]"
+                      : "border-[var(--border-soft)] bg-[var(--bg-elevated)] hover:bg-[var(--bg-menu-hover)]"
                   }`}
                 >
                   <div className="min-w-0" style={{ fontFamily: font.stack }}>
-                    <div className="truncate text-[15px] text-white">
+                    <div className="truncate text-[15px]" style={{ color: "var(--text-primary)" }}>
                       {font.name}
                     </div>
-                    <div className="truncate text-[13px] text-white/50">
+                    <div className="truncate text-[13px]" style={{ color: "var(--text-muted)" }}>
                       Talk to me in this one
                     </div>
                   </div>
@@ -190,7 +199,8 @@ export default function ThemeOverlay({
           {activeTab === "theme" && (
             <button
               onClick={() => setShowPreview((prev) => !prev)}
-              className="flex-1 rounded-xl bg-white/10 py-3 text-sm font-semibold text-white active:bg-white/20"
+              className="flex-1 rounded-xl py-3 text-sm font-semibold hover:bg-[var(--bg-menu-hover)]"
+              style={{ background: "var(--bg-elevated)", color: "var(--text-primary)" }}
             >
               {showPreview ? "Hide preview" : "Preview"}
             </button>
@@ -201,8 +211,9 @@ export default function ThemeOverlay({
             className={`flex-1 rounded-xl py-3 text-sm font-semibold transition ${
               hasChanged
                 ? "bg-blue-600 text-white active:bg-blue-700"
-                : "bg-blue-600/30 text-white/50"
+                : "bg-blue-600/30"
             }`}
+            style={!hasChanged ? { color: "var(--text-muted)" } : undefined}
           >
             Apply
           </button>

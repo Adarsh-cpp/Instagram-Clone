@@ -1,7 +1,7 @@
 // Chat.jsx
 import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Image, Send, Smile, X, ArrowLeft, Sticker } from "lucide-react";
+import { Image, Send, Smile, X, ArrowLeft, Sticker, Info } from "lucide-react";
 import socket from '../socket';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -84,6 +84,7 @@ const Chat = () => {
   // preview is fully self-contained (see ThemePreviewPanel) and never
   // reaches into this component's state.
   const currentThemeId = conversation?.chatTheme || "default";
+  const isDefaultTheme = currentThemeId === "default";
   const activeTheme =
     CHAT_THEMES.find((theme) => theme.id === currentThemeId) ||
     CHAT_THEMES.find((theme) => theme.id === "default");
@@ -103,14 +104,20 @@ const Chat = () => {
     loadChatFont(currentFontId);
   }, [currentFontId]);
 
-  // The input pill itself always renders as flat black or white
-  // depending on the theme's mode, regardless of the theme's actual
-  // background/gradient — that gradient is reserved for the area
-  // *around* the pill (chat container + footer).
-  const isLightTheme = activeTheme?.mode === "light";
-  const inputBarBg = isLightTheme ? "#FFFFFF" : "#000000";
-  const inputBarText = isLightTheme ? "#111111" : "#FFFFFF";
-  const inputBarBorder = isLightTheme ? "#E0E0E0" : "#2A2A2A";
+  // The input pill: for the "default" chat theme it rides the app's
+  // global light/dark CSS vars (so it flips automatically with the
+  // site-wide theme toggle). A custom picked chat theme keeps its own
+  // fixed flat black/white regardless of app mode, per its own `mode`.
+  const isCustomLightTheme = !isDefaultTheme && activeTheme?.mode === "light";
+  const inputBarBg = isDefaultTheme
+    ? "var(--bg-input)"
+    : isCustomLightTheme ? "#FFFFFF" : "#000000";
+  const inputBarText = isDefaultTheme
+    ? "var(--text-input)"
+    : isCustomLightTheme ? "#111111" : "#FFFFFF";
+  const inputBarBorder = isDefaultTheme
+    ? "var(--border-input)"
+    : isCustomLightTheme ? "#E0E0E0" : "#2A2A2A";
 
   // Mobile back arrow: pop the history entry that opening this chat
   // pushed (see MessageCard's `replace={isDesktop}`), so we land back on
@@ -707,9 +714,9 @@ const Chat = () => {
             type="button"
             aria-label="Chat options"
             onClick={() => setIsInfoMenuOpen((prev) => !prev)}
-            className="btn w-[30px] h-[30px] md:w-[35px] md:h-[35px] mr-3 md:mr-4 overflow-hidden cursor-pointer"
+            className="btn w-[30px] h-[30px] md:w-[35px] md:h-[35px] mr-3 md:mr-4 flex items-center justify-center cursor-pointer"
           >
-            <img src="/images/info-icon.png" alt="" className="w-full h-full" />
+            <Info size={22} color="var(--text-primary)" />
           </button>
 
           {isInfoMenuOpen && (
@@ -742,11 +749,14 @@ const Chat = () => {
           message area and the footer, so a gradient is painted once across
           the whole region and runs continuously behind the input pill —
           no second background to keep in sync, no seam where the scroll
-          area ends. The font lives here too, so the input inherits it. */}
+          area ends. The font lives here too, so the input inherits it.
+          For the "default" theme we deliberately paint no inline
+          background at all, so the app-level bg-[var(--bg-app)] on the
+          outer wrapper shows through and flips with the global toggle. */}
       <div
         className="themedArea flex-1 min-h-0 w-full flex flex-col transition-[background] duration-700 ease-in-out"
         style={{
-          ...(activeTheme?.bg ? { background: activeTheme.bg } : {}),
+          ...(activeTheme?.bg && !isDefaultTheme ? { background: activeTheme.bg } : {}),
           ...chatFontStyle,
         }}
       >

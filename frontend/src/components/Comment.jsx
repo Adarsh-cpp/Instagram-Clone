@@ -36,6 +36,8 @@ const Comment = ({
   onReplyClick,     // only used when isReply — bubbles the reply target up to the top-level Comment
   onDeleted,        // only used for top-level comments — tells CommentsOverlay to drop it from the list
   onReplyDeleted,   // only used for replies — tells the parent Comment to drop it from its replies state
+  canModerate = false, // true when the logged-in user owns the post/reel this comment belongs to —
+                        // lets them delete ANY comment on it, not just their own
   // fallback props — used only for the post-caption pseudo-comment, which has no real Comment doc
   author,
   authorDP,
@@ -46,6 +48,10 @@ const Comment = ({
 
   const { user, refreshUser } = useAuth();
   const isOwnComment = user?._id?.toString() === comment?.author?._id?.toString();
+
+  // Either the person who wrote this comment, or the person who owns
+  // the post/reel it's on, is allowed to delete it.
+  const canDelete = isOwnComment || canModerate;
 
   const isRealComment = Boolean(comment?._id);
 
@@ -243,8 +249,9 @@ const Comment = ({
               </span>
             )}
 
-            {/* 3-dot menu — only the comment's own author sees this */}
-            {isOwnComment && (
+            {/* 3-dot menu — shown to the comment's own author, AND to
+                the post/reel owner (who can moderate any comment) */}
+            {canDelete && (
               <div className="relative">
                 <button
                   onClick={() => setShowMenu((prev) => !prev)}
@@ -321,6 +328,7 @@ const Comment = ({
               reelId={reelId}
               currentUserId={currentUserId}
               isReply
+              canModerate={canModerate}
               onReplyClick={(username) => {
                 setReplyTarget({ username });
                 setShowReplies(true);

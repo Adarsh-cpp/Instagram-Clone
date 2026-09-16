@@ -266,7 +266,7 @@ const UserProfilePage = () => {
   const showHighlightSection = isOwnProfile || highlights.length > 0
 
   return (
-    <div className="UserProfilePage w-[100vw] h-[100vh] flex justify-between items-center bg-[var(--bg-app)]">
+    <div className="UserProfilePage w-full h-[100dvh] flex justify-between items-center bg-[var(--bg-app)] overflow-x-hidden">
 
       <IconSidebar />
 
@@ -306,12 +306,12 @@ const UserProfilePage = () => {
         )}
 
         <div className="profileContainer w-full 2xl:w-[80%] h-full relative ">
-            <div className={`profileInfo w-full ${showHighlightSection ? "h-[46%]" : "h-[34.5%] sm:h-[28.5%]"}`}>
-                <div className={`personalInfoSection w-full flex justify-start items-center ${showHighlightSection ? "h-[75%] sm:h-[62%]" : "h-full"}`}>
-                    <div className="profilePicSection w-[30%] md:w-[25%] lg:w-[20%] h-full flex justify-center items-center ">
+            <div className={`profileInfo w-full h-auto ${showHighlightSection ? "sm:h-[46%]" : "sm:h-[34.5%] md:h-[28.5%]"}`}>
+                <div className={`personalInfoSection w-full flex flex-row items-center gap-3 sm:gap-0 py-4 sm:py-0 ${showHighlightSection ? "h-auto sm:h-[62%]" : "h-auto sm:h-full"}`}>
+                    <div className="profilePicSection shrink-0 w-auto sm:w-[30%] md:w-[25%] lg:w-[20%] h-auto sm:h-full flex justify-center items-center ">
                         <div
                           onClick={() => setIsDpOverlayOpen(true)}
-                          className="profilePic w-[120px] h-[120px] sm:w-[180px] sm:h-[180px] md:w-[150px] md:h-[150px] lg:w-[180px] lg:h-[180px] rounded-full overflow-hidden object-cover cursor-pointer "
+                          className="profilePic w-[90px] h-[90px] sm:w-[150px] sm:h-[150px] md:w-[150px] md:h-[150px] lg:w-[180px] lg:h-[180px] rounded-full overflow-hidden object-cover cursor-pointer shrink-0 "
                         >
                             <img
                                 src={
@@ -320,32 +320,34 @@ const UserProfilePage = () => {
                                     : "/images/default-profile-pic.jpg"
                                 }
                                 alt=""
-                                className="w-full h-full"
+                                className="w-full h-full object-cover"
                               />
                         </div>
                     </div>
-                    <div className="profileDetails w-[300px] sm:w-[70%] h-full ">
-                        <div className="nameSection w-full h-[50%] md:h-[25%] flex flex-col md:flex-row justify-center items-start md:items-center  ">
-                           <div className="name w-[70%] h-[50%] md:h-full px-2 sm:px-6 flex items-center text-[var(--text-primary)] text-[16px] sm:text-[20px] font-bold ">{user.username}</div>
+                    <div className="profileDetails flex-1 min-w-0 h-auto sm:h-full flex flex-col justify-center gap-2 sm:gap-0 ">
+                        <div className="nameSection w-full h-auto md:h-[25%] flex flex-col md:flex-row justify-start items-start md:items-center gap-2 md:gap-0 ">
+                           <div className="name w-full md:w-[70%] h-auto md:h-full px-1 sm:px-6 flex items-center text-[var(--text-primary)] text-[16px] sm:text-[20px] font-bold truncate ">{user.username}</div>
 
-                           <div className="buttons  h-[50%] md:w-[60%] md:h-full flex justify-start items-center ">
+                           <div className="buttons w-[50%] h-auto md:w-[60%] md:h-full flex gap-2 sm:gap-3 items-center ">
                             {/* Edit Button */}
                            <div
-                                className={`editbtn w-[50%] h-full justify-center items-center ${
+                                className={`editbtn flex-1 min-w-0 justify-center items-center ${
                                   isOwnProfile ? "flex" : "hidden"
                                 }`}
                               >
-                            <Link to="/user/edit-profile"><button className='w-[100px] sm:w-[150px] h-[40px] bg-[var(--bg-elevated)] hover:bg-[var(--bg-menu-hover)] cursor-pointer text-[var(--text-primary)] text-[14px] sm:text-[16px] font-bold rounded-xl'>Edit Profile</button></Link>
+                            <Link to="/user/edit-profile" className="w-full">
+                              <button className='w-full sm:max-w-[160px] mx-auto block h-[36px] sm:h-[40px] bg-[var(--bg-elevated)] hover:bg-[var(--bg-menu-hover)] cursor-pointer text-[var(--text-primary)] text-[13px] sm:text-[16px] font-bold rounded-xl truncate px-2'>Edit Profile</button>
+                            </Link>
                            </div>
 
                            {/* Follow Button */}
                           {!isOwnProfile && (
                               <>
                                 {/* Follow Button */}
-                                <div className="followbtn w-[50%] h-full flex justify-center items-center">
+                                <div className="followbtn flex-1 min-w-0 flex justify-center items-center">
                                    <button
                                     onClick={handleFollowToggle}
-                                    className={`w-[100px] sm:w-[150px] h-[40px]  cursor-pointer text-[var(--text-on-brand)] text-[14px] sm:text-[16px] font-bold rounded-xl ${
+                                    className={`w-full sm:max-w-[160px] h-[36px] sm:h-[40px] cursor-pointer text-[var(--text-on-brand)] text-[13px] sm:text-[16px] font-bold rounded-xl truncate px-2 ${
                                     isFollowing
                                         ? "bg-[var(--bg-secondary-btn)] hover:bg-[var(--bg-secondary-btn-hover)]"
                                         : "bg-[var(--accent-indigo)] hover:bg-[var(--accent-indigo-hover)]"
@@ -356,8 +358,8 @@ const UserProfilePage = () => {
                                 </div>
 
                                 {/* Message Button */}
-                                <div className="msgbtn w-[50%] h-full flex justify-center items-center">
-                                  <button onClick={handleMessage} className="w-[100px] sm:w-[150px] h-[40px] bg-[var(--bg-elevated)] hover:bg-[var(--bg-menu-hover)] cursor-pointer text-[var(--text-primary)] text-[14px] sm:text-[16px] font-bold rounded-xl ml-4">
+                                <div className="msgbtn flex-1 min-w-0 flex justify-center items-center">
+                                  <button onClick={handleMessage} className="w-full sm:max-w-[160px] h-[36px] sm:h-[40px] bg-[var(--bg-elevated)] hover:bg-[var(--bg-menu-hover)] cursor-pointer text-[var(--text-primary)] text-[13px] sm:text-[16px] font-bold rounded-xl truncate px-2">
                                     Message
                                   </button>
                                 </div>
@@ -368,10 +370,10 @@ const UserProfilePage = () => {
 
                            
                         </div>
-                        <div className="postCount w-full md:w-[80%] h-[20%] flex justify-center items-center ">
-                            <div className="posts w-[26%] sm:w-[30%] h-full px-2 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[12px] "><span className='text-[var(--text-primary)]'>{user.postsCount}</span>&nbsp;posts</div>
-                            <div onClick={() => openFollowOverlay("followers")} className="fllwers w-[37%] sm:w-[35%] h-full px-2 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[12px] cursor-pointer "><span className='text-[var(--text-primary)]'>{followers}</span>&nbsp;followers</div>
-                            <div onClick={() => openFollowOverlay("following")} className="fllwing w-[37%] sm:w-[35%] h-full px-2 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[12px] cursor-pointer "><span className='text-[var(--text-primary)]'>{user.following?.length}</span>&nbsp;following</div>
+                        <div className="postCount w-full md:w-[80%] h-auto md:h-[20%] flex justify-start md:justify-center items-center gap-1 sm:gap-0 ">
+                            <div className="posts flex-1 h-auto md:h-full px-1 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[13px] whitespace-nowrap "><span className='text-[var(--text-primary)]'>{user.postsCount}</span>&nbsp;posts</div>
+                            <div onClick={() => openFollowOverlay("followers")} className="fllwers flex-1 h-auto md:h-full px-1 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[13px] whitespace-nowrap cursor-pointer "><span className='text-[var(--text-primary)]'>{followers}</span>&nbsp;followers</div>
+                            <div onClick={() => openFollowOverlay("following")} className="fllwing flex-1 h-auto md:h-full px-1 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[13px] whitespace-nowrap cursor-pointer "><span className='text-[var(--text-primary)]'>{user.following?.length}</span>&nbsp;following</div>
                         </div>
                         <BioCard bioText={user.bio || ""} />
                     </div>
@@ -383,11 +385,11 @@ const UserProfilePage = () => {
                        onMouseLeave={handleMouseLeave}
                        onMouseUp={handleMouseUp}
                        onMouseMove={handleMouseMove}
-                       className="highlightSection w-full h-[30%] sm:h-[43%] p-2 flex justify-start items-center sm:items-start gap-10 overflow-x-auto scrollbar-hide select-none cursor-grab ">
+                       className="highlightSection w-full min-h-[110px] sm:min-h-[150px] py-2 px-1 sm:px-2 flex justify-start items-center sm:items-start gap-4 sm:gap-10 overflow-x-auto scrollbar-hide select-none cursor-grab ">
                           {isOwnProfile && (
                             <div
                               onClick={() => setShowNewHighlightModal(true)}
-                              className="newHighlightsection h-full w-[100px] flex flex-col justify-center sm:justify-start items-center cursor-pointer"
+                              className="newHighlightsection h-full w-[100px] flex flex-col justify-center sm:justify-start items-center cursor-pointer shrink-0"
                             >
                                <div className="newHighLightCircle w-[70px] h-[70px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-full object-fit object-center border-[4px] border-[var(--border-container)] overflow-hidden flex justify-center items-center bg-[var(--bg-input)]">
                                  <img src="/images/plus-icon.png" alt="" draggable="false" className='w-[60%] h-[60%] select-none' />

@@ -158,11 +158,7 @@ export const getShareUsersList = async (req, res) => {
   }
 };
 
-// PATCH /conversation/:conversationId/theme
-// Persists the chat theme picked in ThemeOverlay. Only a participant of
-// the conversation may change it; the client (Chat.jsx) is responsible
-// for optimistic UI and for broadcasting the "themeChanged" socket event
-// to the other participant once this succeeds.
+
 export const updateChatTheme = async (req, res) => {
   try {
     const userId = req.user._id;
