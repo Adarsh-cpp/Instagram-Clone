@@ -4,14 +4,18 @@ import axios from "axios"
 import IconSidebar from "../components/IconSidebar";
 import EditProfilePic from "../components/EditProfilePic";
 import MobileFooter from "../components/MobileFooter";
+import AiBioAssistant from "../components/AiBioAssistant";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-toastify";
+
+const BASE_URL = import.meta.env.VITE_SERVER_URL
 
 const EditProfilePage = () => {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm();
 
@@ -26,7 +30,7 @@ const navigate = useNavigate()
       try {
         const token = localStorage.getItem("authToken");
 
-        const res = await axios.get("http://localhost:4000/user/profile/get-profile", {
+        const res = await axios.get(`${BASE_URL}/user/profile/get-profile`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -57,10 +61,25 @@ const navigate = useNavigate()
   if(user){
     setBio(user.bio || "");
     setGender(user.gender || "Prefer not to say");
+    // keep react-hook-form's own copy of `bio` in sync with the loaded
+    // profile — see handleBioChange below for why this is needed
+    setValue("bio", user.bio || "");
   }
-}, [user]);
+}, [user, setValue]);
 
 
+  // Single writer for the bio field. The textarea is controlled by local
+  // state AND registered with react-hook-form; because the JSX passes its
+  // own onChange after {...register("bio")}, RHF's onChange is overwritten
+  // and it would otherwise never see the value (submitting `undefined`).
+  // Writing both here keeps the counter, the validation and the submitted
+  // payload consistent — and lets the AI result flow through the exact
+  // same path as typing.
+  const handleBioChange = (value) => {
+    const next = value ?? "";
+    setBio(next);
+    setValue("bio", next, { shouldValidate: true, shouldDirty: true });
+  };
 
   const handleClick = (e) => {
     setGender(e.target.id);
@@ -79,7 +98,7 @@ const navigate = useNavigate()
     };
 
     const res = await axios.put(
-      "http://localhost:4000/user/profile/edit-profile",
+      `${BASE_URL}/user/profile/edit-profile`,
       payload,
       {
         headers: {
@@ -90,7 +109,8 @@ const navigate = useNavigate()
 
     if (res.status === 200) {
 
-      setUser(res.data.user); 
+      // the backend responds with `updatedUser`, not `user`
+      setUser(res.data.updatedUser || res.data.user);
       navigate("/user/get-profile", {
             state: {
               message: "Profile updated successfully"
@@ -130,8 +150,14 @@ const navigate = useNavigate()
           >
             {/* --- Edit Bio --- */}
             <div className="editBio relative w-full h-[40%] mt-4 flex flex-col justify-start items-center rounded-[20px]">
-              <div className="heading w-full text-[18px] text-[var(--text-primary)] font-bold mb-2">
-                Bio
+              <div className="heading w-full flex items-center justify-between gap-2 mb-2">
+                <span className="text-[18px] text-[var(--text-primary)] font-bold">
+                  Bio
+                </span>
+
+                {/* Writes into the same field the user types in — nothing
+                    is saved until Submit is pressed. */}
+                <AiBioAssistant currentBio={bio} onBio={handleBioChange} />
               </div>
 
               <textarea
@@ -143,7 +169,7 @@ const navigate = useNavigate()
                   },
                 })}
                 value={bio}
-                onChange={(e) => setBio(e.target.value)}
+                onChange={(e) => handleBioChange(e.target.value)}
                 rows={3}
                 className={`w-full h-full  text-[16px] resize-none outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[20px] p-2 ${
                   errors.bio

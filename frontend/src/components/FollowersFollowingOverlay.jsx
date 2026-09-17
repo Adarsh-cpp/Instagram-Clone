@@ -7,6 +7,8 @@ import FollowUserCard from './FollowUserCard'
 const INITIAL_LIMIT = 10
 const LOAD_MORE_LIMIT = 5
 
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 const FollowersFollowingOverlay = ({
   isOpen,
   onClose,
@@ -24,8 +26,8 @@ const FollowersFollowingOverlay = ({
 
   const endpoint =
     mode === "followers"
-      ? "http://localhost:4000/auth/get-followers"
-      : "http://localhost:4000/auth/get-followings"
+      ? `${BASE_URL}/auth/get-followers`
+      : `${BASE_URL}/auth/get-followings`
 
   // reset + fetch first page whenever the overlay is opened, or the target user/mode changes
   useEffect(() => {

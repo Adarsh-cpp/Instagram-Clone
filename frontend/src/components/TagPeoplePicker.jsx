@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { Search, X, Check } from "lucide-react";
 import { useDebounce } from "../hooks/useDebounce";
 
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 const MAX_TAGS = 20;
 
 const TagPeoplePicker = ({ selected, onChange, onClose }) => {
@@ -15,7 +17,7 @@ const TagPeoplePicker = ({ selected, onChange, onClose }) => {
 
   useEffect(() => {
     inputRef.current?.focus();
-    fetch("http://localhost:4000/post/suggested-tag-users", {
+    fetch("${BASE_URL}/post/suggested-tag-users", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
@@ -33,7 +35,7 @@ const TagPeoplePicker = ({ selected, onChange, onClose }) => {
     let cancelled = false;
     setLoading(true);
 
-    fetch(`http://localhost:4000/post/search-users?q=${encodeURIComponent(q)}`, {
+    fetch(`${BASE_URL}/post/search-users?q=${encodeURIComponent(q)}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())

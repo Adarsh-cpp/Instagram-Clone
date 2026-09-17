@@ -8,7 +8,7 @@ import { getNotificationToastText } from "../utils/notificationText";
 const NotificationContext = createContext(null);
 export const useNotifications = () => useContext(NotificationContext);
 
-const BASE_URL = "http://localhost:4000";
+const BASE_URL = import.meta.env.VITE_SERVER_URL
 
 const authHeaders = () => ({
   headers: {

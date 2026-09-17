@@ -4,6 +4,8 @@ import socket from "../socket";
 
 const AuthContext = createContext();
 
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
@@ -17,7 +19,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       const response = await axios.get(
-        "http://localhost:4000/auth/me",
+        "${BASE_URL}/auth/me",
         {
           headers: {
             Authorization: `Bearer ${token}`,

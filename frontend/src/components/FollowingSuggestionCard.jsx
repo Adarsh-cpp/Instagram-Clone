@@ -5,6 +5,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 const FollowingSuggestionCard = ({...props}) => {
 
 
@@ -30,7 +32,7 @@ const FollowingSuggestionCard = ({...props}) => {
 
 
       const response = await axios.post(
-        `http://localhost:4000/user/profile/${props.user._id}/follow-toggle`,
+        `${BASE_URL}/user/profile/${props.user._id}/follow-toggle`,
         {},
         {
           headers: {

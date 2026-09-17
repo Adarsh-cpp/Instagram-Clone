@@ -5,6 +5,9 @@ import "leaflet/dist/leaflet.css";
 import { Search, X, MapPin, Check, Loader2 } from "lucide-react";
 import { useDebounce } from "../hooks/useDebounce";
 
+
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 const markerIcon = new L.Icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
@@ -66,7 +69,7 @@ const LocationPicker = ({ value, onChange, onClose }) => {
     let cancelled = false;
     setLoading(true);
 
-    fetch(`http://localhost:4000/post/search-location?q=${encodeURIComponent(q)}`, {
+    fetch(`${BASE_URL}/post/search-location?q=${encodeURIComponent(q)}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
@@ -110,7 +113,7 @@ const LocationPicker = ({ value, onChange, onClose }) => {
     try {
       const token = localStorage.getItem("authToken");
       const res = await fetch(
-        `http://localhost:4000/post/reverse-geocode?lat=${lat}&lng=${lng}`,
+        `${BASE_URL}/post/reverse-geocode?lat=${lat}&lng=${lng}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const data = await res.json();

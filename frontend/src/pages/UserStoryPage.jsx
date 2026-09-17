@@ -12,6 +12,8 @@ import {
 import { getImageFilterPreset, VIDEO_FILTER_CSS, FILTER_NAMES } from "../utils/storyFilters";
 import SongTrimClipper from "../components/SongTrimClipper";
 
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 const EXPORT_W = 1080;
 const EXPORT_H = 1920;
 const STORY_RATIO = 9 / 16;
@@ -285,7 +287,7 @@ const UserStoryPage = () => {
     const fetchSongs = async () => {
       try {
         const token = localStorage.getItem("authToken");
-        const res = await axios.get("http://localhost:4000/song/list", {
+        const res = await axios.get(`${BASE_URL}/song/list`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setSongs(res.data.songs || []);
@@ -560,7 +562,7 @@ const UserStoryPage = () => {
       }
 
       const token = localStorage.getItem("authToken");
-      await axios.post("http://localhost:4000/story/create", formData, {
+      await axios.post(`${BASE_URL}/story/create`, formData, {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
       });
 

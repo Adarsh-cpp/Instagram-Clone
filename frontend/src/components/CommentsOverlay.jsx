@@ -12,9 +12,13 @@ import {
   MessageCircle,
   Send,
   Smile,
+  Sparkles,
+  Loader2,
   ChevronLeft,
   ChevronRight,
   X,
+  Heart,
+  Bookmark,
 } from "lucide-react";
 import EmojiPicker from "emoji-picker-react";
 import axios from "axios";
@@ -22,8 +26,13 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { NavLink } from "react-router-dom";
 import { toast } from "react-toastify";
+import {
+  generateAiComment,
+  getAiErrorMessage,
+  COMMENT_TONES,
+} from "../api/aiApi";
 
-const BASE_URL = "http://localhost:4000";
+const BASE_URL = import.meta.env.VITE_SERVER_URL ;
 
 const authConfig = () => ({
   withCredentials: true,
@@ -73,6 +82,11 @@ const CommentsOverlay = ({
   const [showPicker, setShowPicker] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
 
+  // --- AI "Suggest Comment" state ---
+  const [showToneMenu, setShowToneMenu] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const aiAbortControllerRef = useRef(null);
+
   const touchStartX = useRef(null);
   const animatedLikeRef = useRef(null);
 
@@ -89,6 +103,18 @@ const CommentsOverlay = ({
   );
 
   const isCarousel = mediaList.length > 1;
+
+  // Whether the AI can suggest a comment for whatever is currently on
+  // screen. Posts: only when the active slide is an image, not a video —
+  // the backend rejects videos anyway, but disabling the button up front
+  // avoids a pointless round trip. Reels: always allowed, since the
+  // backend falls back to the reel's thumbnail image.
+  const canSuggestComment = useMemo(() => {
+    if (isReel) return true;
+
+    const currentMedia = mediaList[activeSlide];
+    return Boolean(currentMedia) && currentMedia.mediaType !== "video";
+  }, [isReel, mediaList, activeSlide]);
 
   /*
    * Set the follow state from the logged-in user's own
@@ -202,6 +228,14 @@ const CommentsOverlay = ({
     return () => {
       document.body.style.overflow =
         originalOverflow;
+    };
+  }, []);
+
+  // Cancel any in-flight AI suggestion when the overlay unmounts, so a
+  // late response can't set state on an unmounted component.
+  useEffect(() => {
+    return () => {
+      aiAbortControllerRef.current?.abort();
     };
   }, []);
 
@@ -405,6 +439,48 @@ const CommentsOverlay = ({
       }
     } catch (error) {
       console.log(error);
+    }
+  };
+
+  // Asks the backend to suggest a comment for the post/reel currently
+  // being viewed. Only postId/reelId (+ tone, + which slide for a
+  // carousel) ever leave the browser — the backend looks up the
+  // Cloudinary URL itself and fetches the image server-side, so there's
+  // no CORS issue and the frontend never touches image bytes.
+  //
+  // This only fills the input — posting is still a separate, manual step
+  // via the existing "Post" button below.
+  const handleSuggestComment = async (tone = "default") => {
+    if (isSuggesting || !canSuggestComment || !item?._id) return;
+
+    setShowToneMenu(false);
+    setIsSuggesting(true);
+
+    // Cancel any previous suggestion still in flight.
+    aiAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    aiAbortControllerRef.current = controller;
+
+    try {
+      const suggestion = await generateAiComment({
+        postId: isReel ? undefined : item._id,
+        reelId: isReel ? item._id : undefined,
+        mediaIndex: isReel ? undefined : activeSlide,
+        tone,
+        signal: controller.signal,
+      });
+
+      if (suggestion) {
+        setComment(suggestion);
+      }
+    } catch (error) {
+      const message = getAiErrorMessage(
+        error,
+        "Couldn't suggest a comment right now."
+      );
+      if (message) toast.error(message);
+    } finally {
+      setIsSuggesting(false);
     }
   };
 
@@ -654,16 +730,14 @@ const CommentsOverlay = ({
 
           <div className="flex items-center justify-between border-t border-[var(--border-soft)] px-4 py-3 sm:px-5">
             <div className="flex items-center gap-4 text-[var(--text-primary)]">
-              <img
-                src={
-                  isLiked
-                    ? "/images/redlike-icon.png"
-                    : "/images/postlike-icon.png"
-                }
-                alt=""
-                draggable="false"
+              <Heart
+                size={24}
                 onClick={toggleLike}
-                className="w-[35px] h-[30px] cursor-pointer select-none"
+                className={`cursor-pointer select-none transition-colors ${
+                  isLiked
+                    ? "fill-red-500 stroke-red-500"
+                    : "fill-transparent stroke-[var(--text-primary)] hover:stroke-[var(--text-muted)]"
+                }`}
               />
 
               <button className="hover:opacity-80 transition cursor-pointer">
@@ -680,16 +754,14 @@ const CommentsOverlay = ({
               </button>
             </div>
 
-            <img
-              src={
-                isSaved
-                  ? "/images/filledsave-icon.png"
-                  : "/images/postsave-icon.png"
-              }
-              alt=""
-              draggable="false"
+            <Bookmark
+              size={22}
               onClick={handleSave}
-              className="w-[30px] h-[30px] cursor-pointer select-none"
+              className={`cursor-pointer select-none transition-colors ${
+                isSaved
+                  ? "fill-[var(--text-primary)] stroke-[var(--text-primary)]"
+                  : "fill-transparent stroke-[var(--text-primary)] hover:stroke-[var(--text-muted)]"
+              }`}
             />
           </div>
 
@@ -712,6 +784,52 @@ const CommentsOverlay = ({
                 className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
               />
             </button>
+
+            {/* AI "Suggest Comment" trigger + tone dropdown */}
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() =>
+                  setShowToneMenu((prev) => !prev)
+                }
+                disabled={!canSuggestComment || isSuggesting}
+                title={
+                  canSuggestComment
+                    ? "Suggest a comment with AI"
+                    : "AI comments need a photo, not a video"
+                }
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isSuggesting ? (
+                  <Loader2 size={20} className="animate-spin" />
+                ) : (
+                  <Sparkles size={20} />
+                )}
+              </button>
+
+              {showToneMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowToneMenu(false)}
+                  />
+                  <div className="absolute bottom-full left-0 z-50 mb-2 w-48 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-surface)] shadow-lg py-1">
+                    {COMMENT_TONES.map((toneOption) => (
+                      <button
+                        key={toneOption.id}
+                        type="button"
+                        onClick={() =>
+                          handleSuggestComment(toneOption.id)
+                        }
+                        className="w-full text-left px-3 py-1.5 text-xs sm:text-sm text-[var(--text-primary)] hover:bg-[var(--bg-row-hover)] transition cursor-pointer"
+                      >
+                        {toneOption.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
 
             <div className="relative w-full flex items-center gap-3 px-4 py-3 sm:px-5">
               <input

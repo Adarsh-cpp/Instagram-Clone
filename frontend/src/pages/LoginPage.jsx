@@ -5,6 +5,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from "react-toastify";
 import { GoogleIcon, PasswordVisibleIcon, PasswordHiddenIcon } from '../components/Icons';
 
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 const LoginPage = () => {
 
    const { register, handleSubmit, formState: { errors },  } = useForm();
@@ -13,7 +15,7 @@ const LoginPage = () => {
   const onSubmit = async (data) => {
 
      try {
-      const response = await axios.post("http://localhost:4000/auth/login", {
+      const response = await axios.post(`${BASE_URL}/auth/login`, {
         contact: data.contact,
         password: data.password,
       });
@@ -43,7 +45,7 @@ const LoginPage = () => {
    }
 
    const handleGoogleLogin = () => {
-      window.location.href = "http://localhost:4000/auth/google";
+      window.location.href = `${BASE_URL}/auth/google`;
    }
 
 

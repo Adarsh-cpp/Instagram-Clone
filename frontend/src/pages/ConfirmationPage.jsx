@@ -5,6 +5,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 const ConfirmationPage = () => {
 
   const { register, handleSubmit, formState: { errors } } = useForm();
@@ -18,7 +20,7 @@ const ConfirmationPage = () => {
   };
 
   const sendOTP = async () => {
-    const url = "http://localhost:4000/auth/send-otp";
+    const url = `${BASE_URL}/auth/send-otp`;
     const token = localStorage.getItem("authToken");
 
     try {
@@ -45,7 +47,7 @@ const ConfirmationPage = () => {
       if (!token) return;
 
       try {
-        const { data } = await axios.get("http://localhost:4000/auth/me", {
+        const { data } = await axios.get(`${BASE_URL}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (data?.email) {
@@ -64,7 +66,7 @@ const ConfirmationPage = () => {
   }, []);
 
   const onSubmit = async (data) => {
-    const url = "http://localhost:4000/auth/verify-otp";
+    const url = `${BASE_URL}/auth/verify-otp`;
     const token = localStorage.getItem("authToken");
 
     try {

@@ -4,7 +4,7 @@ import React from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom';
 
-
+const BASE_URL = import.meta.env.VITE_SERVER_URL
 
 const ForgotPasswordPage = () => {
 
@@ -15,7 +15,7 @@ const ForgotPasswordPage = () => {
         
     const onSubmit = async (data) => {
 
-            let url = "http://localhost:4000/auth/send-reset-otp";
+            let url = `${BASE_URL}/auth/send-reset-otp`;
 
             try {
 

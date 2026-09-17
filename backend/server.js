@@ -4,6 +4,7 @@ dns.setServers(["8.8.8.8", "8.8.4.4"]);
 console.log("DNS:", dns.getServers());
 
 import "dotenv/config";
+console.log("GEMINI_API_KEY loaded:", !!process.env.GEMINI_API_KEY);
 
 import http from "http";
 import express from "express";
@@ -26,13 +27,14 @@ import reelRoutes from "./routes/reelRoutes.js";
 import storyRoutes from "./routes/storyRoutes.js";
 import highlightRoutes from "./routes/highlightRoutes.js";
 import songRoutes from "./routes/songRoutes.js";
+import aiRoutes from "./routes/aiRoutes.js";
 
 const app = express();
 const server = http.createServer(app);
 
 initializeSocket(server);
 
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
@@ -65,6 +67,7 @@ app.use("/reels", reelRoutes);
 app.use("/story", storyRoutes);
 app.use("/highlight", highlightRoutes);
 app.use("/song", songRoutes);
+app.use("/api/ai", aiRoutes);
 
 const port = process.env.PORT || 4000;
 

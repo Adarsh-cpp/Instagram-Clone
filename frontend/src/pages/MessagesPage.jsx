@@ -2,13 +2,19 @@
 import React, { useEffect, useState } from 'react'
 import MessageCard from '../components/MessageCard'
 import Chat from '../components/Chat'
+import InstaAIChat from '../components/InstaAIChat'
 import axios from 'axios'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useSocket } from '../context/SocketContext'
-import { Search, MessageCircle } from 'lucide-react'
+import { Search, MessageCircle, Sparkles } from 'lucide-react'
 
-const BASE_URL = "http://localhost:4000"
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
+// Reserved conversation id for the AI assistant. Real conversations are
+// 24-char hex ObjectIds, so this can never collide with one — which is why
+// no new route is needed: /user/messages/insta-ai simply resolves here.
+const AI_CONVERSATION_ID = "insta-ai"
 
 const MessagesPage = () => {
 
@@ -18,6 +24,8 @@ const MessagesPage = () => {
   const { user } = useAuth()
   const { socket } = useSocket()
   const navigate = useNavigate()
+
+  const isAiOpen = conversationId === AI_CONVERSATION_ID
 
   useEffect(() => {
   const getAllConversations = async () => {
@@ -80,6 +88,11 @@ const MessagesPage = () => {
 
     return username.includes(term) || fullname.includes(term)
   })
+
+  // The AI row is pinned above real conversations, and stays searchable
+  // alongside them.
+  const showAiRow =
+    !searchTerm.trim() || "instaai ai assistant".includes(searchTerm.trim().toLowerCase())
 
   // Passed down to MessageCard — actually performs the delete and keeps
   // this list (the single source of truth for conversations) in sync.
@@ -149,6 +162,29 @@ const MessagesPage = () => {
 
         <div className="bottomPart w-full h-[75%]  overflow-y-auto">
 
+        {/* --- InstaAI entry, pinned above real conversations --- */}
+        {showAiRow && (
+          <div
+            onClick={() => navigate(`/user/messages/${AI_CONVERSATION_ID}`)}
+            className={`instaAiRow w-full h-[72px] flex items-center gap-3 px-4 cursor-pointer transition-colors ${
+              isAiOpen ? "bg-[var(--bg-elevated)]" : "hover:bg-[var(--bg-row-hover)]"
+            }`}
+          >
+            <div className="w-[50px] h-[50px] shrink-0 rounded-full flex items-center justify-center bg-gradient-to-tr from-pink-500 via-red-500 to-yellow-500">
+              <Sparkles size={22} color="white" />
+            </div>
+
+            <div className="min-w-0 flex flex-col">
+              <span className="text-[var(--text-primary)] text-[15px] font-semibold truncate">
+                InstaAI
+              </span>
+              <span className="text-[var(--text-muted)] text-[13px] truncate">
+                Your AI assistant
+              </span>
+            </div>
+          </div>
+        )}
+
        {
           filteredConversations.length > 0 ? (
             filteredConversations.map((conversation) => (
@@ -159,16 +195,20 @@ const MessagesPage = () => {
               />
             ))
           ) : (
-            <div className="w-full h-full flex justify-center items-center text-[var(--text-muted)] text-[14px]">
-              No conversations found
-            </div>
+            !showAiRow && (
+              <div className="w-full h-full flex justify-center items-center text-[var(--text-muted)] text-[14px]">
+                No conversations found
+              </div>
+            )
           )
         }
         </div>
 
       </div>
 
-      {conversationId ? (
+      {isAiOpen ? (
+        <InstaAIChat />
+      ) : conversationId ? (
         <Chat conversationId={conversationId} />
       ) : (
         <div className="messageDisplay hidden md:flex md:flex-col relative md:w-[65%] lg:w-[70%] h-full bg-[var(--bg-app)] text-[var(--text-primary)] text-[20px]  justify-center items-center ">

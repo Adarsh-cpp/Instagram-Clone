@@ -7,6 +7,8 @@ import { toast } from 'react-toastify';
 
 axios.defaults.withCredentials = true;
 
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 const DobPage = () => {
 
   const {
@@ -20,7 +22,7 @@ const DobPage = () => {
   const onSubmit = async (data) => {
     const dob = data.date + "-" + data.month + "-" + data.year
 
-    let url = "http://localhost:4000/auth/add-dob";
+    let url = `${BASE_URL}/auth/add-dob`;
     const token = localStorage.getItem("authToken");
 
     try {

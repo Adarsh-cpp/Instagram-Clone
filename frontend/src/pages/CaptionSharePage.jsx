@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import EmojiPicker from "emoji-picker-react";
-import { Play, ChevronLeft, ChevronRight, MapPin, UserPlus, X } from "lucide-react";
+import { Play, ChevronLeft, ChevronRight, MapPin, UserPlus, X, ArrowLeft, Smile } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import LocationPicker from "../components/LocationPicker";
 import TagPeoplePicker from "../components/TagPeoplePicker";
+import AiCaptionAssistant from "../components/AiCaptionAssistant";
 
 const CaptionSharePage = ({
   images,
@@ -34,6 +35,13 @@ const CaptionSharePage = ({
   const touchStartX = useRef(null);
 
   const isCarousel = mediaType === "image" && mediaUrls.length > 1;
+
+  // The File the AI should look at: whichever slide is currently on screen.
+  // These are the already-cropped Files from CropImagePage, so the caption
+  // is generated from exactly what the user will post. Videos have no
+  // caption AI, so this stays null for reels.
+  const aiImageFile =
+    mediaType === "image" ? images?.[activeSlide] || images?.[0] || null : null;
 
   useEffect(() => {
     if (mediaType === "video") {
@@ -118,6 +126,14 @@ const CaptionSharePage = ({
     }, 0);
   };
 
+  // AI result goes straight into the same controlled caption state the
+  // textarea already uses, so it stays fully editable and nothing is
+  // posted automatically — Share is still a separate, manual action.
+  const handleAiCaption = (generated) => {
+    setCaption(generated.slice(0, 2200));
+    captionRef.current?.focus();
+  };
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (pickerRef.current && !pickerRef.current.contains(e.target)) {
@@ -135,10 +151,9 @@ const CaptionSharePage = ({
           {/* Header */}
           <div className="header w-full h-[40px] px-3 sm:px-4 flex justify-between items-center bg-[var(--bg-app)]">
             <div onClick={back} className="back cursor-pointer">
-              <img
-                src="/images/arrow-back-icon.png"
-                className="w-[26px] h-[26px] sm:w-[30px] sm:h-[30px]"
-                alt="Back"
+              <ArrowLeft
+                size={24}
+                className="text-[var(--text-primary)] sm:w-[26px] sm:h-[26px]"
               />
             </div>
 
@@ -267,6 +282,17 @@ const CaptionSharePage = ({
                 </div>
               </div>
 
+              {/* --- AI caption row (images only — reels have no image to read) --- */}
+              {mediaType === "image" && (
+                <div className="aiCaptionRow w-full flex-shrink-0 px-4 pb-2">
+                  <AiCaptionAssistant
+                    imageFile={aiImageFile}
+                    onCaption={handleAiCaption}
+                    disabled={isLoading}
+                  />
+                </div>
+              )}
+
               {/* Location + Tag People rows */}
               <div className="detailsRow w-full flex-shrink-0 border-t border-[rgba(128,128,128,0.15)]">
                 <div
@@ -325,11 +351,10 @@ const CaptionSharePage = ({
 
               <div className="emojiSection relative w-full h-[50px] flex-shrink-0 flex">
                 <div className="emojiPart w-[50%] h-full flex justify-start items-center px-4">
-                  <img
+                  <Smile
+                    size={26}
                     onClick={() => setShowPicker(!showPicker)}
-                    src="/images/emoji-picker-icon.png"
-                    alt="Emoji"
-                    className="w-[28px] h-[28px] sm:w-[30px] sm:h-[30px] cursor-pointer"
+                    className="text-[var(--text-primary)] hover:text-[var(--text-muted)] cursor-pointer sm:w-[28px] sm:h-[28px]"
                   />
 
                   {showPicker && (

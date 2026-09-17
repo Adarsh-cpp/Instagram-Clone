@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { getTimeAgo } from "../utils/timeAgo";
 
-const BASE_URL = "http://localhost:4000";
+const BASE_URL = import.meta.env.VITE_SERVER_URL
 
 const authConfig = () => ({
   withCredentials: true,

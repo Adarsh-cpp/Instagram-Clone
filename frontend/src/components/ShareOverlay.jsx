@@ -3,7 +3,7 @@ import { X, Check } from 'lucide-react'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 
-const BASE_URL = "http://localhost:4000";
+const BASE_URL = import.meta.env.VITE_SERVER_URL
 
 const authConfig = () => ({
   withCredentials: true,

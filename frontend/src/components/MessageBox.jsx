@@ -400,7 +400,7 @@ const MessageBox = ({
             {/* lottie-react forwards unknown props to lottie-web's config,
                 so `path` loads a remote .json animation */}
             <Lottie
-              path={sticker.url}
+              src={sticker.url}
               autoplay
               loop
               style={{ width: "100%", height: "100%" }}

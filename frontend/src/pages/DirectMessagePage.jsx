@@ -6,6 +6,8 @@ import axios from 'axios'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 const DirectMessagePage = () => {
 
   const [conversations, setConversations] = useState([])
@@ -16,7 +18,7 @@ const DirectMessagePage = () => {
   useEffect(() => {
     const getAllConversations = async () => {
       try {
-        const url = "http://localhost:4000/conversation/get-all-conversations"
+        const url = `${BASE_URL}/conversation/get-all-conversations`
         const token = localStorage.getItem("authToken")
 
         const response = await axios.get(url, {

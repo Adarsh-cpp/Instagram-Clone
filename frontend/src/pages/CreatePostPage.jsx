@@ -7,6 +7,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useUpload } from "../context/UploadContext";
 
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 function CreatePostPage() {
   const [step, setStep] = useState(1);
 
@@ -54,7 +56,7 @@ function CreatePostPage() {
     startUpload(
       { type: mediaType, caption },
       {
-        url: isVideo ? "http://localhost:4000/reels/create-reel" : "http://localhost:4000/post/create-post",
+        url: isVideo ? `${BASE_URL}/reels/create-reel` : `${BASE_URL}/post/create-post`,
         method: isVideo ? "post" : "put",
         buildFormData,
         headers: { Authorization: `Bearer ${token}` },

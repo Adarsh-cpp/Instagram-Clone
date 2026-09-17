@@ -6,6 +6,8 @@ import FollowingSuggestionCard from '../components/FollowingSuggestionCard'
 import ExplorePostCard from '../components/ExplorePostCard'
 
 
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 const ExplorePage = () => {
 
 
@@ -18,7 +20,7 @@ const ExplorePage = () => {
     useEffect(() => {
         const fetchAllPosts = async () => {
         try {
-            const url = "http://localhost:4000/post/get-all-posts"
+            const url = `${BASE_URL}/post/get-all-posts`
             const response = await axios.get(url)
             if(response.status === 200){
                 setPosts(response.data.posts)
@@ -35,7 +37,7 @@ useEffect(() => {
 const fetchAllUsers = async () => {
 try {
        const token = localStorage.getItem("authToken")
-   const url = "http://localhost:4000/user/profile/get-all-profiles"
+   const url = `${BASE_URL}/user/profile/get-all-profiles`
    const response = await axios.get(url, {
         headers: {
             Authorization: `Bearer ${token}`

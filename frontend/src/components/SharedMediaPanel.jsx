@@ -4,6 +4,8 @@ import { createPortal } from "react-dom";
 import axios from "axios";
 import { X, Download, ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 const MEDIA_PAGE_SIZE = 24;
 // start fetching the next page while the sentinel is still this far below
 // the visible area, so scrolling never actually hits an empty patch
@@ -49,7 +51,7 @@ export default function SharedMediaPanel({ conversationId }) {
       if (cursorRef.current) params.cursor = cursorRef.current;
 
       const response = await axios.get(
-        `http://localhost:4000/message/${conversationId}/media`,
+        `${BASE_URL}/message/${conversationId}/media`,
         { headers: { Authorization: `Bearer ${token}` }, params }
       );
 

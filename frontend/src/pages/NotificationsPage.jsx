@@ -9,7 +9,7 @@ import CommentsOverlay from "../components/CommentsOverlay";
 import { toast } from "react-toastify";
 import { notificationText } from "../utils/notificationText";
 
-const BASE_URL = "http://localhost:4000";
+const BASE_URL = import.meta.env.VITE_SERVER_URL
 
 const authHeaders = () => ({
   headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },

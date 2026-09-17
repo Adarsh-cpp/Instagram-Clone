@@ -2,6 +2,8 @@ import React, { useRef, useState, useEffect } from "react";
 import axios from 'axios';
 import { toast } from "react-toastify";
 
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 const EditProfilePic = ({...props}) => {
   const fileInputRef = useRef(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -38,7 +40,7 @@ const EditProfilePic = ({...props}) => {
       formData.append("profilePic", file);
       const token = localStorage.getItem("authToken");
       const res = await axios.put(
-        "http://localhost:4000/user/profile/change-dp",
+        `${BASE_URL}/user/profile/change-dp`,
         formData,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -62,7 +64,7 @@ const EditProfilePic = ({...props}) => {
       const token = localStorage.getItem("authToken");
 
       const res = await axios.delete(
-        "http://localhost:4000/user/profile/remove-dp",
+        `${BASE_URL}/user/profile/remove-dp`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

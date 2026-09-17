@@ -19,6 +19,9 @@ const MAX_IMAGES = 4;
 const MESSAGE_PAGE_SIZE = 30;
 const LOAD_OLDER_THRESHOLD_PX = 300;
 
+
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 const Chat = () => {
 
   const { onlineUsers, lastSeenMap } = useSocket()
@@ -199,7 +202,7 @@ const Chat = () => {
     try {
       const token = localStorage.getItem("authToken");
       await axios.patch(
-        `http://localhost:4000/message/${conversationId}/mark-seen`,
+        `${BASE_URL}/message/${conversationId}/mark-seen`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -215,7 +218,7 @@ const Chat = () => {
     const getConversation = async () => {
       try {
         const token = localStorage.getItem("authToken");
-        const url = `http://localhost:4000/conversation/${conversationId}`;
+        const url = `${BASE_URL}/conversation/${conversationId}`;
 
         const response = await axios.get(url, {
           headers: { Authorization: `Bearer ${token}` },
@@ -248,7 +251,7 @@ const Chat = () => {
       try {
         const token = localStorage.getItem("authToken");
         const response = await axios.get(
-          `http://localhost:4000/message/${conversationId}`,
+          `${BASE_URL}/message/${conversationId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
             params: { limit: MESSAGE_PAGE_SIZE },
@@ -297,7 +300,7 @@ const Chat = () => {
       if (oldestCursorRef.current) params.cursor = oldestCursorRef.current;
 
       const response = await axios.get(
-        `http://localhost:4000/message/${conversationId}`,
+        `${BASE_URL}/message/${conversationId}`,
         { headers: { Authorization: `Bearer ${token}` }, params }
       );
 
@@ -571,7 +574,7 @@ const Chat = () => {
 
     try {
       const token = localStorage.getItem("authToken");
-      const url = `http://localhost:4000/message/${conversationId}`;
+      const url = `${BASE_URL}/message/${conversationId}`;
 
       clearTimeout(typingTimeoutRef.current);
       socket.emit("stopTyping", { senderId: user._id, receiverId: friend?._id, conversationId });
@@ -614,7 +617,7 @@ const Chat = () => {
 
     try {
       const token = localStorage.getItem("authToken");
-      const url = `http://localhost:4000/message/${conversationId}`;
+      const url = `${BASE_URL}/message/${conversationId}`;
 
       clearTimeout(typingTimeoutRef.current);
       socket.emit("stopTyping", { senderId: user._id, receiverId: friend?._id, conversationId });
@@ -645,7 +648,7 @@ const Chat = () => {
 
     try {
       const token = localStorage.getItem("authToken");
-      await axios.delete(`http://localhost:4000/message/${messageId}`, {
+      await axios.delete(`${BASE_URL}/message/${messageId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
     } catch (error) {
@@ -699,7 +702,7 @@ const Chat = () => {
     try {
       const token = localStorage.getItem("authToken");
       const response = await axios.patch(
-        `http://localhost:4000/message/${messageId}/react`,
+        `${BASE_URL}/message/${messageId}/react`,
         { emoji },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -731,7 +734,7 @@ const Chat = () => {
     try {
       const token = localStorage.getItem("authToken");
       await axios.patch(
-        `http://localhost:4000/conversation/${conversationId}/theme`,
+        `${BASE_URL}/conversation/${conversationId}/theme`,
         { chatTheme: themeId, chatFont: fontId },
         { headers: { Authorization: `Bearer ${token}` } }
       );

@@ -6,6 +6,8 @@ import { toast } from "react-toastify";
 
 const usernameRegex = /^(?!.*\.\.)(?!.*\.$)[a-zA-Z0-9._]{1,30}$/;
 
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 const CompleteProfile = () => {
   const { register, handleSubmit, formState: { errors } } = useForm();
   const navigate = useNavigate();
@@ -14,7 +16,7 @@ const CompleteProfile = () => {
     try {
       const token = localStorage.getItem("authToken");
       await axios.patch(
-        "http://localhost:4000/auth/add-username",
+        "${BASE_URL}/auth/add-username",
         { username: data.username },
         { headers: { Authorization: `Bearer ${token}` } }
       );

@@ -21,6 +21,8 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import FollowersFollowingOverlay from '../components/FollowersFollowingOverlay';
 
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 
 const UserProfilePage = () => {
 
@@ -90,7 +92,7 @@ const UserProfilePage = () => {
     const token = localStorage.getItem("authToken");
 
     const response = await axios.post(
-      `http://localhost:4000/user/profile/${user._id}/follow-toggle`,
+      `${BASE_URL}/user/profile/${user._id}/follow-toggle`,
       {},
       {
         headers: {
@@ -123,7 +125,7 @@ const UserProfilePage = () => {
 
         const token = localStorage.getItem("authToken")
 
-        const url = userId ? `http://localhost:4000/user/profile/get-profile/${userId}` : "http://localhost:4000/user/profile/get-profile"
+        const url = userId ? `${BASE_URL}/user/profile/get-profile/${userId}` : `${BASE_URL}/user/profile/get-profile`
         const response = await axios.get(url, {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -171,7 +173,7 @@ const UserProfilePage = () => {
     try {
 
       const token = localStorage.getItem("authToken")
-      const url = `http://localhost:4000/conversation/${userId}`
+      const url = `${BASE_URL}/conversation/${userId}`
 
       const response = await axios.post(url,{},{
         headers:{
@@ -197,7 +199,7 @@ const UserProfilePage = () => {
     const getSavedItems = async () => {
       try {
         const token = localStorage.getItem("authToken")
-        const res = await axios.get("http://localhost:4000/user/profile/saved-items", {
+        const res = await axios.get(`${BASE_URL}/user/profile/saved-items`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         setSavedItems(res.data.savedItems)

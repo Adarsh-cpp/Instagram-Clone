@@ -22,7 +22,7 @@ import { useAuth } from '../context/AuthContext'
 import ReelCommentsOverlay from '../components/ReelCommentsOverlay'
 import ShareOverlay from '../components/ShareOverlay'
 
-const BASE_URL = "http://localhost:4000"
+const BASE_URL = import.meta.env.VITE_SERVER_URL
 const LIMIT = 5
 
 const authHeaders = () => ({

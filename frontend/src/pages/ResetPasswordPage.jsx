@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 
 const OTP_LENGTH = 6;
 
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 const ResetPasswordPage = () => {
 
     const { register, handleSubmit, formState: { errors }, setValue } = useForm();
@@ -67,7 +69,7 @@ const ResetPasswordPage = () => {
 
   const onSubmit = async (data) => {
 
-    let url = "http://localhost:4000/auth/reset-password";
+    let url = `${BASE_URL}/auth/reset-password`;
 
     try {
 

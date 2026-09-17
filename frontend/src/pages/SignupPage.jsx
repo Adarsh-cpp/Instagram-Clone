@@ -6,6 +6,8 @@ import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 import { GoogleIcon, PasswordVisibleIcon, PasswordHiddenIcon } from '../components/Icons';
 
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 const SignupPage = () => {
 
   const { user, refreshUser } = useAuth()
@@ -25,13 +27,13 @@ const SignupPage = () => {
       }
 
    const handleGoogleLogin = () => {
-      window.location.href = "http://localhost:4000/auth/google";
+      window.location.href = `${BASE_URL}/auth/google`;
    }
 
 
   const onSubmit = async (data) => {
   try {
-    const url = "http://localhost:4000/auth/signup";
+    const url = `${BASE_URL}/auth/signup`;
     const response = await axios.post(url, {
       contact: data.contact,
       username: data.username,

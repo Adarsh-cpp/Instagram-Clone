@@ -6,6 +6,9 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import axios from "axios";
 
+
+const BASE_URL = import.meta.env.VITE_SERVER_URL
+
 const IconSidebar = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -38,7 +41,7 @@ const IconSidebar = () => {
       const token = localStorage.getItem("authToken");
 
       const response = await axios.post(
-        "http://localhost:4000/auth/logout",
+        "${BASE_URL}/auth/logout",
         {},
         {
           headers: {
