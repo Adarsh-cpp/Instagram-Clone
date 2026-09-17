@@ -2,22 +2,127 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { trimVideoClientSide } from "../utils/trimVideoClient";
 import { Play } from "lucide-react";
 
-const MAX_DURATION = 30;
+const MAX_DURATION = 15; // hard cap on clip length, seconds — matches the app's reel limit
+const MIN_DURATION = 1; // shortest allowed clip, seconds
+const THUMB_COUNT = 12; // filmstrip frames
+
 const ASPECT_OPTIONS = [
   { label: "9 : 16", value: "9:16", ratio: 9 / 16 },
   { label: "16 : 9", value: "16:9", ratio: 16 / 9 },
 ];
 
+const clamp = (v, min, max) => Math.max(min, Math.min(v, max));
+
+const formatTime = (s) => {
+  if (!Number.isFinite(s)) return "0:00";
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, "0")}`;
+};
+
+/**
+ * Generates a small filmstrip of frames from the source video by seeking
+ * an offscreen <video> element. Runs independently of the visible preview
+ * video so it never fights with playback/scrubbing.
+ */
+const useFilmstrip = (file, duration) => {
+  const [thumbnails, setThumbnails] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!file || !duration) {
+      setThumbnails([]);
+      return;
+    }
+
+    let cancelled = false;
+    const url = URL.createObjectURL(file);
+    const offVideo = document.createElement("video");
+    offVideo.muted = true;
+    offVideo.playsInline = true;
+    offVideo.preload = "auto";
+    offVideo.src = url;
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const seekTo = (t) =>
+      new Promise((resolve) => {
+        const onSeeked = () => {
+          offVideo.removeEventListener("seeked", onSeeked);
+          resolve();
+        };
+        offVideo.addEventListener("seeked", onSeeked);
+        offVideo.currentTime = t;
+      });
+
+    const run = async () => {
+      setLoading(true);
+      try {
+        await new Promise((resolve, reject) => {
+          offVideo.onloadedmetadata = resolve;
+          offVideo.onerror = reject;
+        });
+
+        canvas.width = 96;
+        canvas.height =
+          Math.round(96 * (offVideo.videoHeight / offVideo.videoWidth)) || 170;
+
+        const frames = [];
+        for (let i = 0; i < THUMB_COUNT; i++) {
+          if (cancelled) return;
+          const t = (duration * (i + 0.5)) / THUMB_COUNT;
+          // eslint-disable-next-line no-await-in-loop
+          await seekTo(Math.min(t, Math.max(duration - 0.05, 0)));
+          if (cancelled) return;
+          try {
+            ctx.drawImage(offVideo, 0, 0, canvas.width, canvas.height);
+            frames.push(canvas.toDataURL("image/jpeg", 0.6));
+          } catch {
+            // If a frame can't be drawn for some reason, just skip it —
+            // the timeline is still fully usable without a filmstrip.
+          }
+        }
+        if (!cancelled) setThumbnails(frames);
+      } catch {
+        // Non-fatal — timeline works fine without thumbnails.
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+      URL.revokeObjectURL(url);
+    };
+  }, [file, duration]);
+
+  return { thumbnails, loading };
+};
+
 const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, next, back }) => {
   const videoRef = useRef(null);
-  const [videoUrl, setVideoUrl] = useState(null);
+  const trackRef = useRef(null);
+  const dragOffsetRef = useRef(0);
 
+  const [videoUrl, setVideoUrl] = useState(null);
   const [duration, setDuration] = useState(0);
+
+  // The trim window is now: a position (start) + a length (clipSeconds),
+  // exactly like the song trimmer — drag the window to move it, use the
+  // slider to change how long it is.
   const [start, setStart] = useState(0);
-  const [end, setEnd] = useState(0);
+  const [clipSeconds, setClipSeconds] = useState(MAX_DURATION);
+
+  const [previewTime, setPreviewTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [selectedAspect, setSelectedAspect] = useState(ASPECT_OPTIONS[0]);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const { thumbnails, loading: thumbsLoading } = useFilmstrip(video, duration);
 
   useEffect(() => {
     if (!video) {
@@ -31,37 +136,34 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
 
   const handleLoadedMetadata = () => {
     const d = videoRef.current?.duration || 0;
+    const initialClip = clamp(d, MIN_DURATION, MAX_DURATION);
     setDuration(d);
+    setClipSeconds(initialClip);
     setStart(0);
-    setEnd(Math.min(d, MAX_DURATION));
   };
 
-  const handleStartChange = (val) => {
-    let s = Math.max(0, Math.min(val, duration));
-    let e = end;
-    if (e - s > MAX_DURATION) e = s + MAX_DURATION;
-    if (e > duration) e = duration;
-    if (e - s < 1) e = Math.min(s + 1, duration);
-    setStart(s);
-    setEnd(e);
-    if (videoRef.current) videoRef.current.currentTime = s;
-  };
+  const end = start + clipSeconds;
 
-  const handleEndChange = (val) => {
-    let e = Math.max(0, Math.min(val, duration));
-    let s = start;
-    if (e - s > MAX_DURATION) s = e - MAX_DURATION;
-    if (s < 0) s = 0;
-    if (e - s < 1) s = Math.max(e - 1, 0);
-    setStart(s);
-    setEnd(e);
-    if (videoRef.current) videoRef.current.currentTime = s;
+  // Keep start valid whenever clip length or duration changes — e.g.
+  // lengthening the clip near the end of the video shouldn't push the
+  // window past the video's real end.
+  useEffect(() => {
+    setStart((s) => clamp(s, 0, Math.max(0, duration - clipSeconds)));
+  }, [clipSeconds, duration]);
+
+  const sliderMax = Math.max(MIN_DURATION, Math.min(MAX_DURATION, duration || MAX_DURATION));
+  const sliderMin = Math.min(MIN_DURATION, sliderMax);
+
+  const handleClipSecondsChange = (val) => {
+    const v = clamp(val, sliderMin, sliderMax);
+    setClipSeconds(v);
   };
 
   const handleTimeUpdate = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
-    if (v.currentTime >= end) {
+    setPreviewTime(v.currentTime);
+    if (v.currentTime >= end || v.currentTime < start - 0.05) {
       v.currentTime = start;
     }
   }, [start, end]);
@@ -79,7 +181,65 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
     }
   };
 
-  const windowLength = end - start;
+  // --- Timeline drag handling -------------------------------------------
+
+  const timeFromClientX = (clientX) => {
+    const rect = trackRef.current.getBoundingClientRect();
+    const ratio = clamp((clientX - rect.left) / rect.width, 0, 1);
+    return ratio * duration;
+  };
+
+  const pauseForScrub = () => {
+    const v = videoRef.current;
+    if (v && !v.paused) {
+      v.pause();
+      setIsPlaying(false);
+    }
+  };
+
+  const handleWindowPointerDown = (e) => {
+    if (!duration) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    pauseForScrub();
+    const t = timeFromClientX(e.clientX);
+    dragOffsetRef.current = t - start;
+    setIsDragging(true);
+  };
+
+  const handleWindowPointerMove = (e) => {
+    if (!isDragging || !duration) return;
+    const t = timeFromClientX(e.clientX);
+    const newStart = clamp(t - dragOffsetRef.current, 0, Math.max(0, duration - clipSeconds));
+    setStart(newStart);
+    if (videoRef.current) {
+      videoRef.current.currentTime = newStart;
+      setPreviewTime(newStart);
+    }
+  };
+
+  const handleWindowPointerUp = (e) => {
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    setIsDragging(false);
+  };
+
+  // Tapping anywhere else on the track jumps the window there, centered
+  // on the tap point.
+  const handleTrackPointerDown = (e) => {
+    if (!duration || e.target.dataset.trimWindow) return;
+    pauseForScrub();
+    const t = timeFromClientX(e.clientX);
+    const newStart = clamp(t - clipSeconds / 2, 0, Math.max(0, duration - clipSeconds));
+    setStart(newStart);
+    if (videoRef.current) {
+      videoRef.current.currentTime = newStart;
+      setPreviewTime(newStart);
+    }
+  };
+
+  // ------------------------------------------------------------------------
 
   const handleNext = async () => {
     setIsProcessing(true);
@@ -92,21 +252,25 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
     try {
       // Actually cut the file down to just the selected window — this is what
       // shrinks the upload, not just recording start/end numbers.
-      const trimmedFile = await trimVideoClientSide(video, start, windowLength);
+      const trimmedFile = await trimVideoClientSide(video, start, clipSeconds);
       setTrimmedMedia(trimmedFile);
-      setTrimData({ trimStart: 0, trimDuration: windowLength }); // file is already trimmed
+      setTrimData({ trimStart: 0, trimDuration: clipSeconds }); // file is already trimmed
     } catch (err) {
       // Browser can't do client-side trimming (e.g. older Safari) — fall back
       // to sending the original file + trim metadata, same as before.
       console.warn("Client-side trim unavailable, falling back:", err.message);
       setTrimmedMedia(null);
-      setTrimData({ trimStart: start, trimDuration: windowLength });
+      setTrimData({ trimStart: start, trimDuration: clipSeconds });
     } finally {
       setAspectRatio(selectedAspect.value);
       setIsProcessing(false);
       next();
     }
   };
+
+  const windowLeftPct = duration ? (start / duration) * 100 : 0;
+  const windowWidthPct = duration ? (clipSeconds / duration) * 100 : 100;
+  const playheadPct = duration ? (previewTime / duration) * 100 : 0;
 
   return (
     <div className="w-[100vw] h-[100vh] flex justify-center items-center bg-[var(--bg-app)]">
@@ -200,40 +364,107 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
             ))}
           </div>
 
+          {/* --- Trim scrubber: drag the highlighted window to move it, use
+              the slider below to change how long the clip is. Same pattern
+              as the song trimmer. --- */}
           <div className="w-full px-4 py-3 bg-[var(--bg-panel)] shrink-0">
-            <div className="flex justify-between text-xs text-[var(--text-secondary)] mb-1">
+            <div className="flex justify-between text-xs text-[var(--text-secondary)] mb-2">
               <span>Start: {start.toFixed(1)}s</span>
-              <span
-                className={
-                  windowLength > MAX_DURATION ? "text-[var(--color-error)]" : "text-[var(--text-secondary)]"
-                }
-              >
-                Length: {windowLength.toFixed(1)}s / {MAX_DURATION}s max
+              <span className="text-[var(--text-primary)] font-medium">
+                {clipSeconds.toFixed(1)}s clip
               </span>
               <span>End: {end.toFixed(1)}s</span>
             </div>
 
-            <label className="text-[11px] text-[var(--text-muted)]">Start</label>
-            <input
-              type="range"
-              min={0}
-              max={duration}
-              step={0.1}
-              value={start}
-              onChange={(e) => handleStartChange(Number(e.target.value))}
-              className="w-full"
-            />
+            <div
+              ref={trackRef}
+              onPointerDown={handleTrackPointerDown}
+              className="relative w-full h-16 rounded-xl overflow-hidden bg-[var(--bg-elevated)] ring-1 ring-white/10 select-none touch-none cursor-pointer"
+            >
+              {/* Filmstrip background */}
+              {thumbnails.length > 0 ? (
+                <div className="absolute inset-0 flex">
+                  {thumbnails.map((src, i) => (
+                    <img
+                      key={i}
+                      src={src}
+                      alt=""
+                      draggable={false}
+                      className="h-full flex-1 object-cover"
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-[10px] text-[var(--text-muted)]">
+                  {thumbsLoading ? "Loading preview…" : ""}
+                </div>
+              )}
 
-            <label className="text-[11px] text-[var(--text-muted)]">End</label>
-            <input
-              type="range"
-              min={0}
-              max={duration}
-              step={0.1}
-              value={end}
-              onChange={(e) => handleEndChange(Number(e.target.value))}
-              className="w-full"
-            />
+              {/* Dim everything outside the selected window */}
+              <div
+                className="absolute inset-y-0 left-0 bg-black/60 pointer-events-none"
+                style={{ width: `${windowLeftPct}%` }}
+              />
+              <div
+                className="absolute inset-y-0 right-0 bg-black/60 pointer-events-none"
+                style={{ width: `${100 - windowLeftPct - windowWidthPct}%` }}
+              />
+
+              {/* Draggable selected window */}
+              <div
+                data-trim-window="true"
+                onPointerDown={handleWindowPointerDown}
+                onPointerMove={handleWindowPointerMove}
+                onPointerUp={handleWindowPointerUp}
+                onPointerCancel={handleWindowPointerUp}
+                className="absolute inset-y-0 rounded-lg ring-2 ring-[var(--accent-indigo)] cursor-grab active:cursor-grabbing touch-none"
+                style={{
+                  left: `${windowLeftPct}%`,
+                  width: `${windowWidthPct}%`,
+                  boxShadow: "0 0 0 9999px rgba(0,0,0,0)",
+                }}
+              >
+                {/* grip bars, purely visual */}
+                <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-6 rounded-full bg-white/90" />
+                <div className="absolute right-1 top-1/2 -translate-y-1/2 w-1 h-6 rounded-full bg-white/90" />
+              </div>
+
+              {/* Playhead */}
+              {duration > 0 && (
+                <div
+                  className="absolute inset-y-0 w-[2px] bg-white pointer-events-none"
+                  style={{ left: `${playheadPct}%` }}
+                />
+              )}
+            </div>
+
+            <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1">
+              <span>0:00</span>
+              <span>{formatTime(duration)}</span>
+            </div>
+
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] mb-1">
+                <span>Clip length</span>
+                <span className="text-[var(--text-primary)] font-medium">
+                  {clipSeconds.toFixed(1)}s
+                </span>
+              </div>
+              <input
+                type="range"
+                min={sliderMin}
+                max={sliderMax}
+                step={0.1}
+                value={clipSeconds}
+                onChange={(e) => handleClipSecondsChange(Number(e.target.value))}
+                className="w-full accent-[var(--accent-indigo)]"
+                aria-label="Clip length in seconds"
+              />
+            </div>
+
+            <div className="text-[10px] text-[var(--text-muted)] mt-2 text-center">
+              Drag the highlighted window to choose your {clipSeconds.toFixed(1)}s clip
+            </div>
           </div>
         </div>
       </div>

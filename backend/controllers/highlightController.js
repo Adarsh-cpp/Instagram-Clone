@@ -37,10 +37,15 @@ export const createHighlight = async (req, res) => {
     });
 
     if (ids.length > 0) {
-      // mark stories as highlighted and $unset expiresAt so the TTL index leaves them alone forever
+      // Mark stories as highlighted. We deliberately do NOT touch expiresAt
+      // here — it keeps counting down normally so the story still shows up
+      // in the active 24h feed for however long it naturally has left.
+      // The model's partial TTL index (isHighlighted: false) is what stops
+      // Mongo from actually deleting the document once expiresAt passes, so
+      // the story simply stops appearing as "active" but stays saved here.
       await storyModel.updateMany(
         { _id: { $in: ids } },
-        { $set: { isHighlighted: true, highlight: highlight._id }, $unset: { expiresAt: "" } }
+        { $set: { isHighlighted: true, highlight: highlight._id } }
       );
     }
 
@@ -82,9 +87,12 @@ export const addStoryToHighlight = async (req, res) => {
     highlight.stories.push(storyId);
     await highlight.save();
 
+    // Same as createHighlight — leave expiresAt exactly as it is. It'll
+    // naturally stop showing in the active feed at its real 24h mark, and
+    // the partial TTL index (isHighlighted: false) keeps Mongo from
+    // deleting the document while it's still highlighted.
     story.isHighlighted = true;
     story.highlight = highlight._id;
-    story.expiresAt = undefined; // stop TTL from deleting it
     await story.save();
 
     res.status(200).json({ success: true, highlight });
@@ -126,8 +134,12 @@ export const getHighlightById = async (req, res) => {
   }
 };
 
-// DELETE /highlight/:highlightId — owner-only; stories themselves are NOT deleted,
-// just unlinked (they've already lost their expiresAt, so decide below)
+// DELETE /highlight/:highlightId — owner-only; stories themselves are NOT
+// deleted here, just unlinked. Their expiresAt is left completely alone —
+// if it's already in the past (the common case for anything that's been
+// sitting in a highlight a while), the partial TTL index will pick it up
+// and clean it up on its own once isHighlighted flips to false, with no
+// artificial "add 24h back" step and no risk of it reappearing in feeds.
 export const deleteHighlight = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -141,11 +153,6 @@ export const deleteHighlight = async (req, res) => {
       return res.status(403).json({ success: false, message: "Not authorized" });
     }
 
-    // unlink stories — they stay in DB but are no longer "highlighted"
-    // NOTE: they will NOT auto-expire again unless you explicitly reset expiresAt here.
-    // Uncomment the next line if you want them to resume the 24h countdown after removal:
-    // await storyModel.updateMany({ _id: { $in: highlight.stories } }, { isHighlighted: false, highlight: null, expiresAt: new Date(Date.now() + 24*60*60*1000) });
-
     await storyModel.updateMany(
       { _id: { $in: highlight.stories } },
       { isHighlighted: false, highlight: null }
@@ -154,6 +161,66 @@ export const deleteHighlight = async (req, res) => {
     await Highlight.findByIdAndDelete(highlightId);
 
     res.status(200).json({ success: true, message: "Highlight deleted" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// DELETE /highlight/:highlightId/story/:storyId — owner-only. Removes ONE
+// story from a highlight. Same rule as deleteHighlight: expiresAt is never
+// touched here. This is the fix for the "3-day-old story reappears as
+// active" bug — that was caused by resetting expiresAt to now + 24h on
+// removal. Now the story just resumes being governed by whatever expiresAt
+// it already had (almost always already in the past for anything that had
+// been sitting in a highlight), so it never reappears, and the partial TTL
+// index lets Mongo actually delete it soon after since isHighlighted is
+// now false.
+export const removeStoryFromHighlight = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { highlightId, storyId } = req.params;
+
+    const highlight = await Highlight.findById(highlightId);
+    if (!highlight) {
+      return res.status(404).json({ success: false, message: "Highlight not found" });
+    }
+    if (highlight.owner.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: "Not authorized" });
+    }
+
+    const idx = highlight.stories.findIndex((s) => s.toString() === storyId);
+    if (idx === -1) {
+      return res.status(404).json({ success: false, message: "Story not found in this highlight" });
+    }
+
+    highlight.stories.splice(idx, 1);
+
+    const story = await storyModel.findById(storyId);
+    if (story) {
+      story.isHighlighted = false;
+      story.highlight = null;
+      await story.save();
+    }
+
+    // last story removed → delete the now-empty highlight entirely
+    if (highlight.stories.length === 0) {
+      await Highlight.findByIdAndDelete(highlightId);
+      return res.status(200).json({
+        success: true,
+        deleted: true,
+        message: "Highlight deleted (no stories left)",
+      });
+    }
+
+    // if the removed story was the cover image, fall back to the new first story
+    if (story && highlight.coverImage === story.mediaUrl) {
+      const newCoverStory = await storyModel.findById(highlight.stories[0]);
+      highlight.coverImage = newCoverStory?.mediaUrl || "";
+    }
+
+    await highlight.save();
+
+    res.status(200).json({ success: true, deleted: false, highlight });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

@@ -15,7 +15,13 @@ import SongTrimClipper from "../components/SongTrimClipper";
 const EXPORT_W = 1080;
 const EXPORT_H = 1920;
 const STORY_RATIO = 9 / 16;
-const CLIP_SECONDS = 15;
+
+// Song clip length is now adjustable, bounded between these two values.
+const MIN_CLIP_SECONDS = 3;
+const MAX_CLIP_SECONDS = 15;
+// Story duration when no song is attached and it's an image (videos use
+// their own real playback length instead, capped at MAX_CLIP_SECONDS).
+const DEFAULT_IMAGE_SECONDS = 6;
 
 const BG_SWATCHES = ["#000000", "#1a1a2e", "#4a5df9", "#ff6b0d", "#eb0089", "#0f9d58", "#ffffff"];
 const PEN_SWATCHES = ["#ffffff", "#000000", "#ffc600", "#ff6b0d", "#eb0089", "#4a5df9", "#0f9d58"];
@@ -159,21 +165,31 @@ const UserStoryPage = () => {
   const [songs, setSongs] = useState([]);
   const [selectedSong, setSelectedSong] = useState(null);
   const [songStartTime, setSongStartTime] = useState(0);
+  // NEW — how long the chosen song clip (and therefore the story) should
+  // play for. Defaults to the largest possible clip for the song (capped at
+  // MAX_CLIP_SECONDS) whenever a new song is picked, and the user can then
+  // shorten it with the slider below the trimmer.
+  const [songClipSeconds, setSongClipSeconds] = useState(MAX_CLIP_SECONDS);
   const [exporting, setExporting] = useState(false);
   const [isTextSelected, setIsTextSelected] = useState(false);
 
   const [videoBox, setVideoBox] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
-  // Purely cosmetic: a small preview URL used only for the filter-thumbnail
-  // grid. Independent of the canvas/video loading logic below so it can't
-  // affect any existing behavior.
-  const [previewUrl, setPreviewUrl] = useState(null);
+  // Single stable object URL for `file`, created once per file change and
+  // reused everywhere (main <video> element AND the filter-thumbnail
+  // preview). Creating it inline in JSX on every render used to force the
+  // <video> to reload mid-export and corrupt the recording — see history.
+  const [mediaUrl, setMediaUrl] = useState(null);
   useEffect(() => {
     if (!file) return;
     const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
+    setMediaUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [file]);
+
+  // Kept as an alias so the filter-thumbnail grid code below (which already
+  // referenced `previewUrl`) doesn't need any other changes.
+  const previewUrl = mediaUrl;
 
   useEffect(() => {
     if (!file) {
@@ -233,6 +249,10 @@ const UserStoryPage = () => {
     canvas.on("selection:updated", updateSelection);
     canvas.on("selection:cleared", () => setIsTextSelected(false));
 
+    // For the fabric background image we still create a dedicated one-off
+    // object URL, scoped to this effect and revoked on cleanup — that's
+    // fine because it's created exactly once per (file/dims) change, not
+    // on every render, so it never triggers the reload bug.
     const objectUrl = URL.createObjectURL(file);
 
     if (mediaType === "image") {
@@ -284,8 +304,9 @@ const UserStoryPage = () => {
     };
   }, []);
 
-  // play the selected song's 15s clip on loop — same "loops until added"
-  // behavior as Instagram's music sticker preview
+  // play the selected song's clip on loop — same "loops until added"
+  // behavior as Instagram's music sticker preview. Now uses the adjustable
+  // songClipSeconds instead of a fixed 15s window.
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !selectedSong) {
@@ -303,14 +324,26 @@ const UserStoryPage = () => {
     const audio = audioRef.current;
     if (!audio || !selectedSong) return;
     const handleTimeUpdate = () => {
-      if (audio.currentTime >= songStartTime + CLIP_SECONDS) {
+      if (audio.currentTime >= songStartTime + songClipSeconds) {
         audio.currentTime = songStartTime;
         audio.play().catch(() => {});
       }
     };
     audio.addEventListener("timeupdate", handleTimeUpdate);
     return () => audio.removeEventListener("timeupdate", handleTimeUpdate);
-  }, [selectedSong, songStartTime]);
+  }, [selectedSong, songStartTime, songClipSeconds]);
+
+  // Keep the clip's start time valid whenever the clip length changes —
+  // e.g. shortening the clip near the end of the track shouldn't leave
+  // startTime + songClipSeconds hanging past the song's actual duration.
+  useEffect(() => {
+    if (!selectedSong) return;
+    const maxStart = Math.max(0, selectedSong.duration - songClipSeconds);
+    if (songStartTime > maxStart) {
+      setSongStartTime(maxStart);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [songClipSeconds, selectedSong]);
 
   useEffect(() => {
     const canvas = fabricRef.current;
@@ -398,6 +431,7 @@ const UserStoryPage = () => {
     audioRef.current?.pause();
     setSelectedSong(null);
     setSongStartTime(0);
+    setSongClipSeconds(MAX_CLIP_SECONDS);
   };
 
   const exportImage = () => {
@@ -471,12 +505,38 @@ const UserStoryPage = () => {
       };
 
       recorder.start();
-      video.play().then(drawFrame);
+      video.play().then(drawFrame).catch((err) => {
+        // play() can still legitimately reject (e.g. browser autoplay
+        // policy) — surface it instead of silently hanging the export.
+        restoreLoop();
+        reject(err);
+      });
       video.onended = () => {
         cancelAnimationFrame(rafId);
         recorder.stop();
       };
     });
+  };
+
+  // NEW — decides how long the finished story should play for.
+  //   - A song is attached  -> the chosen clip length wins.
+  //   - Video, no song      -> the video's own real length (capped at 15s).
+  //   - Image, no song      -> a flat 6s.
+  // The backend re-derives/clamps this too (it's the ultimate source of
+  // truth for video length via ffprobe), but sending it lets the server
+  // know the song-driven duration, which it has no other way to learn.
+  const computeStoryDuration = () => {
+    if (selectedSong) {
+      return songClipSeconds;
+    }
+    if (mediaType === "video") {
+      const raw = videoElRef.current?.duration;
+      if (Number.isFinite(raw) && raw > 0) {
+        return Math.min(MAX_CLIP_SECONDS, Math.round(raw));
+      }
+      return MAX_CLIP_SECONDS;
+    }
+    return DEFAULT_IMAGE_SECONDS;
   };
 
   const handleAddToStory = async () => {
@@ -493,6 +553,7 @@ const UserStoryPage = () => {
       // anything the client claims.
       formData.append("filterUsed", activeFilter);
       formData.append("bgColor", bgColor);
+      formData.append("duration", computeStoryDuration());
       if (selectedSong) {
         formData.append("songId", selectedSong._id);
         formData.append("songStartTime", songStartTime);
@@ -541,7 +602,7 @@ const UserStoryPage = () => {
             className="relative rounded-2xl overflow-hidden bg-black shadow-2xl shadow-black/60 ring-1 ring-white/10"
             style={{ width: dims.width, height: dims.height }}
           >
-            {mediaType === "video" && (
+            {mediaType === "video" && mediaUrl && (
               <Rnd
                 size={{ width: videoBox.width, height: videoBox.height }}
                 position={{ x: videoBox.x, y: videoBox.y }}
@@ -561,7 +622,7 @@ const UserStoryPage = () => {
               >
                 <video
                   ref={videoElRef}
-                  src={URL.createObjectURL(file)}
+                  src={mediaUrl}
                   muted
                   playsInline
                   loop
@@ -873,8 +934,17 @@ const UserStoryPage = () => {
                               <div
                                 key={song._id}
                                 onClick={() => {
+                                  // Default the clip to the longest allowed
+                                  // window for this track (capped at
+                                  // MAX_CLIP_SECONDS); the user can shorten
+                                  // it afterward with the slider.
+                                  const maxClip = Math.max(
+                                    MIN_CLIP_SECONDS,
+                                    Math.min(MAX_CLIP_SECONDS, Math.floor(song.duration) || MAX_CLIP_SECONDS)
+                                  );
                                   setSelectedSong(song);
                                   setSongStartTime(0);
+                                  setSongClipSeconds(maxClip);
                                 }}
                                 className="flex items-center gap-3 p-2 mx-1 rounded-xl cursor-pointer hover:bg-white/5 active:bg-white/10 transition-colors"
                               >
@@ -922,10 +992,41 @@ const UserStoryPage = () => {
                             duration={selectedSong.duration}
                             startTime={songStartTime}
                             onChange={setSongStartTime}
+                            clipSeconds={songClipSeconds}
                             trackWidth={220}
                           />
+
+                          {/* NEW — clip length control. Bounded between
+                              MIN_CLIP_SECONDS and whichever is smaller of
+                              MAX_CLIP_SECONDS or the song's own real length,
+                              so the slider's max can never exceed the track. */}
+                          {(() => {
+                            const sliderMax = Math.max(
+                              1,
+                              Math.min(MAX_CLIP_SECONDS, Math.floor(selectedSong.duration) || MAX_CLIP_SECONDS)
+                            );
+                            const sliderMin = Math.min(MIN_CLIP_SECONDS, sliderMax);
+                            return (
+                              <div className="mt-3">
+                                <div className="flex items-center justify-between text-[10px] text-[#888] mb-1">
+                                  <span>Clip length</span>
+                                  <span className="text-white font-medium">{songClipSeconds}s</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min={sliderMin}
+                                  max={sliderMax}
+                                  value={songClipSeconds}
+                                  onChange={(e) => setSongClipSeconds(Number(e.target.value))}
+                                  className="w-full accent-[#4a5df9]"
+                                  aria-label="Song clip length in seconds"
+                                />
+                              </div>
+                            );
+                          })()}
+
                           <div className="text-[#888] text-[10px] mt-2 text-center">
-                            Drag to choose your 15s clip
+                            Drag to choose your {songClipSeconds}s clip
                           </div>
                         </>
                       )}

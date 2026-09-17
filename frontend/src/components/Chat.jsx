@@ -12,6 +12,7 @@ import StickerPicker from './StickerPicker';
 import ThemeOverlay from './ThemeOverlay';
 import { useSocket } from '../context/SocketContext';
 import { getTimeAgo } from '../utils/timeAgo';
+import { formatDateHeader, isSameDay } from '../utils/dateTime';
 import { CHAT_THEMES, getFontById, loadChatFont } from "../data/chatTheme";
 
 const MAX_IMAGES = 4;
@@ -42,7 +43,7 @@ const Chat = () => {
   // sticker/animated-sticker/GIF picker overlay
   const [isStickerPickerOpen, setIsStickerPickerOpen] = useState(false);
 
-  // info ("i") popup menu + chat customization overlay
+  // info ("i") popup menu + chat settings overlay
   const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false);
   const [isThemeOverlayOpen, setIsThemeOverlayOpen] = useState(false);
 
@@ -468,6 +469,22 @@ const Chat = () => {
     return () => socket.off("messagesSeen", handleMessagesSeen);
   }, [conversationId, user?._id]);
 
+  // listen for a reaction change (added/removed/swapped) from the friend —
+  // our own reactions are applied optimistically in handleReactToMessage,
+  // so this only needs to handle the OTHER participant's reactions arriving
+  useEffect(() => {
+    const handleMessageReacted = ({ messageId, conversationId: convId, reactions }) => {
+      if (convId !== conversationId) return;
+
+      setMessages((prev) =>
+        prev.map((msg) => (msg._id === messageId ? { ...msg, reactions } : msg))
+      );
+    };
+
+    socket.on("messageReacted", handleMessageReacted);
+    return () => socket.off("messageReacted", handleMessageReacted);
+  }, [conversationId]);
+
   // listen for the friend (or another one of our own tabs/devices)
   // changing the chat theme/font, so both sides stay in sync
   useEffect(() => {
@@ -637,6 +654,68 @@ const Chat = () => {
     }
   };
 
+  // react to a message with an emoji — one reaction per user, toggling
+  // off on repeat-tap and swapping on a different emoji, same as the
+  // backend's logic. Applied optimistically, rolled back on failure.
+  const handleReactToMessage = async (messageId, emoji) => {
+    const previousMessages = messages;
+
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg._id !== messageId) return msg;
+
+        const reactions = msg.reactions || [];
+        const existingIndex = reactions.findIndex((r) => {
+          const rid = typeof r.userId === "object" ? r.userId?._id : r.userId;
+          return rid === user?._id;
+        });
+
+        let nextReactions;
+        if (existingIndex !== -1 && reactions[existingIndex].emoji === emoji) {
+          nextReactions = reactions.filter((_, idx) => idx !== existingIndex);
+        } else if (existingIndex !== -1) {
+          nextReactions = reactions.map((r, idx) =>
+            idx === existingIndex ? { ...r, emoji } : r
+          );
+        } else {
+          nextReactions = [
+            ...reactions,
+            {
+              userId: {
+                _id: user._id,
+                fullname: user.fullname,
+                username: user.username,
+                profilePic: user.profilePic,
+              },
+              emoji,
+            },
+          ];
+        }
+
+        return { ...msg, reactions: nextReactions };
+      })
+    );
+
+    try {
+      const token = localStorage.getItem("authToken");
+      const response = await axios.patch(
+        `http://localhost:4000/message/${messageId}/react`,
+        { emoji },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.status === 200) {
+        const { reactions } = response.data;
+        setMessages((prev) =>
+          prev.map((msg) => (msg._id === messageId ? { ...msg, reactions } : msg))
+        );
+      }
+    } catch (error) {
+      setMessages(previousMessages);
+      toast.error("Could not react to message");
+    }
+  };
+
   // apply a new chat theme + font — optimistic local update, persisted via
   // one PATCH, broadcast over the socket so the friend's open chat updates too
   const handleApplyCustomization = async (themeId, fontId) => {
@@ -736,7 +815,7 @@ const Chat = () => {
                   }}
                   className="w-full text-left px-4 py-2.5 text-[14px] text-[var(--text-primary)] hover:bg-[var(--bg-menu-hover)] cursor-pointer"
                 >
-                  Change theme and font
+                  Change chat settings
                 </button>
               </div>
             </>
@@ -814,6 +893,16 @@ const Chat = () => {
                 const msg = messages[virtualRow.index];
                 if (!msg) return null;
 
+                // A date header renders above this message whenever it's
+                // the first message of the list, or the previous message
+                // (chronologically, i.e. index - 1) falls on a different
+                // calendar day. Living inside the same measured row keeps
+                // the virtualizer's dynamic-height measurement correct —
+                // no separate "header" virtual items to juggle.
+                const prevMsg = messages[virtualRow.index - 1];
+                const showDateHeader =
+                  !prevMsg || !isSameDay(prevMsg.createdAt, msg.createdAt);
+
                 return (
                   <div
                     key={msg._id}
@@ -827,10 +916,19 @@ const Chat = () => {
                       transform: `translateY(${virtualRow.start - scrollMargin}px)`,
                     }}
                   >
+                    {showDateHeader && (
+                      <div className="w-full flex justify-center items-center my-3">
+                        <span className="text-[11px] sm:text-[12px] font-medium px-3 py-1 rounded-full bg-[var(--bg-elevated)] text-[var(--text-muted)]">
+                          {formatDateHeader(msg.createdAt)}
+                        </span>
+                      </div>
+                    )}
+
                     <MessageBox
                       message={msg}
                       showSeen={msg._id === lastSeenMessageId}
                       onDelete={handleDeleteMessage}
+                      onReact={handleReactToMessage}
                       senderBubbleColor={activeTheme?.senderBubble}
                       receiverBubbleColor={activeTheme?.receiverBubble}
                       senderTextColor={activeTheme?.senderText}
@@ -997,6 +1095,7 @@ const Chat = () => {
       <ThemeOverlay
         isOpen={isThemeOverlayOpen}
         onClose={() => setIsThemeOverlayOpen(false)}
+        conversationId={conversationId}
         currentThemeId={currentThemeId}
         currentFontId={currentFontId}
         onApply={handleApplyCustomization}

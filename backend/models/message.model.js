@@ -35,6 +35,26 @@ const messageSchema = new mongoose.Schema(
       default: [],
     },
 
+    // What this message WAS at send time. Written once at creation and never
+    // mutated. This is the only thing that survives the underlying content
+    // being deleted: `sharedPost`/`sharedReel` are refs, so populate returns
+    // null once the post/reel is gone and the message becomes
+    // indistinguishable from a plain text message. With messageType the
+    // client can still render "Post no longer available".
+    messageType: {
+      type: String,
+      enum: [
+        "text",
+        "image",
+        "sticker",
+        "post_share",
+        "reel_share",
+        "story_share",
+        "story_reply",
+      ],
+      default: "text",
+    },
+
     // Sticker / animated sticker / GIF sent as a standalone message.
     // - "sticker": static emoji sticker — no external asset, just `emoji`
     // - "animated_sticker": Lottie JSON animation — `url` points at the JSON
@@ -117,6 +137,29 @@ const messageSchema = new mongoose.Schema(
       default: null,
     },
 
+    // One reaction per user (userId), like Instagram DMs — reacting again
+    // with the same emoji un-reacts; reacting with a different emoji swaps
+    // it. Max entries == number of participants in the conversation.
+    reactions: {
+      type: [
+        new mongoose.Schema(
+          {
+            userId: {
+              type: mongoose.Schema.Types.ObjectId,
+              ref: "User",
+              required: true,
+            },
+            emoji: {
+              type: String,
+              required: true,
+            },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
+
     seen: {
       type: Boolean,
       default: false,
@@ -127,8 +170,21 @@ const messageSchema = new mongoose.Schema(
   }
 );
 
-// Faster message fetching
+// Faster message fetching (also serves the descending sort used by
+// pagination — an index is usable in either direction).
 messageSchema.index({ conversationId: 1, createdAt: 1 });
+
+// Shared-media tab: only ever queries image-bearing messages of one
+// conversation, newest first. Partial index keeps it tiny — it indexes
+// only the small subset of messages that actually carry images, instead
+// of every text message in the DB.
+messageSchema.index(
+  { conversationId: 1, createdAt: -1, _id: -1 },
+  {
+    name: "sharedMedia_idx",
+    partialFilterExpression: { messageType: "image" },
+  }
+);
 
 const Message = mongoose.model("Message", messageSchema);
 

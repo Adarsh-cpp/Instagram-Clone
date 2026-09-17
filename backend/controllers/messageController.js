@@ -17,9 +17,18 @@ const SHARED_MEDIA_POPULATE = [
   },
   // sharedStory is an embedded snapshot, not a ref — it comes back with the
   // message document automatically, no populate needed.
+  {
+    // reaction authors — needed so the reactors list can show fullname + dp
+    // without an extra round trip
+    path: "reactions.userId",
+    select: "fullname username profilePic",
+  },
 ];
 
 const STICKER_TYPES = ["sticker", "animated_sticker", "gif"];
+
+const MEDIA_PAGE_SIZE_DEFAULT = 24;
+const MEDIA_PAGE_SIZE_MAX = 60;
 
 // Validates and narrows a client-supplied sticker payload down to just the
 // fields we trust/store. Returns undefined if the payload doesn't look like
@@ -38,6 +47,45 @@ const sanitizeStickerPayload = (sticker) => {
     emoji: typeof emoji === "string" ? emoji : undefined,
     name: typeof name === "string" ? name : undefined,
   };
+};
+
+// Decodes a base64 keyset cursor into { createdAt, _id }. Returns null if
+// the cursor is malformed, so callers can 400 instead of silently paging
+// from the top again.
+const decodeCursor = (cursor) => {
+  try {
+    const decoded = JSON.parse(Buffer.from(cursor, "base64").toString("utf-8"));
+    if (!decoded?.createdAt || !decoded?._id) return null;
+    return decoded;
+  } catch {
+    return null;
+  }
+};
+
+const encodeCursor = (doc) =>
+  Buffer.from(
+    JSON.stringify({ createdAt: doc.createdAt, _id: doc._id })
+  ).toString("base64");
+
+// The single source of truth for "what kind of message is this". Used at
+// creation time to stamp `messageType` on the document — which is what lets
+// the client still say "Post no longer available" long after the underlying
+// post/reel ref has been populated away to null.
+const resolveMessageType = ({
+  sharedPost,
+  sharedReel,
+  sharedStorySnapshot,
+  repliedStorySnapshot,
+  stickerPayload,
+  imageUrls,
+}) => {
+  if (repliedStorySnapshot) return "story_reply";
+  if (sharedPost) return "post_share";
+  if (sharedReel) return "reel_share";
+  if (sharedStorySnapshot) return "story_share";
+  if (stickerPayload) return "sticker";
+  if (imageUrls?.length > 0) return "image";
+  return "text";
 };
 
 // Builds the conversation-preview fields (lastMessage/lastMessageType/etc.)
@@ -123,10 +171,8 @@ export const getMessages = async (req, res) => {
     const matchStage = { conversationId };
 
     if (cursor) {
-      let decoded;
-      try {
-        decoded = JSON.parse(Buffer.from(cursor, "base64").toString("utf-8"));
-      } catch {
+      const decoded = decodeCursor(cursor);
+      if (!decoded) {
         return res.status(400).json({ success: false, message: "Invalid cursor" });
       }
 
@@ -154,9 +200,7 @@ export const getMessages = async (req, res) => {
     let nextCursor = null;
     if (hasMore && page.length > 0) {
       const oldest = page[page.length - 1];
-      nextCursor = Buffer.from(
-        JSON.stringify({ createdAt: oldest.createdAt, _id: oldest._id })
-      ).toString("base64");
+      nextCursor = encodeCursor(oldest);
     }
 
     const messages = page.reverse(); // chronological ascending for rendering
@@ -178,6 +222,135 @@ export const getMessages = async (req, res) => {
       message: "Internal Server Error",
     });
 
+  }
+};
+
+
+// GET /message/:conversationId/media?limit=24&cursor=<base64>
+//
+// Powers the "Shared media" tab. Deliberately kept as light as possible,
+// because a long-running conversation can hold thousands of images:
+//
+//  - matches ONLY image-bearing messages (sharedMedia_idx covers this)
+//  - keyset pagination, never skip/offset — page 400 costs the same as page 1
+//  - .select() to three fields + .lean(), so no Mongoose documents, no
+//    populate, no reactions/sticker/story subdocs coming back
+//  - returns a FLAT list of image URLs, so the client can render a grid
+//    without flattening N messages itself
+//
+// The cursor is the oldest MESSAGE on the current page, not the oldest
+// image — one message can carry up to 4 images and they always travel
+// together, so a page boundary never splits a message.
+export const getSharedMedia = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { conversationId } = req.params;
+
+    const limit = Math.min(
+      parseInt(req.query.limit, 10) || MEDIA_PAGE_SIZE_DEFAULT,
+      MEDIA_PAGE_SIZE_MAX
+    );
+    const cursor = req.query.cursor;
+
+    if (!conversationId) {
+      return res.status(400).json({
+        success: false,
+        message: "Conversation ID is required",
+      });
+    }
+
+    const conversation = await conversationModel
+      .findById(conversationId)
+      .select("participants");
+
+    if (!conversation) {
+      return res.status(404).json({ success: false, message: "Conversation not found" });
+    }
+
+    const isParticipant = conversation.participants.some(
+      (p) => p.toString() === userId.toString()
+    );
+
+    if (!isParticipant) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not part of this conversation",
+      });
+    }
+
+    // `images` is the current field; `image` is the legacy single-image one.
+    // Both are checked so older conversations still show their media.
+    const matchStage = {
+      conversationId,
+      $or: [
+        { images: { $exists: true, $ne: [] } },
+        { image: { $exists: true, $nin: ["", null] } },
+      ],
+    };
+
+    if (cursor) {
+      const decoded = decodeCursor(cursor);
+      if (!decoded) {
+        return res.status(400).json({ success: false, message: "Invalid cursor" });
+      }
+
+      const cursorDate = new Date(decoded.createdAt);
+      // $or is already taken by the media filter above, so the keyset
+      // condition goes in $and to avoid clobbering it
+      matchStage.$and = [
+        {
+          $or: [
+            { createdAt: { $lt: cursorDate } },
+            { createdAt: cursorDate, _id: { $lt: decoded._id } },
+          ],
+        },
+      ];
+    }
+
+    const docs = await messageModel
+      .find(matchStage)
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(limit + 1) // one extra to detect a further page
+      .select("image images createdAt")
+      .lean();
+
+    const hasMore = docs.length > limit;
+    const page = hasMore ? docs.slice(0, limit) : docs;
+
+    let nextCursor = null;
+    if (hasMore && page.length > 0) {
+      nextCursor = encodeCursor(page[page.length - 1]);
+    }
+
+    // flatten messages -> individual images, newest first
+    const media = [];
+    page.forEach((doc) => {
+      const urls = doc.images?.length ? doc.images : doc.image ? [doc.image] : [];
+
+      urls.forEach((url, index) => {
+        if (!url) return;
+        media.push({
+          id: `${doc._id}-${index}`, // stable React key, unique across pages
+          url,
+          messageId: doc._id,
+          createdAt: doc.createdAt,
+        });
+      });
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Shared media fetched successfully",
+      media,
+      nextCursor,
+      hasMore,
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
   }
 };
 
@@ -266,10 +439,22 @@ export const postMessage = async (req, res) => {
       }
     }
 
+    // Stamped once, never mutated. This is what survives the shared post/reel
+    // being deleted later — see the field's comment in message.model.js.
+    const messageType = resolveMessageType({
+      sharedPost,
+      sharedReel,
+      sharedStorySnapshot,
+      repliedStorySnapshot: null, // replies-to-story are created elsewhere
+      stickerPayload,
+      imageUrls,
+    });
+
     const newMessage = await messageModel.create({
       conversationId,
       senderId,
       receiverId,
+      messageType,
       text: message?.trim() || "",
       images: imageUrls,
       sticker: stickerPayload || undefined,
@@ -401,5 +586,82 @@ export const markSeen = async (req, res) => {
       success: false,
       message: "Internal Server Error",
     });
+  }
+};
+
+// PATCH /message/:messageId/react  { emoji: "❤️" }
+// One reaction per user per message, Instagram-style:
+// - no existing reaction from this user  -> add it
+// - existing reaction, SAME emoji        -> remove it (toggle off)
+// - existing reaction, DIFFERENT emoji   -> swap it
+export const reactToMessage = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+
+    if (!emoji || typeof emoji !== "string") {
+      return res.status(400).json({ success: false, message: "Emoji is required" });
+    }
+
+    const message = await messageModel.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, message: "Message not found" });
+    }
+
+    // only the two participants of this message's conversation may react
+    const isParticipant =
+      message.senderId.toString() === userId.toString() ||
+      message.receiverId.toString() === userId.toString();
+
+    if (!isParticipant) {
+      return res.status(403).json({ success: false, message: "You can't react to this message" });
+    }
+
+    const existingIndex = message.reactions.findIndex(
+      (r) => r.userId.toString() === userId.toString()
+    );
+
+    if (existingIndex !== -1 && message.reactions[existingIndex].emoji === emoji) {
+      message.reactions.splice(existingIndex, 1);
+    } else if (existingIndex !== -1) {
+      message.reactions[existingIndex].emoji = emoji;
+    } else {
+      message.reactions.push({ userId, emoji });
+    }
+
+    await message.save();
+    await message.populate("reactions.userId", "fullname username profilePic");
+
+    const otherParticipantId =
+      message.senderId.toString() === userId.toString()
+        ? message.receiverId
+        : message.senderId;
+
+    const otherSocketEntry = onlineUsers.get(otherParticipantId.toString());
+    if (otherSocketEntry) {
+      const io = getIO();
+      const payload = {
+        messageId: message._id.toString(),
+        conversationId: message.conversationId.toString(),
+        reactions: message.reactions,
+      };
+
+      if (otherSocketEntry instanceof Set) {
+        otherSocketEntry.forEach((socketId) => io.to(socketId).emit("messageReacted", payload));
+      } else {
+        io.to(otherSocketEntry).emit("messageReacted", payload);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Reaction updated",
+      messageId: message._id,
+      reactions: message.reactions,
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };

@@ -6,6 +6,10 @@ import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
 import { getIO, onlineUsers } from "../config/socket.js";
 
+// Story duration bounds — mirrors the client-side MIN/MAX_CLIP_SECONDS.
+const MAX_STORY_DURATION = 15;
+const DEFAULT_IMAGE_DURATION = 6;
+
 // helper — uploads a buffer to Cloudinary via upload_stream (needed since we use multer memoryStorage)
 const uploadBufferToCloudinary = (buffer, resourceType) => {
   return new Promise((resolve, reject) => {
@@ -30,7 +34,7 @@ export const createStory = async (req, res) => {
       return res.status(401).json({ success: false, message: "Not authenticated" });
     }
 
-    const { filterUsed, bgColor, songId, songStartTime } = req.body;
+    const { filterUsed, bgColor, songId, songStartTime, duration } = req.body;
 
     if (!req.file) {
       return res.status(400).json({ success: false, message: "Media file is required" });
@@ -42,12 +46,26 @@ export const createStory = async (req, res) => {
 
     const uploadResult = await uploadBufferToCloudinary(req.file.buffer, mediaType);
 
+
+    let finalDuration;
+    if (songId) {
+      const requested = Number(duration);
+      finalDuration =
+        Number.isFinite(requested) && requested > 0
+          ? Math.min(Math.round(requested), MAX_STORY_DURATION)
+          : MAX_STORY_DURATION;
+    } else if (mediaType === "video") {
+      finalDuration = req.mediaDuration || DEFAULT_IMAGE_DURATION;
+    } else {
+      finalDuration = DEFAULT_IMAGE_DURATION;
+    }
+
     const story = await storyModel.create({
       author: userId,
       mediaType,
       mediaUrl: uploadResult.secure_url,
       mediaPublicId: uploadResult.public_id,
-      duration: mediaType === "video" ? (req.mediaDuration || 5) : 5,
+      duration: finalDuration,
       filterUsed: filterUsed || "none",
       bgColor: bgColor || "#000000",
       song: songId ? { songId, startTime: songStartTime || 0 } : undefined,
@@ -244,16 +262,7 @@ export const getStoryLikes = async (req, res) => {
   }
 };
 
-// POST /story/:storyId/reply — send a DM to the story's author quoting the
-// story, e.g. replying "nice" renders in chat as:
-//   [thumb] Replied to your story
-//   nice
-//
-// NOTE: Conversation model shape is still assumed here as
-// { participants: [ObjectId, ObjectId], lastMessage, ... } since I haven't
-// seen conversation.model.js — send it over and I'll line this up exactly
-// (e.g. if you already have a getOrCreateConversation helper elsewhere,
-// this should call that instead of duplicating the find-or-create logic).
+
 export const replyToStory = async (req, res) => {
   try {
     const { storyId } = req.params;
@@ -270,8 +279,7 @@ export const replyToStory = async (req, res) => {
       return res.status(404).json({ success: false, message: "Story not found" });
     }
 
-    // stories older than the TTL window shouldn't be repliable even if the
-    // TTL delete hasn't swept them yet
+
     if (story.expiresAt && story.expiresAt.getTime() < Date.now()) {
       return res.status(410).json({ success: false, message: "This story has expired" });
     }
@@ -292,9 +300,7 @@ export const replyToStory = async (req, res) => {
       });
     }
 
-    // snapshot of the story at reply-time — used to render the thumbnail
-    // even after the story itself expires/gets deleted (matches the
-    // sharedStory snapshot shape in message.model.js)
+
     const repliedStorySnapshot = {
       storyId: story._id,
       mediaType: story.mediaType,
@@ -316,9 +322,7 @@ export const replyToStory = async (req, res) => {
       repliedStory: repliedStorySnapshot,
     });
 
-    // conversation preview fields — kept in sync so MessageCard can render
-    // the correct "Replied to your/their story" label per viewer, and so
-    // the timestamp used for sorting/"time ago" actually updates
+
     conversation.lastMessage = text;
     conversation.lastMessageType = "story_reply";
     conversation.lastMessageSenderId = senderId;
@@ -327,11 +331,7 @@ export const replyToStory = async (req, res) => {
 
     const populatedMessage = await newMessage.populate("senderId", "username profilePic");
 
-    // emit over the socket exactly like a normal chat message, so it shows
-    // up live for the story author if they're in the Chat view. onlineUsers
-    // maps userId -> Set of socketIds (a user can have several tabs/devices
-    // open at once), so emit to every socket in that set rather than a
-    // single id.
+  
     const receiverSockets = onlineUsers.get(authorId.toString());
     if (receiverSockets && receiverSockets.size > 0) {
       const io = getIO();

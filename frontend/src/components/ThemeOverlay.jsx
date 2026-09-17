@@ -3,10 +3,18 @@ import { useEffect, useState } from "react";
 import { X, Check } from "lucide-react";
 import { CHAT_THEMES, CHAT_FONTS, loadAllChatFonts } from "../data/chatTheme";
 import ThemePreviewPanel from "./ThemePreviewPanel";
+import SharedMediaPanel from "./SharedMediaPanel";
+
+const TABS = [
+  { id: "theme", label: "Theme" },
+  { id: "font", label: "Font" },
+  { id: "media", label: "Shared media" },
+];
 
 export default function ThemeOverlay({
   isOpen,
   onClose,
+  conversationId,
   currentThemeId,
   currentFontId,
   onApply,
@@ -16,18 +24,27 @@ export default function ThemeOverlay({
   const [selectedFontId, setSelectedFontId] = useState(currentFontId || "default");
   const [showPreview, setShowPreview] = useState(false);
 
+  // the media tab only ever mounts once the user actually opens it, so the
+  // first media request isn't fired just because someone wanted to change a font
+  const [hasOpenedMedia, setHasOpenedMedia] = useState(false);
+
   useEffect(() => {
     if (isOpen) {
       setActiveTab("theme");
       setSelectedThemeId(currentThemeId || "default");
       setSelectedFontId(currentFontId || "default");
       setShowPreview(false);
+      setHasOpenedMedia(false);
 
       // every font row renders in its own typeface, so pull the whole
       // catalog in one stylesheet request when the sheet opens
       loadAllChatFonts();
     }
   }, [isOpen, currentThemeId, currentFontId]);
+
+  useEffect(() => {
+    if (activeTab === "media") setHasOpenedMedia(true);
+  }, [activeTab]);
 
   if (!isOpen) return null;
 
@@ -59,7 +76,7 @@ export default function ThemeOverlay({
 
         {/* header */}
         <div className="relative flex items-center justify-center px-4 pt-3 pb-2">
-          <h2 className="text-base font-medium">Customize</h2>
+          <h2 className="text-base font-medium">Chat settings</h2>
           <button
             onClick={onClose}
             className="absolute right-4 rounded-full p-1 hover:bg-[var(--bg-menu-hover)]"
@@ -72,35 +89,28 @@ export default function ThemeOverlay({
 
         {/* tabs */}
         <div className="mt-1 flex border-b border-[var(--border-soft)] px-4">
-          <button
-            onClick={() => setActiveTab("theme")}
-            className={`relative px-3 pb-3 text-sm transition ${
-              activeTab === "theme"
-                ? "font-semibold text-[var(--text-primary)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            Theme
-            {activeTab === "theme" && (
-              <span className="absolute inset-x-0 -bottom-px h-[2px] rounded bg-[var(--text-primary)]" />
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab("font")}
-            className={`relative px-3 pb-3 text-sm transition ${
-              activeTab === "font"
-                ? "font-semibold text-[var(--text-primary)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            Font
-            {activeTab === "font" && (
-              <span className="absolute inset-x-0 -bottom-px h-[2px] rounded bg-[var(--text-primary)]" />
-            )}
-          </button>
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`relative px-3 pb-3 text-sm transition ${
+                  isActive
+                    ? "font-semibold text-[var(--text-primary)]"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                {tab.label}
+                {isActive && (
+                  <span className="absolute inset-x-0 -bottom-px h-[2px] rounded bg-[var(--text-primary)]" />
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        {activeTab === "theme" ? (
+        {activeTab === "theme" && (
           <>
             {/* live mock preview of whichever swatch is currently selected —
                 never touches the real chat behind the sheet */}
@@ -158,7 +168,9 @@ export default function ThemeOverlay({
               })}
             </div>
           </>
-        ) : (
+        )}
+
+        {activeTab === "font" && (
           // Font list — each row is set in its own typeface, so the list is
           // the preview. No mock panel needed here.
           <div className="max-h-[46vh] overflow-y-auto px-4 py-3 sm:max-h-[52vh]">
@@ -194,30 +206,40 @@ export default function ThemeOverlay({
           </div>
         )}
 
-        {/* action bar */}
-        <div className="flex gap-3 px-4 pt-2">
-          {activeTab === "theme" && (
+        {/* Kept mounted (just hidden) once visited, so flicking back to the
+            media tab doesn't re-fetch every page the user already scrolled. */}
+        {hasOpenedMedia && (
+          <div className={activeTab === "media" ? "block" : "hidden"}>
+            <SharedMediaPanel conversationId={conversationId} />
+          </div>
+        )}
+
+        {/* action bar — theme/font only; the media tab has nothing to apply */}
+        {activeTab !== "media" && (
+          <div className="flex gap-3 px-4 pt-2">
+            {activeTab === "theme" && (
+              <button
+                onClick={() => setShowPreview((prev) => !prev)}
+                className="flex-1 rounded-xl py-3 text-sm font-semibold hover:bg-[var(--bg-menu-hover)]"
+                style={{ background: "var(--bg-elevated)", color: "var(--text-primary)" }}
+              >
+                {showPreview ? "Hide preview" : "Preview"}
+              </button>
+            )}
             <button
-              onClick={() => setShowPreview((prev) => !prev)}
-              className="flex-1 rounded-xl py-3 text-sm font-semibold hover:bg-[var(--bg-menu-hover)]"
-              style={{ background: "var(--bg-elevated)", color: "var(--text-primary)" }}
+              onClick={handleApply}
+              disabled={!hasChanged}
+              className={`flex-1 rounded-xl py-3 text-sm font-semibold transition ${
+                hasChanged
+                  ? "bg-blue-600 text-white active:bg-blue-700"
+                  : "bg-blue-600/30"
+              }`}
+              style={!hasChanged ? { color: "var(--text-muted)" } : undefined}
             >
-              {showPreview ? "Hide preview" : "Preview"}
+              Apply
             </button>
-          )}
-          <button
-            onClick={handleApply}
-            disabled={!hasChanged}
-            className={`flex-1 rounded-xl py-3 text-sm font-semibold transition ${
-              hasChanged
-                ? "bg-blue-600 text-white active:bg-blue-700"
-                : "bg-blue-600/30"
-            }`}
-            style={!hasChanged ? { color: "var(--text-muted)" } : undefined}
-          >
-            Apply
-          </button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

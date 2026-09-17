@@ -2,15 +2,18 @@
 import React from "react";
 import { Rnd } from "react-rnd";
 
-const CLIP_SECONDS = 15;
 const TRACK_HEIGHT = 56;
 
-// Instagram-style trimmer: a fixed-width (15s) draggable window sliding
-// along a bar representing the full song, styled with IG's gradient.
-const SongTrimClipper = ({ duration, startTime, onChange, trackWidth = 220 }) => {
-  const safeDuration = Math.max(duration, CLIP_SECONDS); // guard against very short tracks
+// Instagram-style trimmer: a draggable window sliding along a bar
+// representing the full song, styled with IG's gradient. The window's
+// width is now driven by `clipSeconds` (adjustable via the slider in
+// UserStoryPage) instead of a fixed 15s — previously this component always
+// rendered/dragged a 15s-wide window no matter what the user picked.
+const SongTrimClipper = ({ duration, startTime, onChange, trackWidth = 220, clipSeconds = 15 }) => {
+  const safeClipSeconds = Math.max(1, clipSeconds);
+  const safeDuration = Math.max(duration, safeClipSeconds); // guard against very short tracks
   const pxPerSecond = trackWidth / safeDuration;
-  const clipWidthPx = Math.min(CLIP_SECONDS, safeDuration) * pxPerSecond;
+  const clipWidthPx = Math.min(safeClipSeconds, safeDuration) * pxPerSecond;
   const maxX = trackWidth - clipWidthPx;
 
   return (

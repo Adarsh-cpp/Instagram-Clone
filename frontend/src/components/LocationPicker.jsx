@@ -170,7 +170,19 @@ const LocationPicker = ({ value, onChange, onClose }) => {
       </div>
 
       {/* Map + overlay results */}
-      <div className="relative flex-1 min-h-0">
+      {/*
+        NOTE: relative + isolate creates a fresh stacking context for this
+        wrapper. Leaflet sets its own explicit z-index values on internal
+        panes (tilePane ~200, markerPane ~600, popupPane ~700, controls
+        ~1000). Any overlay we place as a plain sibling with no z-index
+        defaults to z-index:auto (effectively 0), so Leaflet's panes were
+        rendering ON TOP of our dropdown/hint pills even though they appear
+        later in the DOM — that's why only a sliver (shadow/border) was
+        visible and the suggestion text itself was hidden underneath the
+        map tiles. Giving every overlay an explicit z-[1000]+ (higher than
+        Leaflet's highest internal z-index) fixes it.
+      */}
+      <div className="relative isolate flex-1 min-h-0">
         <MapContainer
           center={[center.lat, center.lng]}
           zoom={zoom}
@@ -188,12 +200,12 @@ const LocationPicker = ({ value, onChange, onClose }) => {
 
         {/* hint / resolving pill */}
         {!value && !showDropdown && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1100] bg-black/70 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
             Tap anywhere on the map to drop a pin
           </div>
         )}
         {resolvingPin && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1100] flex items-center gap-1.5 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none">
             <Loader2 size={12} className="animate-spin" />
             Finding place name...
           </div>
@@ -201,7 +213,7 @@ const LocationPicker = ({ value, onChange, onClose }) => {
 
         {/* search results dropdown, floats above the map */}
         {showDropdown && (
-          <div className="absolute top-0 left-0 right-0 max-h-full overflow-y-auto bg-[var(--bg-surface)] shadow-lg">
+          <div className="absolute top-0 left-0 right-0 z-[1100] max-h-full overflow-y-auto bg-[var(--bg-surface)] shadow-lg">
             {loading && (
               <div className="text-center text-xs text-[#8e8e8e] py-3">Searching...</div>
             )}

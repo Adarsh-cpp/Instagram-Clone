@@ -243,6 +243,35 @@ const UserProfilePage = () => {
     setShowNewHighlightModal(false)
   }
 
+  // keep the highlight circles in sync with changes made inside the story
+  // viewer page. Removing a story there can change the highlight's cover
+  // image; removing the last story (or explicitly deleting the highlight)
+  // removes it entirely. The viewer lives on its own route, so it can't just
+  // call setHighlights directly — it broadcasts these as window events and
+  // whichever profile page is mounted patches its own state in response.
+  useEffect(() => {
+    const handleCoverUpdated = (e) => {
+      const { highlightId, coverImage } = e.detail || {}
+      if (!highlightId) return
+      setHighlights((prev) =>
+        prev.map((h) => (h._id === highlightId ? { ...h, coverImage } : h))
+      )
+    }
+
+    const handleHighlightDeleted = (e) => {
+      const { highlightId } = e.detail || {}
+      if (!highlightId) return
+      setHighlights((prev) => prev.filter((h) => h._id !== highlightId))
+    }
+
+    window.addEventListener("highlightCoverUpdated", handleCoverUpdated)
+    window.addEventListener("highlightDeleted", handleHighlightDeleted)
+    return () => {
+      window.removeEventListener("highlightCoverUpdated", handleCoverUpdated)
+      window.removeEventListener("highlightDeleted", handleHighlightDeleted)
+    }
+  }, [])
+
   // lock background scroll while the dp overlay is open
   useEffect(() => {
     document.body.style.overflow = isDpOverlayOpen ? "hidden" : "";

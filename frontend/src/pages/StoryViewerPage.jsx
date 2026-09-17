@@ -11,13 +11,21 @@ import { useAuth } from "../context/AuthContext";
 import ShareOverlay from "../components/ShareOverlay"; // adjust path if your folder layout differs
 import HighlightPickerSheet from "../components/HighlightPickerSheet";
 
-const DEFAULT_IMAGE_SECONDS = 5;
+// Matches the backend's DEFAULT_IMAGE_DURATION in story.controller.js —
+// only used as a fallback if a story somehow has no `duration` at all.
+const DEFAULT_IMAGE_SECONDS = 6;
 const HOLD_THRESHOLD_MS = 200;
 const DOUBLE_TAP_MS = 300;
 const DEFAULT_AVATAR = "/images/default-profile-pic.jpg";
-// how long a story's attached song clip plays before looping back to its
-// start — matches the 15s clip length picked in UserStoryPage's trimmer
-const SONG_CLIP_SECONDS = 15;
+// Fallback only — used if a story's `duration` field is somehow missing
+// (e.g. a legacy story created before duration was made song-aware). Every
+// story created going forward carries its own correct duration: the chosen
+// song-clip length when a song is attached, or the media's own length
+// otherwise. Previously this was a fixed 15s ALWAYS used for the audio
+// loop, regardless of what the story's actual duration was — that's the
+// bug that made the song keep playing after a short image's progress bar
+// had already finished.
+const FALLBACK_CLIP_SECONDS = 15;
 
 // ---- carousel geometry ----
 const CARD_WIDTH = 300;   // px, base width before scale is applied
@@ -317,15 +325,20 @@ const StoryViewerPage = () => {
   }, [playing, muted, currentSong?._id]);
 
   // ---- story song: loop just the saved clip window (songStartTime to
-  // songStartTime + 15s) instead of playing the whole track ----
+  // songStartTime + clip length). The clip length now comes straight from
+  // the story's own `duration` field — which, for any story with a song
+  // attached, IS the chosen clip length (see story.controller.js). This
+  // replaces the old fixed 15s, which is why the song used to keep
+  // playing well past a short image's progress bar finishing. ----
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !currentSong) return;
 
     const start = Math.max(0, Number(currentStory?.song?.startTime) || 0);
+    const clipSeconds = currentStory?.duration || FALLBACK_CLIP_SECONDS;
 
     const handleTimeUpdate = () => {
-      if (audio.currentTime >= start + SONG_CLIP_SECONDS) {
+      if (audio.currentTime >= start + clipSeconds) {
         try {
           audio.currentTime = start;
         } catch (_) {}
@@ -339,7 +352,7 @@ const StoryViewerPage = () => {
     audio.addEventListener("timeupdate", handleTimeUpdate);
     return () => audio.removeEventListener("timeupdate", handleTimeUpdate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountIndex, storyIndex, currentSong?._id]);
+  }, [accountIndex, storyIndex, currentSong?._id, currentStory?.duration]);
 
   // ---- story song: keep muted state in sync ----
   useEffect(() => {

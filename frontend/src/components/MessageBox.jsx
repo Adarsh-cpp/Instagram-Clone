@@ -9,17 +9,33 @@ import {
   ChevronLeft,
   ChevronRight,
   Clapperboard,
+  Plus,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getTimeAgo } from "../utils/timeAgo";
+import { formatFullTimestamp } from "../utils/dateTime";
 import CommentsOverlay from "./CommentsOverlay";
+import EmojiPickerPanel from "./EmojiPickerPanel";
+import ReactorsListOverlay from "./ReactorsListOverlay";
 import { createPortal } from "react-dom";
 
 const TILT_ANGLES = [-8, 5, -4, 7];
 const CAPTION_TRIM_LENGTH = 60;
 const STORY_TTL_MS = 24 * 60 * 60 * 1000;
 const LONG_PRESS_MS = 500;
+const MENU_WIDTH = 260;
+const MENU_HEIGHT_ESTIMATE = 210; // quick-reactions row + timestamp row (+ unsend row)
+
+// Instagram-style quick reaction row. The "+" next to these opens the
+// full EmojiPickerPanel for anything else.
+const QUICK_REACTIONS = ["❤️", "😆", "😮", "😢", "👍"];
+
+// messageType values that mean "this was a post share" / "a reel share".
+// The canonical values written by the backend are post_share / reel_share;
+// the others are accepted so any older/alternate naming still resolves.
+const POST_SHARE_TYPES = ["post_share", "post", "sharedPost"];
+const REEL_SHARE_TYPES = ["reel_share", "reel", "sharedReel"];
 
 const trimCaption = (text) => {
   if (!text) return "";
@@ -33,6 +49,7 @@ const MessageBox = ({
   message,
   showSeen,
   onDelete,
+  onReact,
   senderBubbleColor,
   receiverBubbleColor,
   senderTextColor,
@@ -45,9 +62,15 @@ const MessageBox = ({
   const [isDownloading, setIsDownloading] = useState(false);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
 
-  // right-click (desktop) / long-press (mobile) unsend menu — own messages only
+  // right-click (desktop) / long-press (mobile) info menu — opens for
+  // ANY message. Content inside (reaction row, timestamp, Unsend) is
+  // decided at render time by `isSenderMessage`.
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+
+  // reactors sheet — who reacted with what, tapped from the small badge
+  const [isReactorsListOpen, setIsReactorsListOpen] = useState(false);
 
   const longPressTimerRef = useRef(null);
   const menuRef = useRef(null);
@@ -84,6 +107,13 @@ const MessageBox = ({
   const sharedReel = message?.sharedReel;
   const sharedStory = message?.sharedStory;
 
+  // When a shared post/reel is deleted, the backend populate returns null —
+  // there's nothing left in `sharedPost`/`sharedReel` to tell us the message
+  // *used to* be a share. `messageType` (stamped at send time in
+  // postMessage and never mutated) is what lets us still know "this was a
+  // post share" after the post is gone.
+  const messageType = message?.messageType || message?.type;
+
   // only one of these is ever set on a given message
   const shareKind = sharedPost
     ? "post"
@@ -91,7 +121,17 @@ const MessageBox = ({
     ? "reel"
     : sharedStory
     ? "story"
+    : POST_SHARE_TYPES.includes(messageType)
+    ? "post"
+    : REEL_SHARE_TYPES.includes(messageType)
+    ? "reel"
     : null;
+
+  // true when the message was a post/reel share but the underlying content
+  // has since been deleted (populate came back empty)
+  const isSharedPostDeleted = shareKind === "post" && !sharedPost;
+  const isSharedReelDeleted = shareKind === "reel" && !sharedReel;
+  const isSharedContentDeleted = isSharedPostDeleted || isSharedReelDeleted;
 
   const sharedItem = sharedPost || sharedReel || sharedStory;
 
@@ -111,20 +151,20 @@ const MessageBox = ({
   // thumbnail to show in the compact chat card
   const sharedThumbUrl =
     shareKind === "post"
-      ? sharedPost.media?.[0]?.url
+      ? sharedPost?.media?.[0]?.url
       : shareKind === "reel"
-      ? sharedReel.media?.thumbnailUrl || sharedReel.media?.url
+      ? sharedReel?.media?.thumbnailUrl || sharedReel?.media?.url
       : shareKind === "story"
-      ? sharedStory.mediaUrl
+      ? sharedStory?.mediaUrl
       : null;
 
   const sharedThumbIsVideo =
     shareKind === "post"
-      ? sharedPost.media?.[0]?.mediaType === "video"
+      ? sharedPost?.media?.[0]?.mediaType === "video"
       : shareKind === "reel"
-      ? !sharedReel.media?.thumbnailUrl
+      ? !sharedReel?.media?.thumbnailUrl
       : shareKind === "story"
-      ? sharedStory.mediaType === "video"
+      ? sharedStory?.mediaType === "video"
       : false;
 
   const sharedPostAsItem = useMemo(() => {
@@ -227,27 +267,27 @@ const MessageBox = ({
     }
   };
 
-  // ---- unsend menu: right-click on desktop, long-press on mobile ----
-
-  const MENU_WIDTH = 140;
+  // ---- info menu: right-click on desktop, long-press on mobile ----
+  // Opens for both sender and receiver messages. What's inside it
+  // (reaction row + timestamp always; Unsend only for own messages) is
+  // decided at render time by `isSenderMessage`.
 
   const openMenuAt = (x, y) => {
     const left = Math.max(8, Math.min(x - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8));
-    const top = Math.min(y, window.innerHeight - 60);
+    const top = Math.max(
+      8,
+      Math.min(y, window.innerHeight - MENU_HEIGHT_ESTIMATE - 8)
+    );
     setMenuPosition({ x: left, y: top });
     setIsMenuOpen(true);
   };
 
   const handleContextMenu = (e) => {
-    if (!isSenderMessage) return;
-
     e.preventDefault();
     openMenuAt(e.clientX, e.clientY);
   };
 
   const handleTouchStart = (e) => {
-    if (!isSenderMessage) return;
-
     const touch = e.touches[0];
 
     longPressTimerRef.current = setTimeout(() => {
@@ -282,13 +322,50 @@ const MessageBox = ({
     };
   }, [isMenuOpen]);
 
+  // the nested emoji picker shouldn't stay open once the menu itself closes
+  useEffect(() => {
+    if (!isMenuOpen) setIsEmojiPickerOpen(false);
+  }, [isMenuOpen]);
+
   const handleUnsend = () => {
     setIsMenuOpen(false);
     onDelete?.(message._id);
   };
 
+  const handleReact = (emoji) => {
+    setIsMenuOpen(false);
+    onReact?.(message._id, emoji);
+  };
+
   const hasMedia =
-    imageList.length > 0 || !!sharedItem || !!repliedStory || !!sticker;
+    imageList.length > 0 ||
+    !!sharedItem ||
+    !!repliedStory ||
+    !!sticker ||
+    isSharedContentDeleted;
+
+  const messageFullTimestamp = formatFullTimestamp(message?.createdAt);
+
+  // ---- reactions ----
+  const reactions = message?.reactions || [];
+
+  const myReactionEmoji = useMemo(() => {
+    const mine = reactions.find((r) => {
+      const rid = typeof r.userId === "object" ? r.userId?._id : r.userId;
+      return rid === user?._id;
+    });
+    return mine?.emoji;
+  }, [reactions, user?._id]);
+
+  // grouped by emoji so two people reacting the same way show as one
+  // badge with a count, Instagram-style
+  const groupedReactions = useMemo(() => {
+    const map = new Map();
+    reactions.forEach((r) => {
+      map.set(r.emoji, (map.get(r.emoji) || 0) + 1);
+    });
+    return Array.from(map.entries()).map(([emoji, count]) => ({ emoji, count }));
+  }, [reactions]);
 
   return (
     <div
@@ -308,9 +385,9 @@ const MessageBox = ({
             ? undefined
             : { backgroundColor: bubbleBg, color: bubbleText }
         }
-        className={`messageBox max-w-[85%] sm:max-w-[75%] md:max-w-[70%] w-fit min-h-[40px] rounded-3xl my-1 select-none break-words ${
+        className={`messageBox relative max-w-[85%] sm:max-w-[75%] md:max-w-[70%] w-fit min-h-[40px] rounded-3xl my-1 select-none break-words ${
           hasMedia ? "px-0 py-2 bg-transparent" : "px-4 py-2"
-        }`}
+        } ${groupedReactions.length > 0 ? "mb-3" : ""}`}
       >
         {sticker && sticker.type === "sticker" && (
           <div className="stickerMessage w-[96px] h-[96px] sm:w-[130px] sm:h-[130px] flex items-center justify-center text-[62px] sm:text-[84px] leading-none">
@@ -323,7 +400,7 @@ const MessageBox = ({
             {/* lottie-react forwards unknown props to lottie-web's config,
                 so `path` loads a remote .json animation */}
             <Lottie
-              src={sticker.url}
+              path={sticker.url}
               autoplay
               loop
               style={{ width: "100%", height: "100%" }}
@@ -373,16 +450,16 @@ const MessageBox = ({
           </div>
         )}
 
-        {sharedItem && (
+        {(sharedItem || isSharedContentDeleted) && (
           <div
             onClick={() => {
-              if (shareKind !== "story") setIsCommentsOpen(true);
+              if (shareKind !== "story" && sharedItem) setIsCommentsOpen(true);
             }}
             className={`sharedPostCard rounded-xl overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-soft)] max-w-full ${
               shareKind === "post"
-                ? "w-[170px] sm:w-[220px] cursor-pointer"
+                ? `w-[170px] sm:w-[220px] ${sharedItem ? "cursor-pointer" : ""}`
                 : "w-[135px] sm:w-[160px]"
-            } ${shareKind === "reel" ? "cursor-pointer" : ""}`}
+            } ${shareKind === "reel" && sharedItem ? "cursor-pointer" : ""}`}
           >
             {shareKind === "story" ? (
               // Story: portrait card, transparent header, no caption, expiry-aware
@@ -437,45 +514,65 @@ const MessageBox = ({
                 </div>
               </div>
             ) : shareKind === "reel" ? (
-              // Reel: portrait card, transparent header overlay, no caption
-              <div className="relative w-full h-[210px] sm:h-[280px]">
-                {sharedThumbIsVideo ? (
-                  <video
-                    src={sharedThumbUrl}
-                    className="w-full h-full object-cover"
-                    muted
-                    loop
-                    playsInline
-                  />
-                ) : (
-                  <img
-                    src={sharedThumbUrl}
-                    alt="shared content"
-                    className="w-full h-full object-cover"
-                  />
-                )}
+              isSharedReelDeleted ? (
+                // Reel was deleted after being shared
+                <div className="relative w-full h-[210px] sm:h-[280px] flex flex-col items-center justify-center gap-2 bg-[var(--bg-app)] text-center px-3">
+                  <Clapperboard size={26} className="text-[var(--text-muted)]" />
 
-                <div className="absolute top-0 left-0 right-0 flex items-center gap-2 px-2.5 py-2 bg-gradient-to-b from-black/60 to-transparent">
-                  <Link
-                    to={`/user/get-profile/${sharedItem.author?._id}`}
-                    className="flex items-center gap-2 min-w-0"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <img
-                      src={sharedItem.author?.profilePic}
-                      alt=""
-                      className="w-[22px] h-[22px] rounded-full object-cover shrink-0"
+                  <span className="text-[var(--text-muted)] text-[12px]">
+                    Reel no longer available
+                  </span>
+                </div>
+              ) : (
+                // Reel: portrait card, transparent header overlay, no caption
+                <div className="relative w-full h-[210px] sm:h-[280px]">
+                  {sharedThumbIsVideo ? (
+                    <video
+                      src={sharedThumbUrl}
+                      className="w-full h-full object-cover"
+                      muted
+                      loop
+                      playsInline
                     />
+                  ) : (
+                    <img
+                      src={sharedThumbUrl}
+                      alt="shared content"
+                      className="w-full h-full object-cover"
+                    />
+                  )}
 
-                    <span className="text-white text-[12px] font-medium truncate">
-                      {sharedItem.author?.username}
-                    </span>
-                  </Link>
-                </div>
+                  <div className="absolute top-0 left-0 right-0 flex items-center gap-2 px-2.5 py-2 bg-gradient-to-b from-black/60 to-transparent">
+                    <Link
+                      to={`/user/get-profile/${sharedItem.author?._id}`}
+                      className="flex items-center gap-2 min-w-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <img
+                        src={sharedItem.author?.profilePic}
+                        alt=""
+                        className="w-[22px] h-[22px] rounded-full object-cover shrink-0"
+                      />
 
-                <div className="videoIcon absolute bottom-2 left-2">
-                  <Clapperboard size={24} className="text-white ml-auto shrink-0" />
+                      <span className="text-white text-[12px] font-medium truncate">
+                        {sharedItem.author?.username}
+                      </span>
+                    </Link>
+                  </div>
+
+                  <div className="videoIcon absolute bottom-2 left-2">
+                    <Clapperboard size={24} className="text-white ml-auto shrink-0" />
+                  </div>
                 </div>
+              )
+            ) : isSharedPostDeleted ? (
+              // Post was deleted after being shared
+              <div className="w-full h-[165px] sm:h-[220px] flex flex-col items-center justify-center gap-2 bg-[var(--bg-app)] text-center px-3">
+                <Clapperboard size={26} className="text-[var(--text-muted)]" />
+
+                <span className="text-[var(--text-muted)] text-[12px]">
+                  Post no longer available
+                </span>
               </div>
             ) : (
               // Post: square card, solid header, caption shown
@@ -588,6 +685,33 @@ const MessageBox = ({
             {message.text}
           </span>
         )}
+
+        {/* Reaction badge — overlaps the bottom corner of the bubble,
+            Instagram-style. Tapping it opens the full reactors list. */}
+        {groupedReactions.length > 0 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsReactorsListOpen(true);
+            }}
+            aria-label="View reactions"
+            className={`absolute -bottom-3 ${
+              isSenderMessage ? "right-1" : "left-1"
+            } flex items-center gap-0.5 bg-[var(--bg-elevated)] border border-[var(--border-soft)] rounded-full px-1.5 py-0.5 shadow-sm cursor-pointer z-20`}
+          >
+            {groupedReactions.map((g) => (
+              <span key={g.emoji} className="text-[13px] leading-none">
+                {g.emoji}
+              </span>
+            ))}
+            {reactions.length > 1 && (
+              <span className="text-[10px] text-[var(--text-muted)] leading-none ml-0.5">
+                {reactions.length}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
       {showSeen && (
@@ -605,17 +729,72 @@ const MessageBox = ({
               top: menuPosition.y,
               left: menuPosition.x,
             }}
-            className="z-[110] bg-[var(--bg-panel)] border border-[var(--border-popup)] rounded-xl shadow-lg overflow-hidden min-w-[140px]"
+            className="z-[110] bg-[var(--bg-panel)] border border-[var(--border-popup)] rounded-2xl shadow-lg overflow-visible min-w-[230px]"
           >
-            <button
-              onClick={handleUnsend}
-              className="w-full text-left px-4 py-2.5 text-[var(--color-danger)] text-[14px] hover:bg-[var(--bg-popup-hover)] cursor-pointer"
-            >
-              Unsend
-            </button>
+            {/* quick reactions + "more" picker */}
+            <div className="flex items-center justify-between px-2.5 py-2 border-b border-[var(--border-popup)]">
+              {QUICK_REACTIONS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => handleReact(emoji)}
+                  aria-label={`React with ${emoji}`}
+                  className={`text-[21px] w-[32px] h-[32px] flex items-center justify-center rounded-full hover:scale-125 transition-transform cursor-pointer ${
+                    myReactionEmoji === emoji ? "bg-[var(--bg-menu-hover)]" : ""
+                  }`}
+                >
+                  {emoji}
+                </button>
+              ))}
+
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
+                  aria-label="More reactions"
+                  className="w-[32px] h-[32px] flex items-center justify-center rounded-full hover:bg-[var(--bg-menu-hover)] cursor-pointer text-[var(--text-primary)]"
+                >
+                  <Plus size={18} />
+                </button>
+
+                {isEmojiPickerOpen && (
+                  <div
+                    className={`absolute z-[130] top-[38px] ${
+                      isSenderMessage ? "right-0" : "left-0"
+                    }`}
+                  >
+                    <EmojiPickerPanel
+                      onSelect={(emoji) => handleReact(emoji)}
+                      onClose={() => setIsEmojiPickerOpen(false)}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* non-editable, non-clickable — just the delivered timestamp */}
+            <div className="w-full text-left px-4 py-2.5 text-[var(--text-muted)] text-[12px] select-none cursor-default border-b border-[var(--border-popup)]">
+              Delivered {messageFullTimestamp}
+            </div>
+
+            {isSenderMessage && (
+              <button
+                onClick={handleUnsend}
+                className="w-full text-left px-4 py-2.5 text-[var(--color-danger)] text-[14px] hover:bg-[var(--bg-popup-hover)] cursor-pointer"
+              >
+                Unsend
+              </button>
+            )}
           </div>,
           document.body
         )}
+
+      {isReactorsListOpen && reactions.length > 0 && (
+        <ReactorsListOverlay
+          reactions={reactions}
+          onClose={() => setIsReactorsListOpen(false)}
+        />
+      )}
 
       {isImageOpen &&
         imageList.length > 0 &&
