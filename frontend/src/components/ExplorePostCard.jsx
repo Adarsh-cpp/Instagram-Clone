@@ -61,6 +61,7 @@ const ExplorePostCard = ({ post }) => {
         <CommentsOverlay
           post={post}
           authorId={post?.author._id}
+          authorRole={post?.author?.role}
           onClose={() => setIsCommentsOpen(false)}
           onLikesCountChange={setLikesCount}
           onSaveChange={setIsSaved}

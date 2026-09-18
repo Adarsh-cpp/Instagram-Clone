@@ -585,12 +585,12 @@ export const getTaggedItems = async (req, res) => {
     const [posts, reels] = await Promise.all([
       postModel
         .find({ taggedUsers: targetUserId })
-        .populate("author", "username profilePic")
+        .populate("author", "username profilePic role")
         .sort({ createdAt: -1 })
         .lean(),
       reelModel
         .find({ taggedUsers: targetUserId })
-        .populate("author", "username profilePic")
+        .populate("author", "username profilePic role")
         .sort({ createdAt: -1 })
         .lean(),
     ]);

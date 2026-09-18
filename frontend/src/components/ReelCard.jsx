@@ -15,6 +15,8 @@ const ReelCard = ({ reel, authorId, ...props }) => {
   const [likesCount, setLikesCount] = useState(props.likesCount || 0)
   const [isSaved, setIsSaved] = useState(false)
 
+  
+
 
   useEffect(() => {
     setIsSaved(
@@ -54,6 +56,7 @@ const ReelCard = ({ reel, authorId, ...props }) => {
             <CommentsOverlay
               reel={reel}
               authorId={authorId}
+              authorRole={props.authorRole}
               onClose={() => setIsCommentsOpen(false)}
               onLikesCountChange={setLikesCount}
               onSaveChange={setIsSaved}

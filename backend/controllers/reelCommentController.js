@@ -62,10 +62,10 @@ export const getComments = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("author", "username profilePic")
+      .populate("author", "username profilePic role")
       .populate({
         path: "replies",
-        populate: { path: "author", select: "username profilePic" },
+        populate: { path: "author", select: "username profilePic role" },
       });
 
     return res.status(200).json({success:true, comments, page, hasMore: comments.length === limit });

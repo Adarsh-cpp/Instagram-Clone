@@ -1,5 +1,5 @@
 // FollowUserCard.jsx
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { BadgeCheck } from 'lucide-react'
 
@@ -16,6 +16,11 @@ const FollowUserCard = ({ userId, profilePic, username, fullName, isFollowing, r
     if (onCardClick) onCardClick()
   }
 
+  useEffect(() => {
+  console.log(role)
+  }, [])
+  
+
   return (
     <Link
       to={`/user/get-profile/${userId}`}
@@ -24,7 +29,7 @@ const FollowUserCard = ({ userId, profilePic, username, fullName, isFollowing, r
     >
       <div className="detailsSide flex items-center gap-3">
         <div className="profilePic w-[45px] h-[45px] flex justify-center items-center rounded-full overflow-hidden shrink-0">
-          <img src={profilePic} alt="" className="w-full h-full object-cover" />
+          <img src={profilePic ? profilePic : "images/default-profile-pic.jpg"} alt="" className="w-full h-full object-cover" />
         </div>
         <div className="flex flex-col leading-tight">
           <span className="flex items-center gap-1 text-[var(--text-primary)] text-[14px] font-semibold">

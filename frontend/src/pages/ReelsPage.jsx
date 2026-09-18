@@ -422,6 +422,7 @@ const ReelsPage = () => {
                 <ReelCommentsOverlay
                   reelId={currentReel._id}
                   isOpen={isCommentsOpen}
+                  authorRole={currentReel?.author?.role}
                   onClose={() => setIsCommentsOpen(false)}
                 />
               )}

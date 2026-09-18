@@ -18,7 +18,7 @@ const authConfig = () => ({
  * every row — top-level comments and their replies both render through
  * that component, exactly like the feed post card does.
  */
-const ReelCommentsOverlay = ({ reelId, isOpen = true, onClose }) => {
+const ReelCommentsOverlay = ({ reelId, authorRole, isOpen = true, onClose }) => {
   const { user } = useAuth();
 
   const [comments, setComments] = useState([]);
@@ -26,6 +26,8 @@ const ReelCommentsOverlay = ({ reelId, isOpen = true, onClose }) => {
   const [commentText, setCommentText] = useState("");
   const [posting, setPosting] = useState(false);
   const inputRef = useRef(null);
+
+  const isAdmin = authorRole === "admin"
 
   useEffect(() => {
     if (!isOpen || !reelId) return;
@@ -102,7 +104,7 @@ const ReelCommentsOverlay = ({ reelId, isOpen = true, onClose }) => {
 
           {!loading &&
             comments.map((comment) => (
-              <Comment key={comment._id} comment={comment} reelId={reelId} currentUserId={user?._id} />
+              <Comment key={comment._id} comment={comment} reelId={reelId} currentUserId={user?._id} verified={isAdmin} />
             ))}
         </div>
 

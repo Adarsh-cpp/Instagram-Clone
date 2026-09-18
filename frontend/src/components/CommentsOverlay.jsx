@@ -95,9 +95,7 @@ const CommentsOverlay = ({
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
 
-  const authorName = isOwnItem
-    ? "You"
-    : item?.author?.username;
+  const authorName = item?.author?.username;
 
   // Blue verified tick, shown only for the admin account.
   const isAdminAuthor = authorRole === "admin";

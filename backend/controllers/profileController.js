@@ -19,8 +19,8 @@ export const getProfile = async (req, res) => {
       .findById(id)
       .select("-password -email"); 
 
-    const posts = await postModel.find({author:id}).sort({createdAt:-1}).populate("author", "username profilePic fullname")
-    const reels = await reelModel.find({author:id}).sort({createdAt:-1}).populate("author", "username profilePic fullname")
+    const posts = await postModel.find({author:id}).sort({createdAt:-1}).populate("author", "username profilePic fullname role")
+    const reels = await reelModel.find({author:id}).sort({createdAt:-1}).populate("author", "username profilePic fullname role")
 
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
@@ -338,7 +338,7 @@ export const getSavedItems = async (req, res) => {
       path: "savedItems.itemId",
       populate: {
         path: "author",
-        select: "username profilePic isVerified",
+        select: "username profilePic isVerified role",
       },
     });
 

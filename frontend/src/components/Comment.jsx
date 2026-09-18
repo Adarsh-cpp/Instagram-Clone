@@ -200,7 +200,7 @@ const Comment = ({
         <div className="min-w-0 flex-1" onDoubleClick={handleDoubleClick}>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h4 className="text-sm sm:text-[15px] font-semibold text-[var(--text-primary)] truncate flex items-center gap-1">
-             {isOwnComment ? "You" : displayAuthor}
+             {isOwnComment ? displayAuthor : displayAuthor}
              {isAdminAuthor && (
                <BadgeCheck size={13} className="text-sky-400 shrink-0" />
              )}
@@ -332,6 +332,7 @@ const Comment = ({
               comment={reply}
               postId={postId}
               reelId={reelId}
+              verified={verified}
               currentUserId={currentUserId}
               isReply
               canModerate={canModerate}

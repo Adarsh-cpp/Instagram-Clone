@@ -328,7 +328,7 @@ const UserProfilePage = () => {
               onClick={(e) => e.stopPropagation()} // prevents click on image from closing overlay
             >
               <img
-                src={user.profilePic}
+                src={user.profilePic ? user.profilePic : "images/default-profile-pic.jpg"}
                 alt=""
                 className="w-full h-full object-cover"
               />
@@ -337,9 +337,12 @@ const UserProfilePage = () => {
         )}
 
         <div className="profileContainer w-full 2xl:w-[80%] h-full relative ">
-            <div className={`profileInfo w-full h-auto ${showHighlightSection ? "sm:h-[46%]" : "sm:h-[34.5%] md:h-[28.5%]"}`}>
-                <div className={`personalInfoSection w-full flex flex-row items-center gap-3 sm:gap-0 py-4 sm:py-0 ${showHighlightSection ? "h-auto sm:h-[62%]" : "h-auto sm:h-full"}`}>
-                    <div className="profilePicSection shrink-0 w-auto sm:w-[30%] md:w-[25%] lg:w-[20%] h-auto sm:h-full flex justify-center items-center ">
+            {/* profileInfo now grows naturally with content (h-auto) instead of a
+                fixed % height, so a long/multi-line bio pushes the highlights row
+                down instead of overlapping it */}
+            <div className="profileInfo w-full h-auto py-4 sm:py-6">
+                <div className="personalInfoSection w-full flex flex-row items-center gap-3 sm:gap-6 py-4 sm:py-0">
+                    <div className="profilePicSection shrink-0 w-auto sm:w-[30%] md:w-[25%] lg:w-[20%] h-auto flex justify-center items-center ">
                         <div
                           onClick={() => setIsDpOverlayOpen(true)}
                           className="profilePic w-[90px] h-[90px] sm:w-[150px] sm:h-[150px] md:w-[150px] md:h-[150px] lg:w-[180px] lg:h-[180px] rounded-full overflow-hidden object-cover cursor-pointer shrink-0 "
@@ -355,8 +358,8 @@ const UserProfilePage = () => {
                               />
                         </div>
                     </div>
-                    <div className="profileDetails flex-1 min-w-0 h-auto sm:h-full flex flex-col justify-center gap-2 sm:gap-0 ">
-                        <div className="nameSection w-full h-auto md:h-[25%] flex flex-col md:flex-row justify-start items-start md:items-center gap-2 md:gap-0 ">
+                    <div className="profileDetails flex-1 min-w-0 h-auto flex flex-col justify-center gap-2 sm:gap-3 ">
+                        <div className="nameSection w-full h-auto flex flex-col md:flex-row justify-start items-start md:items-center gap-2 md:gap-0 ">
                            <div className="name w-full md:w-[70%] h-auto md:h-full px-1 sm:px-6 flex items-center gap-1 text-[var(--text-primary)] text-[16px] sm:text-[20px] font-bold truncate ">
                              {user.username}
                              {user?.role === "admin" && (
@@ -406,10 +409,10 @@ const UserProfilePage = () => {
 
                            
                         </div>
-                        <div className="postCount w-full md:w-[80%] h-auto md:h-[20%] flex justify-start md:justify-center items-center gap-1 sm:gap-0 ">
-                            <div className="posts flex-1 h-auto md:h-full px-1 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[13px] whitespace-nowrap "><span className='text-[var(--text-primary)]'>{user.postsCount}</span>&nbsp;posts</div>
-                            <div onClick={() => openFollowOverlay("followers")} className="fllwers flex-1 h-auto md:h-full px-1 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[13px] whitespace-nowrap cursor-pointer "><span className='text-[var(--text-primary)]'>{followers}</span>&nbsp;followers</div>
-                            <div onClick={() => openFollowOverlay("following")} className="fllwing flex-1 h-auto md:h-full px-1 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[13px] whitespace-nowrap cursor-pointer "><span className='text-[var(--text-primary)]'>{user.following?.length}</span>&nbsp;following</div>
+                        <div className="postCount w-full md:w-[80%] h-auto flex justify-start md:justify-center items-center gap-1 sm:gap-0 ">
+                            <div className="posts flex-1 h-auto px-1 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[13px] whitespace-nowrap "><span className='text-[var(--text-primary)]'>{user.postsCount}</span>&nbsp;posts</div>
+                            <div onClick={() => openFollowOverlay("followers")} className="fllwers flex-1 h-auto px-1 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[13px] whitespace-nowrap cursor-pointer "><span className='text-[var(--text-primary)]'>{followers}</span>&nbsp;followers</div>
+                            <div onClick={() => openFollowOverlay("following")} className="fllwing flex-1 h-auto px-1 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[13px] whitespace-nowrap cursor-pointer "><span className='text-[var(--text-primary)]'>{user.following?.length}</span>&nbsp;following</div>
                         </div>
                         <BioCard bioText={user.bio || ""} />
                     </div>
@@ -465,10 +468,11 @@ const UserProfilePage = () => {
                     <PostCard
                       key={post._id}
                       post={post}
-                      authorId={post.author._id}
-                      imgSrc={post.media?.[0]?.url}
-                      likesCount={post.likes.length}
-                      commentsCount={post.commentsCount}
+                      authorId={post?.author?._id}
+                      authorRole={post?.author?.role}
+                      imgSrc={post?.media?.[0]?.url}
+                      likesCount={post?.likes.length}
+                      commentsCount={post?.commentsCount}
                     />
                   ))}
                 </div>
@@ -493,6 +497,7 @@ const UserProfilePage = () => {
                       key={reel._id}
                       reel={reel}
                       authorId={reel.author?._id}
+                      authorRole={reel?.author?.role}
                       imgSrc={reel.media?.thumbnailUrl}
                       likesCount={reel.likes.length}
                       commentsCount={reel.commentsCount}

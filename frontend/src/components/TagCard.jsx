@@ -12,6 +12,8 @@ const TagCard = ({ item }) => {
   const imgSrc = isVideo ? item.media?.thumbnailUrl : item.media?.[0]?.url
   const authorId = item.author?._id
 
+  const authorRole = item?.author?.role
+
   const [isCommentsOpen, setIsCommentsOpen] = useState(false)
   const [likesCount, setLikesCount] = useState(item.likes?.length || 0)
   const [isSaved, setIsSaved] = useState(
@@ -54,6 +56,7 @@ const TagCard = ({ item }) => {
               <CommentsOverlay
                 reel={item}
                 authorId={authorId}
+                authorRole={authorRole}
                 onClose={() => setIsCommentsOpen(false)}
                 onLikesCountChange={setLikesCount}
                 onSaveChange={setIsSaved}
@@ -64,6 +67,7 @@ const TagCard = ({ item }) => {
               <CommentsOverlay
                 post={item}
                 authorId={authorId}
+                authorRole={authorRole}
                 onClose={() => setIsCommentsOpen(false)}
                 onLikesCountChange={setLikesCount}
                 onSaveChange={setIsSaved}

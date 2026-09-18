@@ -239,7 +239,14 @@ const MessageCard = ({ conversation, onDeleteConversation }) => {
     <>
       <Link
         to={`/user/messages/${conversation?._id}`}
-        replace={isDesktop}
+        // Always replace — regardless of desktop/mobile. Every chat you
+        // open from this list should overwrite the current "messages"
+        // history entry, not stack a new one. Otherwise navigating
+        // chat1 -> chat2 -> chat3 -> chat4 builds up dead entries, and if
+        // one of those conversations (e.g. chat2) gets deleted along the
+        // way, pressing back can land you on a route for a conversation
+        // that no longer exists.
+        replace={true}
         onClick={handleLinkClick}
         onContextMenu={handleContextMenu}
         onTouchStart={handleTouchStart}

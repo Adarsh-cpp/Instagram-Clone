@@ -459,7 +459,7 @@ export const getFollowers = async (req, res) => {
 
     const populatedUsers = await userModel
       .find({ _id: { $in: pageIds } })
-      .select("username profilePic fullname");
+      .select("username profilePic fullname role");
 
     const orderedUsers = pageIds
       .map((id) => populatedUsers.find((u) => u._id.toString() === id.toString()))
@@ -475,6 +475,7 @@ export const getFollowers = async (req, res) => {
       username: u.username,
       profilePic: u.profilePic,
       fullName: u.fullname,
+      role: u.role,
       isFollowing: currentUserFollowingSet.has(u._id.toString()),
     }));
 
@@ -510,7 +511,7 @@ export const getFollowings = async (req, res) => {
 
     const populatedUsers = await userModel
       .find({ _id: { $in: pageIds } })
-      .select("username profilePic fullname");
+      .select("username profilePic fullname role");
 
     const orderedUsers = pageIds
       .map((id) => populatedUsers.find((u) => u._id.toString() === id.toString()))
@@ -526,6 +527,7 @@ export const getFollowings = async (req, res) => {
       username: u.username,
       profilePic: u.profilePic,
       fullName: u.fullname,
+      role: u.role,
       isFollowing: currentUserFollowingSet.has(u._id.toString()),
     }));
 

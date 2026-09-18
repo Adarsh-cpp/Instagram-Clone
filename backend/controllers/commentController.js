@@ -85,10 +85,10 @@ export const getComments = async (req, res) => {
     // so they don't also show up as their own top-level entries
     const comments = await commentModel
       .find({ post: postId, parentComment: null })
-      .populate("author", "username profilePic")
+      .populate("author", "username profilePic role")
       .populate({
         path: "replies",
-        populate: { path: "author", select: "username profilePic" },
+        populate: { path: "author", select: "username profilePic role" },
         options: { sort: { createdAt: 1 } }, // replies oldest-first, like Instagram
       })
       .sort({ createdAt: -1 });

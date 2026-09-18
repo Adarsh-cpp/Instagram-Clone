@@ -21,6 +21,7 @@ const PostCard = ({ post, authorId, ...props }) => {
   )
 
 
+
   const likedBool = post?.likes?.some(
     (like) => (like?._id || like)?.toString() === user?._id?.toString()
   ) || false
@@ -60,6 +61,7 @@ const PostCard = ({ post, authorId, ...props }) => {
             <CommentsOverlay
               post={post}
               authorId={authorId}
+              authorRole={props.authorRole}
               onClose={() => setIsCommentsOpen(false)}
               onLikesCountChange={setLikesCount}
               onSaveChange={setIsSaved}

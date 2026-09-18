@@ -60,7 +60,9 @@ const MessagesPage = () => {
     const handleConversationDeleted = ({ conversationId: deletedId }) => {
       setConversations((prev) => prev.filter((c) => c._id !== deletedId))
       if (conversationId === deletedId) {
-        navigate('/user/messages')
+        // replace, not push — we're already "inside" messages, so this
+        // should not create a new history entry on top of the dead one
+        navigate('/user/messages', { replace: true })
       }
     }
 
@@ -114,7 +116,8 @@ const MessagesPage = () => {
       }
 
       if (conversationId === idToDelete) {
-        navigate('/user/messages')
+        // replace here too, for the same reason as above
+        navigate('/user/messages', { replace: true })
       }
     } catch (error) {
       console.log(error.message)
@@ -168,7 +171,7 @@ const MessagesPage = () => {
         {/* --- InstaAI entry, pinned above real conversations --- */}
         {showAiRow && (
           <div
-            onClick={() => navigate(`/user/messages/${AI_CONVERSATION_ID}`)}
+            onClick={() => navigate(`/user/messages/${AI_CONVERSATION_ID}`, { replace: true })}
             className={`instaAiRow w-full h-[72px] flex items-center gap-3 px-4 cursor-pointer transition-colors ${
               isAiOpen ? "bg-[var(--bg-elevated)]" : "hover:bg-[var(--bg-row-hover)]"
             }`}

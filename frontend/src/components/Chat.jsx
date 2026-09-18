@@ -1,7 +1,7 @@
 // Chat.jsx
 import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Image, Send, Smile, X, ArrowLeft, Sticker, Info } from "lucide-react";
+import { Image, Send, Smile, X, ArrowLeft, Sticker, Info, BadgeCheck } from "lucide-react";
 import socket from '../socket';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -126,12 +126,8 @@ const Chat = () => {
   // Mobile back arrow: pop the history entry that opening this chat
   // pushed (see MessageCard's `replace={isDesktop}`), so we land back on
   // the list instead of stacking yet another "list" entry on top of it.
-  const handleBack = () => {
-    if (location.key && location.key !== "default") {
-      navigate(-1);
-    } else {
-      navigate("/user/messages", { replace: true });
-    }
+ const handleBack = () => {
+    navigate("/user/messages", { replace: true });
   };
 
   const handleImageSelect = (e) => {
@@ -778,10 +774,22 @@ const Chat = () => {
 
           <div className="messageDetails min-w-0 flex flex-col justify-center">
             <div className="fullname text-[var(--text-primary)] text-[15px] lg:text-[18px] truncate">
-              <Link to={`/user/get-profile/${friend?._id}`} className="truncate">
-                {friend?.fullname}
-              </Link>
-            </div>
+                <Link
+                  to={`/user/get-profile/${friend?._id}`}
+                  className="inline-flex items-center gap-1 max-w-full"
+                >
+                  <span className="truncate">
+                    {friend?.fullname}
+                  </span>
+
+                  {friend?.role === "admin" && (
+                    <BadgeCheck
+                      size={18}
+                      className="text-sky-400 shrink-0"
+                    />
+                  )}
+                </Link>
+              </div>
             <div className="lastMsg text-[12px] lg:text-[14px] truncate">
               <span className={isFriendOnline ? "text-green-500" : "text-[var(--text-muted)]"}>
                 {activeStatusText}
