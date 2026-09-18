@@ -193,6 +193,7 @@ const HomePage = () => {
                         profileImgSrc={post.author.profilePic}
                         authorId={post.author._id}
                         author={post.author.username}
+                        authorRole={post.author.role}
                         caption={post.caption}
                         aspectRatio={post.aspectRatio}
                         isLiked={post.likes.some(

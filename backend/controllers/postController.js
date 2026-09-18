@@ -170,6 +170,7 @@ export const getFeedPosts = async (req, res) => {
           "author._id": 1,
           "author.username": 1,
           "author.profilePic": 1,
+          "author.role": 1,
           "taggedUsers._id": 1,
           "taggedUsers.username": 1,
           "taggedUsers.profilePic": 1,
@@ -384,7 +385,7 @@ export const getSavedPosts = async (req, res) => {
                 path: "savedPosts",
                 populate: {
                     path: "author",
-                    select: "username profileImage"
+                    select: "username profileImage role"
                 }
             });
 

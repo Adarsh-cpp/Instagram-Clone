@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import EmojiPicker from "emoji-picker-react";
-import { Play, ChevronLeft, ChevronRight, MapPin, UserPlus, X, ArrowLeft, Smile } from "lucide-react";
+import { Play, ChevronLeft, ChevronRight, MapPin, UserPlus, X, ArrowLeft, Smile, BadgeCheck } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import LocationPicker from "../components/LocationPicker";
 import TagPeoplePicker from "../components/TagPeoplePicker";
@@ -262,8 +262,11 @@ const CaptionSharePage = ({
                 <div className="profilePicSection w-[40px] h-[40px] rounded-full overflow-hidden">
                   <img src={user?.profilePic ? user.profilePic : "/images/default-profile-pic.jpg"} alt="" />
                 </div>
-                <div className="usernameSection h-full flex items-center px-2 text-[var(--text-primary)] font-semibold text-sm sm:text-base">
+                <div className="usernameSection h-full flex items-center gap-1 px-2 text-[var(--text-primary)] font-semibold text-sm sm:text-base">
                   {user?.username}
+                  {user?.role === "admin" && (
+                    <BadgeCheck size={14} className="text-sky-400 shrink-0" />
+                  )}
                 </div>
               </div>
 

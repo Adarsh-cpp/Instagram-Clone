@@ -134,12 +134,7 @@ export const getHighlightById = async (req, res) => {
   }
 };
 
-// DELETE /highlight/:highlightId — owner-only; stories themselves are NOT
-// deleted here, just unlinked. Their expiresAt is left completely alone —
-// if it's already in the past (the common case for anything that's been
-// sitting in a highlight a while), the partial TTL index will pick it up
-// and clean it up on its own once isHighlighted flips to false, with no
-// artificial "add 24h back" step and no risk of it reappearing in feeds.
+
 export const deleteHighlight = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -166,15 +161,7 @@ export const deleteHighlight = async (req, res) => {
   }
 };
 
-// DELETE /highlight/:highlightId/story/:storyId — owner-only. Removes ONE
-// story from a highlight. Same rule as deleteHighlight: expiresAt is never
-// touched here. This is the fix for the "3-day-old story reappears as
-// active" bug — that was caused by resetting expiresAt to now + 24h on
-// removal. Now the story just resumes being governed by whatever expiresAt
-// it already had (almost always already in the past for anything that had
-// been sitting in a highlight), so it never reappears, and the partial TTL
-// index lets Mongo actually delete it soon after since isHighlighted is
-// now false.
+
 export const removeStoryFromHighlight = async (req, res) => {
   try {
     const userId = req.user._id;

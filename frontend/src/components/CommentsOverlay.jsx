@@ -19,6 +19,7 @@ import {
   X,
   Heart,
   Bookmark,
+  BadgeCheck,
 } from "lucide-react";
 import EmojiPicker from "emoji-picker-react";
 import axios from "axios";
@@ -45,6 +46,7 @@ const CommentsOverlay = ({
   post,
   reel,
   authorId,
+  authorRole,
   onClose,
   onLikesCountChange,
   onSaveChange,
@@ -96,6 +98,9 @@ const CommentsOverlay = ({
   const authorName = isOwnItem
     ? "You"
     : item?.author?.username;
+
+  // Blue verified tick, shown only for the admin account.
+  const isAdminAuthor = authorRole === "admin";
 
   const mediaList = useMemo(
     () => (isReel ? [] : post?.media || []),
@@ -645,8 +650,11 @@ const CommentsOverlay = ({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <NavLink to={profileURL}>
-                    <h3 className="truncate text-sm sm:text-base font-semibold text-[var(--text-primary)]">
+                    <h3 className="truncate text-sm sm:text-base font-semibold text-[var(--text-primary)] flex items-center gap-1">
                       {authorName}
+                      {isAdminAuthor && (
+                        <BadgeCheck size={14} className="text-sky-400 shrink-0" />
+                      )}
                     </h3>
                   </NavLink>
 
@@ -694,6 +702,7 @@ const CommentsOverlay = ({
               }
               text={item?.caption}
               createdAt={item?.createdAt}
+              verified={isAdminAuthor}
             />
 
             {fetchedComments.map(

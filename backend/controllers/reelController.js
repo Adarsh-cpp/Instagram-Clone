@@ -89,7 +89,7 @@ export const getReels = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("author", "username profilePic isVerified")
+      .populate("author", "username profilePic isVerified role")
       .lean();
 
     const userId = req.user?._id?.toString();

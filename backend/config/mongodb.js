@@ -3,10 +3,11 @@ import userModel from "../models/user.model.js";
 
 const connectDB = async () => {
   try {
-    // Attach before connecting
-    // console.log(process.env.MONGODB_URI);
-   
-    mongoose.connection.on("connected", () => console.log("✅ MongoDB connected"));
+    mongoose.connection.on("connected", () => {
+      console.log("✅ MongoDB connected");
+      console.log("📂 Connected to database:", mongoose.connection.name);
+      console.log("🔗 Connected to host:", mongoose.connection.host);
+    });
 
     await mongoose.connect(process.env.MONGODB_URI);
 

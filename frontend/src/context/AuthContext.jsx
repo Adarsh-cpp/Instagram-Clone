@@ -19,7 +19,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       const response = await axios.get(
-        "${BASE_URL}/auth/me",
+        `${BASE_URL}/auth/me`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

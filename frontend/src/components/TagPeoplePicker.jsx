@@ -17,7 +17,7 @@ const TagPeoplePicker = ({ selected, onChange, onClose }) => {
 
   useEffect(() => {
     inputRef.current?.focus();
-    fetch("${BASE_URL}/post/suggested-tag-users", {
+    fetch(`${BASE_URL}/post/suggested-tag-users`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())

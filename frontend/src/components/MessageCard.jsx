@@ -3,15 +3,11 @@ import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
+import { BadgeCheck } from 'lucide-react'
 import { useSocket } from '../context/SocketContext'
 import { getTimeAgo } from '../utils/timeAgo'
 
-// Desktop shows both panes at once, so opening a chat there is just a
-// "change selection", not a real navigation — it should replace the
-// current history entry rather than push a new one. Otherwise clicking
-// through several chats fills the history stack and back has to step
-// through each one before reaching /home. Mobile is a real full-screen
-// navigation, so it still pushes (see MessageCard usage below).
+
 const useIsDesktop = () => {
   const [isDesktop, setIsDesktop] = useState(
     typeof window !== "undefined"
@@ -270,7 +266,12 @@ const MessageCard = ({ conversation, onDeleteConversation }) => {
 
           <div className="messageDetails w-[80%] h-full">
             <div className="fullname w-full h-[50%] flex justify-start items-end text-[var(--text-primary)] text-[18px] md:text-[15px] lg:text-[18px]">
-              <span className="ml-2">{friend?.fullname}</span>
+              <span className="ml-2 flex items-center gap-1">
+                {friend?.fullname}
+                {friend?.role === "admin" && (
+                  <BadgeCheck size={14} className="text-sky-400 shrink-0" />
+                )}
+              </span>
             </div>
 
             <div className="lastMsg w-full h-[50%] flex justify-start items-start text-[14px] md:text-[12px] lg:text-[14px] mt-1">

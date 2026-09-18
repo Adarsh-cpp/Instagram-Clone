@@ -331,6 +331,7 @@ export const followToggle = async (req, res) => {
     });
   }
 };
+
 export const getSavedItems = async (req, res) => {
   try {
     const user = await userModel.findById(req.user._id).populate({

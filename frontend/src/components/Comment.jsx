@@ -1,5 +1,6 @@
 // Comment.jsx
 import React, { useState } from "react";
+import { BadgeCheck } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { getTimeAgo } from "../utils/timeAgo";
@@ -60,6 +61,14 @@ const Comment = ({
   const displayText = comment?.text ?? text;
   const displayTime = comment?.createdAt ?? createdAt;
   const commentTime = getTimeAgo(displayTime);
+
+  // Blue verified tick, shown only for the admin account. Real comments
+  // check the comment author's own role; the caption pseudo-comment has
+  // no `comment` doc, so it falls back to the `verified` prop passed in
+  // by the caller (CommentsOverlay derives that from the post/reel author).
+  const isAdminAuthor = isRealComment
+    ? comment?.author?.role === "admin"
+    : Boolean(verified);
 
   const [isLiked, setIsLiked] = useState(
     isRealComment
@@ -190,15 +199,12 @@ const Comment = ({
 
         <div className="min-w-0 flex-1" onDoubleClick={handleDoubleClick}>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h4 className="text-sm sm:text-[15px] font-semibold text-[var(--text-primary)] truncate">
+            <h4 className="text-sm sm:text-[15px] font-semibold text-[var(--text-primary)] truncate flex items-center gap-1">
              {isOwnComment ? "You" : displayAuthor}
+             {isAdminAuthor && (
+               <BadgeCheck size={13} className="text-sky-400 shrink-0" />
+             )}
             </h4>
-
-            {verified && (
-              <span className="text-[11px] sm:text-xs text-sky-400 font-medium">
-                • verified
-              </span>
-            )}
 
             <span className="text-[11px] sm:text-xs text-[var(--text-muted)]">{commentTime}</span>
           </div>

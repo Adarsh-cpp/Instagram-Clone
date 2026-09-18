@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import axios from "axios"
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { BadgeCheck } from 'lucide-react';
 
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
@@ -11,6 +12,8 @@ const FollowingSuggestionCard = ({...props}) => {
 
 
   const [isFollowed, setIsFollowed] = useState(false);
+
+  const isAdmin = props.user.role === "admin"
 
 
   const { user, refreshUser } = useAuth()
@@ -69,16 +72,29 @@ const FollowingSuggestionCard = ({...props}) => {
       </div>
       
       {/* Name Section */}
-      <div className="nameSection w-full h-[35%] px-2 pb-2">
-        <Link to={`/user/get-profile/${props.user._id}`}>
-          <div className="fullname w-full text-center text-[13px] font-semibold text-[var(--text-primary)] truncate hover:text-[var(--brand-blue)] transition-colors px-1">
-            {props.user.fullname}
-          </div>
-          <div className="username w-full text-center text-[11px] text-[var(--text-muted)] truncate hover:text-[var(--text-secondary)] transition-colors px-1">
-            @{props.user.username}
-          </div>
-        </Link>
-      </div>
+
+        <div className="nameSection w-full h-[35%] px-2 pb-2">
+          <Link to={`/user/get-profile/${props.user._id}`}>
+            <div className="fullname w-full flex items-center justify-center gap-1 px-1">
+              <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate hover:text-[var(--brand-blue)] transition-colors">
+                {props.user.fullname}
+              </span>
+
+              {isAdmin && (
+                <BadgeCheck
+                  size={13}
+                  className="text-sky-400 shrink-0"
+                />
+              )}
+            </div>
+
+            <div className="username w-full text-center text-[11px] text-[var(--text-muted)] truncate hover:text-[var(--text-secondary)] transition-colors px-1">
+              @{props.user.username}
+            </div>
+          </Link>
+        </div>
+
+
 
 
       {/* Follow Button */}

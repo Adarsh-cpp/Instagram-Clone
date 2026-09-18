@@ -54,7 +54,7 @@ export const getAllConversations = async (req, res) => {
 
     const allConversations = await conversationModel
       .find({ participants: userId })
-      .populate("participants", "username fullname profilePic lastSeen")
+      .populate("participants", "username fullname profilePic lastSeen role")
       .sort({ updatedAt: -1 });
 
     const conversationsWithUnread = await Promise.all(
@@ -92,7 +92,7 @@ export const getConversationById = async (req, res) => {
 
     const conversation = await conversationModel
       .findById(conversationId)
-      .populate("participants", "username fullname profilePic lastSeen");
+      .populate("participants", "username fullname profilePic lastSeen role");
 
     if (!conversation) {
       return res.status(404).json({
@@ -125,7 +125,7 @@ export const getShareUsersList = async (req, res) => {
     const conversations = await conversationModel
       .find({ participants: userId })
       .select("participants lastMessageTime")
-      .populate("participants", "username fullname profilePic")
+      .populate("participants", "username fullname profilePic role")
       .sort({ lastMessageTime: -1 })
       .skip(skip)
       .limit(limit)

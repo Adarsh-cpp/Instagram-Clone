@@ -28,16 +28,16 @@ export const getNotifications = async (req, res) => {
 
     // Model.populate() works on plain lean objects too, not just documents.
     const populated = await notificationModel.populate(withRawRefs, [
-      { path: "sender", select: "username fullName profilePic" },
+      { path: "sender", select: "username fullName profilePic role" },
       {
         path: "post",
         select: "media author likes commentsCount caption createdAt",
-        populate: { path: "author", select: "username profilePic isVerified" },
+        populate: { path: "author", select: "username profilePic isVerified role" },
       },
       {
         path: "reel",
         select: "media author likes commentsCount caption createdAt",
-        populate: { path: "author", select: "username profilePic isVerified" },
+        populate: { path: "author", select: "username profilePic isVerified role" },
       },
     ]);
 

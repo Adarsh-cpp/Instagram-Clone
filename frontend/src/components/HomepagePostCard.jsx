@@ -13,6 +13,7 @@ import {
   MessageCircle,
   Send,
   Bookmark,
+  BadgeCheck,
 } from "lucide-react";
 import { getTimeAgo } from "../utils/timeAgo";
 
@@ -25,15 +26,23 @@ const authConfig = () => ({
 
 const HomepagePostCard = ({ ...props }) => {
   const { user } = useAuth();
-  const isOwnPost = user?._id === props?.authorId;
 
-  const isFollowing = user?.following?.some(
-    (id) => id?.toString() === props?.authorId?.toString()
-  );
-
-  const followDisplay = !isOwnPost && !isFollowing;
+  // Compare ids as strings — user._id and props.authorId may be different
+  // types (ObjectId vs string) depending on where they came from, so a
+  // strict === can silently fail even when they refer to the same user.
+  const isOwnPost =
+    !!user?._id &&
+    !!props?.authorId &&
+    user._id.toString() === props.authorId.toString();
 
   const profileURL = isOwnPost ? "/user/get-profile" : `/user/get-profile/${props?.authorId}`;
+
+  // Blue verified tick, shown only for the admin account. This component
+  // only ever receives a flat `authorId`/`author` (username string) via
+  // props, never the full author document, so the parent that renders
+  // this card needs to also pass `authorRole` (e.g. authorRole={post.author.role})
+  // for this to resolve to true.
+  const isAdminAuthor = props.authorRole === "admin";
 
   const animatedLikeRef = useRef();
   const touchStartX = useRef(null);
@@ -47,6 +56,11 @@ const HomepagePostCard = ({ ...props }) => {
   const [showFullCaption, setShowFullCaption] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
 
+  // Follow state — kept as real state (synced from context) instead of
+  // derived inline, so a toggle can update it immediately without a refresh.
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
+
   // 3-dot menu / delete flow
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -56,6 +70,17 @@ const HomepagePostCard = ({ ...props }) => {
   useEffect(() => {
     setIsLiked(props.isLiked);
   }, [props.isLiked]);
+
+  // Keep local follow state in sync whenever the logged-in user's
+  // following list (or the post's author) changes.
+  useEffect(() => {
+    const following = user?.following?.some(
+      (id) => id?.toString() === props?.authorId?.toString()
+    );
+    setIsFollowing(!!following);
+  }, [user?.following, props?.authorId]);
+
+  const followDisplay = !isOwnPost && !isFollowing;
 
   // close the 3-dot menu when clicking anywhere outside it
   useEffect(() => {
@@ -152,6 +177,35 @@ const HomepagePostCard = ({ ...props }) => {
     }
   }, [props?.postId, isSaved]);
 
+  // Follow / unfollow the post's author. Optimistically flips the local
+  // state so the UI (and visibility of the Follow link) updates instantly,
+  // then reconciles with the server response; reverts on failure.
+  const handleFollowToggle = useCallback(
+    async (e) => {
+      e?.stopPropagation();
+      if (isOwnPost || !props?.authorId || isFollowLoading) return;
+
+      const prevValue = isFollowing;
+      setIsFollowing(!prevValue);
+      setIsFollowLoading(true);
+
+      try {
+        const { data } = await axios.post(
+          `${BASE_URL}/user/profile/${props.authorId}/follow-toggle`,
+          {},
+          authConfig()
+        );
+        setIsFollowing(data.isFollowing);
+      } catch (error) {
+        setIsFollowing(prevValue);
+        toast.error("Something went wrong");
+      } finally {
+        setIsFollowLoading(false);
+      }
+    },
+    [props?.authorId, isOwnPost, isFollowing, isFollowLoading]
+  );
+
   const handleDeletePost = async () => {
     setIsDeleting(true);
     try {
@@ -197,16 +251,22 @@ const HomepagePostCard = ({ ...props }) => {
         <div className="profileInfo min-w-[70%] h-full px-2 text-[var(--text-primary)]">
           <div className="info w-full h-[50%] flex justify-start items-center">
             <NavLink to={profileURL} className="w-[40%] h-full">
-              <div className="name w-full h-full cursor-pointer ">{props.author}</div>
+              <div className="name w-full h-full cursor-pointer flex items-center gap-1">
+                {props.author}
+                {isAdminAuthor && (
+                  <BadgeCheck size={14} className="text-sky-400 shrink-0" />
+                )}
+              </div>
             </NavLink>
             <div className="day w-[20%] h-full text-[var(--text-muted)]">{getTimeAgo(props.createdAt)}</div>
-            <div
-              className={`follow w-[40%] h-full text-[var(--link-muted)] hover:text-[var(--link-muted-hover)] cursor-pointer ${
-                followDisplay ? "" : "hidden"
-              }`}
-            >
-              Follow
-            </div>
+            {followDisplay && (
+              <div
+                onClick={handleFollowToggle}
+                className="follow w-[40%] h-full text-[var(--link-muted)] hover:text-[var(--link-muted-hover)] cursor-pointer"
+              >
+                Follow
+              </div>
+            )}
           </div>
           <div className="location w-full h-[50%] text-[var(--text-muted)]">
             {props.location?.name || "India"}
@@ -399,6 +459,7 @@ const HomepagePostCard = ({ ...props }) => {
         <CommentsOverlay
           post={post}
           authorId={props.authorId}
+          authorRole={props.authorRole}
           onClose={() => setIsCommentsOpen(false)}
           onLikesCountChange={(count) => setLikesCount(count)}
           onSaveChange={(saved) => setIsSaved(saved)}

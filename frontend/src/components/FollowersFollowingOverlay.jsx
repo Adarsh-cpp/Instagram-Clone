@@ -166,6 +166,7 @@ const FollowersFollowingOverlay = ({
                   username={user.username}
                   fullName={user.fullName}
                   isFollowing={user.isFollowing}
+                  role={user.role}
                   onToggleFollow={() => {
                     console.log("toggle follow:", user.username)
                   }}

@@ -7,7 +7,7 @@ import axios from 'axios'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useSocket } from '../context/SocketContext'
-import { Search, MessageCircle, Sparkles } from 'lucide-react'
+import { Search, MessageCircle, Sparkles, BadgeCheck } from 'lucide-react'
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
@@ -130,8 +130,11 @@ const MessagesPage = () => {
 
         <div className="upperPart w-full h-[20%]">
 
-          <div className="accName w-full h-[40%] text-[var(--text-primary)] text-[18px] sm:text-[20px] font-semibold px-4 sm:px-8 flex justify-start items-center">
+          <div className="accName w-full h-[40%] text-[var(--text-primary)] text-[18px] sm:text-[20px] font-semibold px-4 sm:px-8 flex justify-start items-center gap-1.5">
             {user?.username}
+            {user?.role === "admin" && (
+             <BadgeCheck size={14} className="text-sky-400 shrink-0" />
+            )}
           </div>
 
           <div className="searchSection w-full h-[60%] flex justify-center items-center border-b border-[var(--border-soft)]">

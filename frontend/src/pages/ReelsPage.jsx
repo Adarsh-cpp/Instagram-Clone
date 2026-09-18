@@ -449,9 +449,9 @@ const ReelsPage = () => {
                   <NavLink to={`/user/get-profile/${currentReel?.author?._id}`}>
                   <span className="font-semibold text-xs sm:text-sm flex items-center gap-1">
                     {currentReel.author?.username}
-                    {/* {currentReel.author?.isVerified && (
+                    {currentReel.author?.role === "admin" && (
                       <BadgeCheck size={13} className="text-sky-400" />
-                    )} */}
+                    )}
                   </span>
                   </NavLink>
                   <span className="text-xs sm:text-sm text-neutral-300">·</span>

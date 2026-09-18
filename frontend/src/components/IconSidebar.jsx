@@ -41,7 +41,7 @@ const IconSidebar = () => {
       const token = localStorage.getItem("authToken");
 
       const response = await axios.post(
-        "${BASE_URL}/auth/logout",
+        `${BASE_URL}/auth/logout`,
         {},
         {
           headers: {

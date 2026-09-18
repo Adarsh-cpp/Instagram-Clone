@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { X, Check } from 'lucide-react'
+import { X, Check, BadgeCheck } from 'lucide-react'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 
@@ -223,8 +223,23 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
               )}
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-[var(--text-primary)] text-[13px] font-medium">
-                {shareType === 'story' ? `${item.author?.username}'s story` : item.author?.username}
+              <span className="text-[var(--text-primary)] text-[13px] font-medium inline-flex items-center gap-1">
+                {shareType === 'story' ? (
+                  <>
+                    {item.author?.username}
+                    {item.author?.role === "admin" && (
+                      <BadgeCheck size={14} className="text-sky-400 shrink-0" />
+                    )}
+                    's story
+                  </>
+                ) : (
+                  <>
+                    {item.author?.username}
+                    {item.author?.role === "admin" && (
+                      <BadgeCheck size={14} className="text-sky-400 shrink-0" />
+                    )}
+                  </>
+                )}
               </span>
               {item.caption && (
                 <span className="text-[var(--text-muted)] text-[12px] truncate max-w-[380px]">
@@ -291,8 +306,11 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
                           </div>
                         )}
                       </div>
-                      <span className="text-[var(--text-primary)] text-[12px] truncate max-w-[70px] text-center">
-                        {user.username}
+                      <span className="text-[var(--text-primary)] text-[12px] max-w-[70px] flex items-center justify-center gap-1">
+                        <span className="truncate min-w-0">{user.username}</span>
+                        {user.role === "admin" && (
+                          <BadgeCheck size={14} className="text-sky-400 shrink-0" />
+                        )}
                       </span>
                     </div>
                   )

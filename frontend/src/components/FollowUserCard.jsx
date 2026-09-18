@@ -1,8 +1,9 @@
 // FollowUserCard.jsx
 import React from 'react'
 import { Link } from 'react-router-dom'
+import { BadgeCheck } from 'lucide-react'
 
-const FollowUserCard = ({ userId, profilePic, username, fullName, isFollowing, onToggleFollow, onCardClick }) => {
+const FollowUserCard = ({ userId, profilePic, username, fullName, isFollowing, role, onToggleFollow, onCardClick }) => {
 
   const handleFollowClick = (e) => {
     // Prevent the click from bubbling up to the Link and navigating away
@@ -26,7 +27,10 @@ const FollowUserCard = ({ userId, profilePic, username, fullName, isFollowing, o
           <img src={profilePic} alt="" className="w-full h-full object-cover" />
         </div>
         <div className="flex flex-col leading-tight">
-          <span className="text-[var(--text-primary)] text-[14px] font-semibold">{username}</span>
+          <span className="flex items-center gap-1 text-[var(--text-primary)] text-[14px] font-semibold">
+            {username}
+            {role === "admin" && <BadgeCheck size={14} className="text-sky-400 shrink-0" />}
+          </span>
           <span className="text-[var(--text-muted)] text-[13px]">{fullName}</span>
         </div>
       </div>

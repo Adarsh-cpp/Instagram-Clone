@@ -12,7 +12,7 @@ import MobileIcons from '../components/MobileIcons';
 import BioCard from '../components/BioCard';
 import MobileFooter from '../components/MobileFooter';
 import IconSidebar from '../components/IconSidebar';
-import { X } from "lucide-react";
+import { X, BadgeCheck } from "lucide-react";
 
 
 import axios from "axios"
@@ -357,7 +357,12 @@ const UserProfilePage = () => {
                     </div>
                     <div className="profileDetails flex-1 min-w-0 h-auto sm:h-full flex flex-col justify-center gap-2 sm:gap-0 ">
                         <div className="nameSection w-full h-auto md:h-[25%] flex flex-col md:flex-row justify-start items-start md:items-center gap-2 md:gap-0 ">
-                           <div className="name w-full md:w-[70%] h-auto md:h-full px-1 sm:px-6 flex items-center text-[var(--text-primary)] text-[16px] sm:text-[20px] font-bold truncate ">{user.username}</div>
+                           <div className="name w-full md:w-[70%] h-auto md:h-full px-1 sm:px-6 flex items-center gap-1 text-[var(--text-primary)] text-[16px] sm:text-[20px] font-bold truncate ">
+                             {user.username}
+                             {user?.role === "admin" && (
+                               <BadgeCheck size={20} className="text-sky-400 shrink-0" />
+                             )}
+                           </div>
 
                            <div className="buttons w-[50%] h-auto md:w-[60%] md:h-full flex gap-2 sm:gap-3 items-center ">
                             {/* Edit Button */}

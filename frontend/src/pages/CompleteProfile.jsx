@@ -16,7 +16,7 @@ const CompleteProfile = () => {
     try {
       const token = localStorage.getItem("authToken");
       await axios.patch(
-        "${BASE_URL}/auth/add-username",
+        `${BASE_URL}/auth/add-username`,
         { username: data.username },
         { headers: { Authorization: `Bearer ${token}` } }
       );

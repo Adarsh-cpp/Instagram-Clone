@@ -1,10 +1,7 @@
-// ReactorsListOverlay.jsx
-// Tapping the small reaction badge on a message opens this — a centered
-// sheet listing everyone who reacted, each with their dp, fullname, and
-// the emoji they picked. Mirrors Instagram's "Reactions" sheet.
+
 import React from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { X, BadgeCheck } from "lucide-react";
 
 const ReactorsListOverlay = ({ reactions, onClose }) => {
   return createPortal(
@@ -52,8 +49,11 @@ const ReactorsListOverlay = ({ reactions, onClose }) => {
                   />
                 </div>
 
-                <span className="flex-1 min-w-0 truncate text-[14px] text-[var(--text-primary)]">
+                <span className="flex-1 min-w-0 truncate text-[14px] text-[var(--text-primary)] flex items-center gap-1">
                   {typeof reactor === "object" ? reactor?.fullname : "Someone"}
+                  {typeof reactor === "object" && reactor?.role === "admin" && (
+                    <BadgeCheck size={14} className="text-sky-400 shrink-0" />
+                  )}
                 </span>
 
                 <span className="text-[20px] shrink-0">{r.emoji}</span>

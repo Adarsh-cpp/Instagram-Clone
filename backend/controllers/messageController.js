@@ -8,12 +8,12 @@ const SHARED_MEDIA_POPULATE = [
   {
     path: "sharedPost",
     select: "media caption author likes createdAt",
-    populate: { path: "author", select: "username profilePic" },
+    populate: { path: "author", select: "username profilePic role" },
   },
   {
     path: "sharedReel",
     select: "media caption author likes createdAt aspectRatio",
-    populate: { path: "author", select: "username profilePic" },
+    populate: { path: "author", select: "username profilePic role" },
   },
   // sharedStory is an embedded snapshot, not a ref — it comes back with the
   // message document automatically, no populate needed.
@@ -21,7 +21,7 @@ const SHARED_MEDIA_POPULATE = [
     // reaction authors — needed so the reactors list can show fullname + dp
     // without an extra round trip
     path: "reactions.userId",
-    select: "fullname username profilePic",
+    select: "fullname username profilePic role",
   },
 ];
 
@@ -190,8 +190,8 @@ export const getMessages = async (req, res) => {
       .find(matchStage)
       .sort({ createdAt: -1, _id: -1 })
       .limit(limit + 1) // one extra to know if there's an older page left
-      .populate("senderId", "fullname username profilePic")
-      .populate("receiverId", "fullname username profilePic")
+      .populate("senderId", "fullname username profilePic role")
+      .populate("receiverId", "fullname username profilePic role")
       .populate(SHARED_MEDIA_POPULATE);
 
     const hasMore = docs.length > limit;
@@ -410,7 +410,7 @@ export const postMessage = async (req, res) => {
     if (sharedStoryId) {
       const storyDoc = await storyModel
         .findById(sharedStoryId)
-        .populate("author", "username profilePic");
+        .populate("author", "username profilePic role");
 
       if (!storyDoc) {
         // Only a hard failure if there's nothing else riding along in this message
@@ -434,6 +434,7 @@ export const postMessage = async (req, res) => {
             _id: storyDoc.author._id,
             username: storyDoc.author.username,
             profilePic: storyDoc.author.profilePic,
+            role: storyDoc.author.role,
           },
         };
       }

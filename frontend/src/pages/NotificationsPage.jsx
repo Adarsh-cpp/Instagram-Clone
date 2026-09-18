@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
+import { BadgeCheck } from "lucide-react";
 import { useNotifications } from "../context/NotificationContext";
 import { useAuth } from "../context/AuthContext";
 import IconSidebar from "../components/IconSidebar";
@@ -198,10 +199,16 @@ const NotificationsPage = () => {
                     )}
 
                     <div className="notifText min-w-0 text-[14px] text-[var(--text-primary)] leading-tight">
-                      <span className="truncate">
+                      <span className="truncate inline-flex items-center gap-1">
                         <Link to={`/user/get-profile/${n.sender._id}`} className="font-bold hover:underline">
                           {n.sender.username}
-                        </Link>{" "}
+                        </Link>
+                        {n.sender.role === "admin" && (
+                          <BadgeCheck
+                            size={14}
+                            className="text-sky-400 shrink-0"
+                          />
+                        )}{" "}
                         <span className="text-[var(--text-muted)]">{notificationText(n)}</span>
                       </span>
                       <div className="text-[var(--text-muted)] text-[12px]">{timeAgo(n.createdAt)}</div>
