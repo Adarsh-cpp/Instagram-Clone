@@ -70,6 +70,7 @@ const ReelsPage = () => {
   const [isDeleting, setIsDeleting] = useState(false)
 
   const isOwnReel = currentReel && user?._id?.toString() === currentReel?.author?._id?.toString()
+  const canDeleteReel = isOwnReel || user?.role === "admin"
 
   const computeDims = useCallback(() => {
     const section = sectionRef.current
@@ -422,6 +423,7 @@ const ReelsPage = () => {
                 <ReelCommentsOverlay
                   reelId={currentReel._id}
                   isOpen={isCommentsOpen}
+                  authorId={currentReel?.author?._id}
                   authorRole={currentReel?.author?.role}
                   onClose={() => setIsCommentsOpen(false)}
                 />
@@ -520,31 +522,31 @@ const ReelsPage = () => {
                 />
               </button>
 
-              {isOwnReel && (
-                <div ref={menuRef} className="relative">
-                  <button
-                    className="cursor-pointer"
-                    onClick={() => setIsMenuOpen((prev) => !prev)}
-                    aria-label="Reel options"
-                  >
-                    <MoreHorizontal size={22} />
-                  </button>
-
-                  {isMenuOpen && (
-                    <div className="absolute right-0 bottom-[110%] sm:bottom-auto sm:top-[110%] w-[160px] bg-[var(--bg-surface)] border border-[var(--border-soft)] rounded-xl shadow-2xl overflow-hidden z-20">
+              {canDeleteReel && (
+                    <div ref={menuRef} className="relative">
                       <button
-                        onClick={() => {
-                          setIsMenuOpen(false)
-                          setIsDeleteConfirmOpen(true)
-                        }}
-                        className="w-full text-left px-4 py-3 text-sm font-semibold text-[var(--color-danger)] hover:bg-[var(--bg-row-hover)] cursor-pointer transition"
+                        className="cursor-pointer"
+                        onClick={() => setIsMenuOpen((prev) => !prev)}
+                        aria-label="Reel options"
                       >
-                        Delete
+                        <MoreHorizontal size={22} />
                       </button>
+
+                      {isMenuOpen && (
+                        <div className="absolute right-0 bottom-[110%] sm:bottom-auto sm:top-[110%] w-[160px] bg-[var(--bg-surface)] border border-[var(--border-soft)] rounded-xl shadow-2xl overflow-hidden z-20">
+                          <button
+                            onClick={() => {
+                              setIsMenuOpen(false)
+                              setIsDeleteConfirmOpen(true)
+                            }}
+                            className="w-full text-left px-4 py-3 text-sm font-semibold text-[var(--color-danger)] hover:bg-[var(--bg-row-hover)] cursor-pointer transition"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
-              )}
             </div>
           </div>
         )}

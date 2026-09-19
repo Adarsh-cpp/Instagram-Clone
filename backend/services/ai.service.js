@@ -15,11 +15,14 @@ import {
   COMMENT_TONES,
   COMMENT_SYSTEM_PROMPT,
   CHAT_SYSTEM_PROMPT,
+  REPLY_SYSTEM_PROMPT,
+  REPLY_SUGGESTION_COUNT,
   MAX_CHAT_MESSAGES,
   MAX_CHAT_TOTAL_CHARS,
   MAX_GENERATED_BIO_LENGTH,
   MAX_GENERATED_CAPTION_LENGTH,
   MAX_GENERATED_COMMENT_LENGTH,
+  MAX_GENERATED_REPLY_LENGTH,
   MAX_IMAGE_BYTES,
   ALLOWED_IMAGE_MIME_TYPES,
 } from "../constants/ai.js";
@@ -452,4 +455,116 @@ export const chatWithAI = async ({ messages, profile = {} }) => {
     // how many history turns were actually sent upstream, handy for debugging
     contextMessages: contents.length,
   };
+};
+
+// ---------------------------------------------------------------------------
+// Feature 5 — reply suggestions inside a real DM conversation
+// ---------------------------------------------------------------------------
+
+/**
+ * Turns the model's raw output into a clean array of reply strings.
+ * The prompt asks for a JSON array, but models occasionally add fences or
+ * fall back to a numbered/bulleted list, so parsing is deliberately forgiving.
+ */
+const parseReplySuggestions = (raw) => {
+  const text = (raw || "")
+    .trim()
+    .replace(/^```[a-z]*\s*/i, "")
+    .replace(/```$/, "")
+    .trim();
+
+  let list = [];
+
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) list = parsed;
+  } catch {
+    const match = text.match(/\[[\s\S]*\]/);
+    if (match) {
+      try {
+        const parsed = JSON.parse(match[0]);
+        if (Array.isArray(parsed)) list = parsed;
+      } catch {
+        // fall through to line splitting
+      }
+    }
+  }
+
+  if (list.length === 0) {
+    list = text
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && line !== "[" && line !== "]")
+      .map((line) => line.replace(/,$/, ""));
+  }
+
+  const seen = new Set();
+  const results = [];
+
+  for (const item of list) {
+    if (typeof item !== "string") continue;
+
+    const stripped = item.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "");
+    const cleaned = cleanOutput(stripped, MAX_GENERATED_REPLY_LENGTH);
+
+    if (!cleaned) continue;
+
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+    results.push(cleaned);
+
+    if (results.length >= REPLY_SUGGESTION_COUNT) break;
+  }
+
+  return results;
+};
+
+/**
+ * Suggests replies to the friend's latest message. Pure text generation —
+ * nothing is stored and nothing is sent to the friend; the user picks one
+ * and sends it through the normal message endpoint.
+ *
+ * @param {Object} params
+ * @param {Array<{sender: "me"|"friend", text: string}>} params.messages
+ *        Recent conversation, oldest first, newest last. Already sanitized
+ *        by the controller.
+ */
+export const generateReplySuggestions = async ({ messages }) => {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    throw new AIError("No messages were provided.", 400, "AI_BAD_REQUEST");
+  }
+
+  const transcript = messages
+    .map((msg) => `${msg.sender === "me" ? "Me" : "Friend"}: ${msg.text}`)
+    .join("\n");
+
+  const prompt = [
+    asUserBlock("Conversation (oldest first, newest last)", transcript),
+    `Write ${REPLY_SUGGESTION_COUNT} different replies that Me could send to Friend's latest message. Reply in the same language and script as Friend's latest message. Output only the JSON array.`,
+  ].join("\n\n");
+
+  const { text, model } = await callGemini({
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    systemInstruction: REPLY_SYSTEM_PROMPT,
+    generationConfig: {
+      temperature: 0.9,
+      // Odia/Devanagari scripts cost many more tokens per character than
+      // English, so leave generous headroom.
+      maxOutputTokens: 800,
+    },
+  });
+
+  const suggestions = parseReplySuggestions(text);
+
+  if (suggestions.length === 0) {
+    throw new AIError(
+      "Couldn't come up with replies this time. Please try again.",
+      502,
+      "AI_EMPTY_RESPONSE"
+    );
+  }
+
+  return { suggestions, model };
 };

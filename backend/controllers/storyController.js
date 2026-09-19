@@ -191,16 +191,37 @@ export const deleteStory = async (req, res) => {
       return res.status(403).json({ success: false, message: "Not authorized" });
     }
 
-    // clean up Cloudinary asset too
-    await cloudinary.uploader.destroy(story.mediaPublicId, {
-      resource_type: story.mediaType === "video" ? "video" : "image",
-    });
+    // Cloudinary cleanup — fire-and-forget with retry, so a Cloudinary
+    // hiccup can no longer turn into a 500 that leaves the story undeleted.
+    deleteCloudinaryAssetWithRetry(
+      story.mediaPublicId,
+      story.mediaType === "video" ? "video" : "image",
+      1,
+      5,
+      cloudinary
+    );
 
-    // if it belonged to a highlight, pull it out of that highlight's stories array
+    // if it belonged to a highlight, pull it out of that highlight
     if (story.highlight) {
-      await highlightModel.findByIdAndUpdate(story.highlight, {
-        $pull: { stories: story._id },
-      });
+      const highlight = await highlightModel.findByIdAndUpdate(
+        story.highlight,
+        { $pull: { stories: story._id } },
+        { new: true }
+      );
+
+      if (highlight) {
+        if (highlight.stories.length === 0) {
+          // last story gone -> don't leave an empty highlight behind
+          await highlightModel.findByIdAndDelete(highlight._id);
+        } else if (highlight.coverImage === story.mediaUrl) {
+          // the cover file was just deleted -> fall back to the new first story
+          const nextCoverStory = await storyModel
+            .findById(highlight.stories[0])
+            .select("mediaUrl");
+          highlight.coverImage = nextCoverStory?.mediaUrl || "";
+          await highlight.save();
+        }
+      }
     }
 
     await storyModel.findByIdAndDelete(storyId);

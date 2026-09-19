@@ -12,7 +12,7 @@ import MobileIcons from '../components/MobileIcons';
 import BioCard from '../components/BioCard';
 import MobileFooter from '../components/MobileFooter';
 import IconSidebar from '../components/IconSidebar';
-import { X, BadgeCheck } from "lucide-react";
+import { X, BadgeCheck, Plus, Grid3x3, Clapperboard, Bookmark, Tag } from "lucide-react";
 
 
 import axios from "axios"
@@ -431,7 +431,7 @@ const UserProfilePage = () => {
                               className="newHighlightsection h-full w-[100px] flex flex-col justify-center sm:justify-start items-center cursor-pointer shrink-0"
                             >
                                <div className="newHighLightCircle w-[70px] h-[70px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-full object-fit object-center border-[4px] border-[var(--border-container)] overflow-hidden flex justify-center items-center bg-[var(--bg-input)]">
-                                 <img src="/images/plus-icon.png" alt="" draggable="false" className='w-[60%] h-[60%] select-none' />
+                                 <Plus size={32} className="text-[var(--text-primary)] select-none sm:w-10 sm:h-10" />
                               </div>
                               <div className="newtext text-[var(--text-primary)] text-[12px]">New</div>
                              </div>
@@ -451,12 +451,12 @@ const UserProfilePage = () => {
 
             <div className="postHeader w-full h-[10%] flex justify-center items-center ">
 
-             <PostType type={"Posts"} imgSrc={"/images/grid-icon.png"} activeTab={activeTab} setActiveTab={setActiveTab} />
-             <PostType type={"Reels"} imgSrc={"/images/reel-icon.png"} activeTab={activeTab} setActiveTab={setActiveTab} />
+             <PostType type={"Posts"} icon={Grid3x3} activeTab={activeTab} setActiveTab={setActiveTab} />
+             <PostType type={"Reels"} icon={Clapperboard} activeTab={activeTab} setActiveTab={setActiveTab} />
              {isOwnProfile && (
-               <PostType type={"Saved"} imgSrc={"/images/bookmark-icon.png"} activeTab={activeTab} setActiveTab={setActiveTab} />
+               <PostType type={"Saved"} icon={Bookmark} activeTab={activeTab} setActiveTab={setActiveTab} />
              )}
-             <PostType type={"Tagged"} imgSrc={"/images/tag-icon.png"} activeTab={activeTab} setActiveTab={setActiveTab} />
+             <PostType type={"Tagged"} icon={Tag} activeTab={activeTab} setActiveTab={setActiveTab} />
 
             </div>
 

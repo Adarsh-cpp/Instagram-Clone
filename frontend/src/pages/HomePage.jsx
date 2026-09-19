@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useUpload } from '../context/UploadContext';
+import { useHomeFeedStore } from '../context/HomeFeedContext';
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
@@ -19,11 +20,13 @@ const authConfig = () => ({
 
 const HomePage = () => {
 
-  const [posts, setPosts] = useState([]);
-  const [nextCursor, setNextCursor] = useState(null);
-  const [hasMore, setHasMore] = useState(true);
+  const store = useHomeFeedStore();
+
+  const [posts, setPosts] = useState(() => store.current.posts);
+  const [nextCursor, setNextCursor] = useState(() => store.current.nextCursor);
+  const [hasMore, setHasMore] = useState(() => store.current.hasMore);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(() => !store.current.hasFetchedOnce);
 
   const { user } = useAuth();
   const { uploads, markConsumed } = useUpload();
@@ -31,13 +34,12 @@ const HomePage = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // scroll container + measured offset of where the virtualized list starts
-  // (StoryContainer sits above it in the same scroll box)
   const scrollParentRef = useRef(null);
   const listStartRef = useRef(null);
   const [scrollMargin, setScrollMargin] = useState(0);
 
-  const isFetchingRef = useRef(false); // guards against duplicate concurrent fetches
+  const isFetchingRef = useRef(false);
+  const hasRestoredScrollRef = useRef(false);
 
   const PAGE_SIZE = 10;
 
@@ -59,8 +61,7 @@ const HomePage = () => {
       const { posts: newPosts, nextCursor: newCursor, hasMore: more } = response.data;
 
       setPosts((prev) => {
-        if (!cursor) return newPosts; // first page — replace
-        // de-dupe defensively in case of any overlap at page boundaries
+        if (!cursor) return newPosts;
         const seen = new Set(prev.map((p) => p._id));
         const filtered = newPosts.filter((p) => !seen.has(p._id));
         return [...prev, ...filtered];
@@ -77,10 +78,18 @@ const HomePage = () => {
     }
   }, []);
 
-  // initial load
   useEffect(() => {
-    fetchPage(null);
-  }, [fetchPage]);
+    if (!store.current.hasFetchedOnce) {
+      store.current.hasFetchedOnce = true;
+      fetchPage(null);
+    }
+  }, [fetchPage, store]);
+
+  useEffect(() => {
+    store.current.posts = posts;
+    store.current.nextCursor = nextCursor;
+    store.current.hasMore = hasMore;
+  }, [posts, nextCursor, hasMore, store]);
 
   useEffect(() => {
     if (location.state?.message) {
@@ -101,8 +110,6 @@ const HomePage = () => {
     });
   }, [uploads, markConsumed]);
 
-  // measure where the virtualized list begins inside the scroll container,
-  // so the virtualizer's offsets line up correctly under StoryContainer etc.
   useLayoutEffect(() => {
     if (listStartRef.current) {
       setScrollMargin(listStartRef.current.offsetTop);
@@ -112,7 +119,7 @@ const HomePage = () => {
   const virtualizer = useVirtualizer({
     count: posts.length,
     getScrollElement: () => scrollParentRef.current,
-    estimateSize: () => 640, // rough guess; real height is measured per-card below
+    estimateSize: () => 640,
     overscan: 4,
     scrollMargin,
     useFlushSync: false,
@@ -120,7 +127,43 @@ const HomePage = () => {
 
   const virtualItems = virtualizer.getVirtualItems();
 
-  // trigger the next page once the user scrolls near the end of what's rendered
+  useLayoutEffect(() => {
+    if (hasRestoredScrollRef.current) return;
+    if (initialLoading) return;
+    if (posts.length === 0) return;
+
+    const targetIndex = Math.min(store.current.topPostIndex, posts.length - 1);
+    hasRestoredScrollRef.current = true;
+
+    if (targetIndex > 0) {
+      virtualizer.scrollToIndex(targetIndex, { align: "start" });
+      requestAnimationFrame(() => {
+        virtualizer.scrollToIndex(targetIndex, { align: "start" });
+      });
+    }
+  }, [initialLoading, posts.length, virtualizer, store]);
+
+  // continuously remember which post is at the top of the *visible*
+  // viewport (not the top of virtualItems — that array includes
+  // `overscan` extra rows rendered ABOVE what's on screen for smooth
+  // scroll-ahead, so its [0] is usually several posts higher than what
+  // the user can actually see). We instead find the first row whose
+  // bottom edge is still below the current scrollTop — i.e. the first
+  // row that's actually, at least partially, on screen.
+  const handleScroll = () => {
+    const el = scrollParentRef.current;
+    if (!el) return;
+
+    const items = virtualizer.getVirtualItems();
+    const visible = items.find(
+      (item) => item.start - scrollMargin + item.size > el.scrollTop
+    );
+
+    if (visible) {
+      store.current.topPostIndex = visible.index;
+    }
+  };
+
   useEffect(() => {
     if (!virtualItems.length || !hasMore || isFetchingRef.current) return;
 
@@ -141,6 +184,7 @@ const HomePage = () => {
 
       <div
         ref={scrollParentRef}
+        onScroll={handleScroll}
         className="homeSection no-scrollbar w-full md:w-[80%] min-h-full flex justify-center overflow-y-auto"
       >
 

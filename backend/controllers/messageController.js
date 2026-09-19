@@ -507,7 +507,18 @@ export const deleteMessage = async (req, res) => {
 
     const { conversationId, receiverId } = message;
 
+    // grab the message's own Cloudinary files before the doc is gone
+    const mediaUrls = [message.image, ...(message.images || [])].filter(Boolean);
+
     await messageModel.deleteOne({ _id: messageId });
+
+    // fire-and-forget so "unsend" stays instant; deleteMediaByUrls never
+    // throws, the catch is just a safety net
+    if (mediaUrls.length > 0) {
+      deleteMediaByUrls(mediaUrls).catch((err) =>
+        console.log("Unsend media cleanup failed:", err)
+      );
+    }
 
     const conversation = await conversationModel.findById(conversationId);
     if (conversation) {
@@ -551,6 +562,7 @@ export const deleteMessage = async (req, res) => {
     return res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
+
 
 export const markSeen = async (req, res) => {
   try {

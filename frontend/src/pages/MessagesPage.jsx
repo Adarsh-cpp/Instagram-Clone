@@ -1,5 +1,5 @@
 // MessagesPage.jsx
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import MessageCard from '../components/MessageCard'
 import Chat from '../components/Chat'
 import InstaAIChat from '../components/InstaAIChat'
@@ -16,6 +16,28 @@ const BASE_URL = import.meta.env.VITE_SERVER_URL
 // no new route is needed: /user/messages/insta-ai simply resolves here.
 const AI_CONVERSATION_ID = "insta-ai"
 
+// ---- helpers for turning a raw message into the "last message" preview ----
+
+const getSenderId = (msg) =>
+  typeof msg?.senderId === "object" ? msg.senderId?._id : msg?.senderId
+
+// What the conversation card shows as its last-message text. Plain text
+// messages show their text; media-only messages get a short label.
+const getPreviewText = (msg) => {
+  const text = (msg?.text ?? msg?.message ?? "")
+  if (typeof text === "string" && text.trim()) return text.trim()
+
+  if (msg?.sticker) return "Sent a sticker"
+
+  const hasImages =
+    (Array.isArray(msg?.images) && msg.images.length > 0) ||
+    (Array.isArray(msg?.media) && msg.media.length > 0) ||
+    !!msg?.image
+  if (hasImages) return "Sent a photo"
+
+  return "Sent a message"
+}
+
 const MessagesPage = () => {
 
   const [conversations, setConversations] = useState([])
@@ -27,19 +49,27 @@ const MessagesPage = () => {
 
   const isAiOpen = conversationId === AI_CONVERSATION_ID
 
-  useEffect(() => {
-  const getAllConversations = async () => {
+  // Mirror of `conversations` for use inside socket callbacks, so they can
+  // check "is this conversation already in my list?" without being
+  // re-subscribed on every list change.
+  const conversationsRef = useRef([])
+  conversationsRef.current = conversations
+
+  // Fetches the whole list from the backend. Used on first load, and as a
+  // fallback when something happens that we can't patch locally (a brand
+  // new conversation appearing, or a message being unsent).
+  const fetchConversations = useCallback(async () => {
     try {
       const url = `${BASE_URL}/conversation/get-all-conversations`
       const token = localStorage.getItem("authToken")
 
-      const response = await axios.get(url,{
-        headers:{
+      const response = await axios.get(url, {
+        headers: {
           Authorization: `Bearer ${token}`
-        }}
-      )
+        }
+      })
 
-      if(response.status === 200){
+      if (response.status === 200) {
         setConversations(response.data.conversations)
       }
       else
@@ -48,9 +78,90 @@ const MessagesPage = () => {
     } catch (error) {
       console.log(error.message)
     }
-  }
-  getAllConversations()
   }, [])
+
+  useEffect(() => {
+    fetchConversations()
+  }, [fetchConversations])
+
+  // Core of the real-time behaviour. Called for:
+  //   - a message the friend sent us (socket "newMessage")
+  //   - a message WE just sent (Chat calls this via onConversationActivity,
+  //     because the server doesn't echo our own messages back to us)
+  //
+  // It patches that conversation's last message / time / sender / unread
+  // count and moves it to the top of the list. If the conversation isn't in
+  // the list yet (first ever message between two people), it refetches.
+  const handleConversationActivity = useCallback((msg) => {
+    if (!msg?.conversationId) return
+
+    const convId = String(msg.conversationId)
+    const isMine = String(getSenderId(msg)) === String(user?._id)
+    const isOpen = conversationId === convId
+
+    const exists = conversationsRef.current.some((c) => String(c._id) === convId)
+    if (!exists) {
+      fetchConversations()
+      return
+    }
+
+    setConversations((prev) => {
+      const index = prev.findIndex((c) => String(c._id) === convId)
+      if (index === -1) return prev
+
+      const current = prev[index]
+
+      // Unread badge: our own messages never count; a message arriving in
+      // the chat we're currently looking at is seen immediately (Chat marks
+      // it seen), so it doesn't count either.
+      const nextUnread = isMine || isOpen ? 0 : (current.unreadCount || 0) + 1
+
+      const updated = {
+        ...current,
+        lastMessage: getPreviewText(msg),
+        lastMessageTime: msg.createdAt || new Date().toISOString(),
+        lastMessageSenderId: getSenderId(msg),
+        lastMessageType: msg.messageType || msg.type || "text",
+        unreadCount: nextUnread,
+      }
+
+      // move to the top, keep everything else in the same order
+      return [updated, ...prev.slice(0, index), ...prev.slice(index + 1)]
+    })
+  }, [conversationId, user?._id, fetchConversations])
+
+  // Friend's messages arriving in real time
+  useEffect(() => {
+    if (!socket) return
+
+    socket.on("newMessage", handleConversationActivity)
+    return () => socket.off("newMessage", handleConversationActivity)
+  }, [socket, handleConversationActivity])
+
+  // A message got unsent — the "last message" on the card may now be wrong,
+  // so just pull the authoritative list again.
+  useEffect(() => {
+    if (!socket) return
+
+    const handleMessageDeleted = () => {
+      fetchConversations()
+    }
+
+    socket.on("messageDeleted", handleMessageDeleted)
+    return () => socket.off("messageDeleted", handleMessageDeleted)
+  }, [socket, fetchConversations])
+
+  // If we open a conversation, its unread badge should clear right away
+  // (Chat marks the messages seen on the backend when it loads).
+  useEffect(() => {
+    if (!conversationId || isAiOpen) return
+
+    setConversations((prev) =>
+      prev.some((c) => c._id === conversationId && (c.unreadCount || 0) > 0)
+        ? prev.map((c) => (c._id === conversationId ? { ...c, unreadCount: 0 } : c))
+        : prev
+    )
+  }, [conversationId, isAiOpen])
 
   // If the *other* participant deletes the conversation, our copy needs to
   // disappear too — deletion is a hard delete on the backend for both sides.
@@ -215,7 +326,10 @@ const MessagesPage = () => {
       {isAiOpen ? (
         <InstaAIChat />
       ) : conversationId ? (
-        <Chat conversationId={conversationId} />
+        <Chat
+          conversationId={conversationId}
+          onConversationActivity={handleConversationActivity}
+        />
       ) : (
         <div className="messageDisplay hidden md:flex md:flex-col relative md:w-[65%] lg:w-[70%] h-full bg-[var(--bg-app)] text-[var(--text-primary)] text-[20px]  justify-center items-center ">
           <div className="messageIcon w-full h-[120px] flex justify-center items-center ">

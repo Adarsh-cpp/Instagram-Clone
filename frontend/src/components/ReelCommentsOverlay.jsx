@@ -18,7 +18,7 @@ const authConfig = () => ({
  * every row — top-level comments and their replies both render through
  * that component, exactly like the feed post card does.
  */
-const ReelCommentsOverlay = ({ reelId, authorRole, isOpen = true, onClose }) => {
+const ReelCommentsOverlay = ({ reelId, authorId, authorRole, isOpen = true, onClose }) => {
   const { user } = useAuth();
 
   const [comments, setComments] = useState([]);
@@ -28,6 +28,11 @@ const ReelCommentsOverlay = ({ reelId, authorRole, isOpen = true, onClose }) => 
   const inputRef = useRef(null);
 
   const isAdmin = authorRole === "admin"
+
+  // Whether the viewer owns this reel — lets them delete ANY comment on
+  // it, not just their own. Admins can moderate any reel's comments too.
+  const isOwnReel = Boolean(authorId) && String(user?._id) === String(authorId);
+  const canModerateComments = isOwnReel || user?.role === "admin";
 
   useEffect(() => {
     if (!isOpen || !reelId) return;
@@ -104,7 +109,17 @@ const ReelCommentsOverlay = ({ reelId, authorRole, isOpen = true, onClose }) => 
 
           {!loading &&
             comments.map((comment) => (
-              <Comment key={comment._id} comment={comment} reelId={reelId} currentUserId={user?._id} verified={isAdmin} />
+              <Comment
+                key={comment._id}
+                comment={comment}
+                reelId={reelId}
+                currentUserId={user?._id}
+                verified={isAdmin}
+                canModerate={canModerateComments}
+                onDeleted={(id) =>
+                  setComments((prev) => prev.filter((c) => c._id !== id))
+                }
+              />
             ))}
         </div>
 

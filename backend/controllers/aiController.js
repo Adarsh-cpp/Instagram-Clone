@@ -9,6 +9,7 @@ import {
   generateBio,
   generateCommentForImageUrl,
   chatWithAI,
+  generateReplySuggestions,
 } from "../services/ai.service.js";
 import {
   VALID_CAPTION_TONES,
@@ -18,6 +19,8 @@ import {
   MAX_BIO_INPUT_LENGTH,
   MAX_CHAT_MESSAGE_LENGTH,
   MAX_CHAT_MESSAGES,
+  MAX_REPLY_CONTEXT_MESSAGES,
+  MAX_REPLY_MESSAGE_LENGTH,
   DEFAULT_AI_MODEL,
 } from "../constants/ai.js";
 
@@ -60,7 +63,7 @@ export const getAIStatus = async (req, res) => {
     success: true,
     configured: isAIConfigured(),
     model: DEFAULT_AI_MODEL,
-    features: ["caption", "bio", "comment", "chat"],
+    features: ["caption", "bio", "comment", "chat", "reply"],
   });
 };
 
@@ -402,5 +405,69 @@ export const chat = async (req, res) => {
     });
   } catch (error) {
     return handleAIError(error, res, "chat");
+  }
+};
+
+// ---------------------------------------------------------------------------
+// POST /api/ai/reply-suggestions   application/json
+// body: { messages: [{ sender: "me" | "friend", text: "..." }, ...] }
+//
+// Oldest first, newest last. The client sends only the last few text
+// messages of the open DM. Read-only: nothing is stored or sent to the
+// friend — the user taps a suggestion, edits it if they like, and sends it
+// through the normal message endpoint.
+// ---------------------------------------------------------------------------
+
+export const suggestReplies = async (req, res) => {
+  try {
+    const body = req.body || {};
+
+    if (!Array.isArray(body.messages) || body.messages.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Send 'messages' as a non-empty array.",
+      });
+    }
+
+    // Same ceiling idea as /chat: refuse absurd payloads before any work.
+    if (body.messages.length > 100) {
+      return res.status(413).json({
+        success: false,
+        message: `Too many messages. Send at most the last ${MAX_REPLY_CONTEXT_MESSAGES}.`,
+      });
+    }
+
+    const sanitized = [];
+
+    for (const msg of body.messages) {
+      if (!msg || typeof msg !== "object") continue;
+
+      const sender = msg.sender === "me" ? "me" : "friend";
+      // clipped rather than rejected — a very long DM shouldn't block replies
+      const text = asTrimmedString(msg.text, MAX_REPLY_MESSAGE_LENGTH);
+
+      if (!text) continue;
+
+      sanitized.push({ sender, text });
+    }
+
+    const context = sanitized.slice(-MAX_REPLY_CONTEXT_MESSAGES);
+
+    if (!context.some((msg) => msg.sender === "friend")) {
+      return res.status(400).json({
+        success: false,
+        message: "There is no message from your friend to reply to.",
+      });
+    }
+
+    const result = await generateReplySuggestions({ messages: context });
+
+    return res.status(200).json({
+      success: true,
+      message: "Suggestions generated successfully",
+      suggestions: result.suggestions,
+    });
+  } catch (error) {
+    return handleAIError(error, res, "suggestReplies");
   }
 };

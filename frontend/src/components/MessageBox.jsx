@@ -10,6 +10,8 @@ import {
   ChevronRight,
   Clapperboard,
   Plus,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -71,6 +73,9 @@ const MessageBox = ({
 
   // reactors sheet — who reacted with what, tapped from the small badge
   const [isReactorsListOpen, setIsReactorsListOpen] = useState(false);
+
+  // brief "Copied!" confirmation state after using the Copy option
+  const [isCopied, setIsCopied] = useState(false);
 
   const longPressTimerRef = useRef(null);
   const menuRef = useRef(null);
@@ -327,6 +332,12 @@ const MessageBox = ({
     if (!isMenuOpen) setIsEmojiPickerOpen(false);
   }, [isMenuOpen]);
 
+  // reset the "Copied!" confirmation whenever the menu is reopened/closed,
+  // so it doesn't linger stale the next time the menu is opened
+  useEffect(() => {
+    if (!isMenuOpen) setIsCopied(false);
+  }, [isMenuOpen]);
+
   const handleUnsend = () => {
     setIsMenuOpen(false);
     onDelete?.(message._id);
@@ -337,6 +348,44 @@ const MessageBox = ({
     onReact?.(message._id, emoji);
   };
 
+  // Copies the message's text to the clipboard. Only rendered for
+  // messages that actually have text (see canCopyText below) — media-only
+  // messages (images, stickers, shares) have nothing textual to copy.
+  const handleCopyText = async () => {
+    if (!message?.text) return;
+
+    try {
+      await navigator.clipboard.writeText(message.text);
+      setIsCopied(true);
+      // brief confirmation, then close the menu
+      setTimeout(() => {
+        setIsCopied(false);
+        setIsMenuOpen(false);
+      }, 700);
+    } catch (error) {
+      // clipboard API can fail (permissions, insecure context, etc.) —
+      // fall back to a manual copy via a temporary textarea
+      try {
+        const textarea = document.createElement("textarea");
+        textarea.value = message.text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+        textarea.remove();
+        setIsCopied(true);
+        setTimeout(() => {
+          setIsCopied(false);
+          setIsMenuOpen(false);
+        }, 700);
+      } catch (fallbackError) {
+        console.log(fallbackError);
+      }
+    }
+  };
+
   const hasMedia =
     imageList.length > 0 ||
     !!sharedItem ||
@@ -345,6 +394,9 @@ const MessageBox = ({
     isSharedContentDeleted;
 
   const messageFullTimestamp = formatFullTimestamp(message?.createdAt);
+
+  // only text messages have something to copy
+  const canCopyText = Boolean(message?.text);
 
   // ---- reactions ----
   const reactions = message?.reactions || [];
@@ -776,6 +828,26 @@ const MessageBox = ({
             <div className="w-full text-left px-4 py-2.5 text-[var(--text-muted)] text-[12px] select-none cursor-default border-b border-[var(--border-popup)]">
               Delivered {messageFullTimestamp}
             </div>
+
+            {/* Copy — only for messages that have text on them */}
+            {canCopyText && (
+              <button
+                onClick={handleCopyText}
+                className="w-full flex items-center gap-2 text-left px-4 py-2.5 text-[var(--text-primary)] text-[14px] hover:bg-[var(--bg-popup-hover)] cursor-pointer border-b border-[var(--border-popup)]"
+              >
+                {isCopied ? (
+                  <>
+                    <Check size={15} />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy size={15} />
+                    Copy
+                  </>
+                )}
+              </button>
+            )}
 
             {isSenderMessage && (
               <button

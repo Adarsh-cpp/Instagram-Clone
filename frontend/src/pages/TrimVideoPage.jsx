@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { trimVideoClientSide } from "../utils/trimVideoClient";
-import { Play } from "lucide-react";
+import { ArrowLeft, Play } from "lucide-react";
 
 const MAX_DURATION = 15; // hard cap on clip length, seconds — matches the app's reel limit
 const MIN_DURATION = 1; // shortest allowed clip, seconds
@@ -278,11 +278,7 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
         <div className="cropContainer relative w-full max-w-[500px] md:w-[70%] lg:w-[50%] xl:w-[35%] h-[80%] rounded-2xl bg-[var(--bg-surface)] overflow-hidden flex flex-col">
           <div className="header w-full h-[40px] px-3 sm:px-4 flex justify-between items-center bg-[var(--bg-app)] shrink-0">
             <div onClick={back} className="back cursor-pointer">
-              <img
-                src="/images/arrow-back-icon.png"
-                className="w-[26px] h-[26px] sm:w-[30px] sm:h-[30px]"
-                alt="Back"
-              />
+              <ArrowLeft className="w-[26px] h-[26px] sm:w-[30px] sm:h-[30px] text-[var(--text-primary)]" />
             </div>
             <div className="heading text-[var(--text-primary)] text-[16px] sm:text-[18px] font-semibold">
               Trim

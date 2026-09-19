@@ -1,5 +1,5 @@
 import express from "express";
-import { changeDP, editProfile, followToggle, getAllProfiles, getProfile, getSavedItems, removeDP } from "../controllers/profileController.js";
+import { changeDP, deleteProfile, editProfile, followToggle, getAllProfiles, getProfile, getSavedItems, removeDP } from "../controllers/profileController.js";
 import { authUser } from "../middlewares/authMiddleware.js";
 import { upload } from "../config/multer.js"
 
@@ -13,6 +13,7 @@ router.delete("/remove-dp", authUser, removeDP)
 router.put("/change-dp", authUser, upload.single("profilePic"), changeDP);
 router.put("/edit-profile", authUser, editProfile)
 router.post("/:id/follow-toggle", authUser, followToggle)
+router.delete("/delete-profile", authUser, deleteProfile);
 
 
 export default router;

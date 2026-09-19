@@ -418,19 +418,31 @@ export const deletePost = async (req, res) => {
       return res.status(404).json({ success: false, message: "Post not found" });
     }
 
-    if (post.author.toString() !== req.user._id.toString()) {
+    const isOwner = post.author.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === "admin";
+
+    if (!isOwner && !isAdmin) {
       return res.status(403).json({ success: false, message: "Not authorized to delete this post" });
     }
 
+    // Cloudinary media — fire-and-forget with retry
     post.media.forEach((m) => {
-        deleteCloudinaryAssetWithRetry(
-          m.publicId,
-          m.mediaType === "video" ? "video" : "image",
-          1,
-          5,
-          cloudinary
-        );
-      });
+      deleteCloudinaryAssetWithRetry(
+        m.publicId,
+        m.mediaType === "video" ? "video" : "image",
+        1,
+        5,
+        cloudinary
+      );
+    });
+
+    // comments AND replies both store `post`, so one query covers both.
+    // Collect the ids first so their notifications can be removed too.
+    const commentIds = await commentModel.distinct("_id", { post: post._id });
+
+    await notificationModel.deleteMany({
+      $or: [{ post: post._id }, { comment: { $in: commentIds } }],
+    });
 
     await commentModel.deleteMany({ post: post._id });
 
@@ -444,6 +456,8 @@ export const deletePost = async (req, res) => {
       }
     );
 
+    // messageType stays "post_share", so the client can still render
+    // "Post no longer available"
     await messageModel.updateMany(
       { sharedPost: post._id },
       { $set: { sharedPost: null } }

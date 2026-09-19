@@ -10,7 +10,7 @@ import {
   shareReel,
   toggleSaveReel,
 } from "../controllers/reelController.js";
-import { addComment, getComments, toggleCommentLike } from "../controllers/reelCommentController.js";
+import { addComment, deleteComment, getComments, toggleCommentLike } from "../controllers/reelCommentController.js";
 
 const router = express.Router();
 
@@ -26,6 +26,7 @@ router.post("/:id/toggle-save", authUser, toggleSaveReel)
 router.post("/:id/post-comment", authUser, addComment);
 router.get("/:id/get-comments", authUser, getComments);
 router.post("/:reelId/comment/:commentId/toggle-like", authUser, toggleCommentLike)
+router.delete("/:id/comment/:commentId/delete", authUser, deleteComment);
 
 
 export default router;

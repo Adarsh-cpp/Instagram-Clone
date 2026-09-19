@@ -9,6 +9,7 @@ import { SocketProvider } from './context/SocketContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { UploadProvider } from './context/UploadContext';
+import { HomeFeedProvider } from './context/HomeFeedContext';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -17,7 +18,9 @@ createRoot(document.getElementById('root')).render(
         <SocketProvider>
           <NotificationProvider>
             <UploadProvider>
-              <RouterProvider router={router} />
+              <HomeFeedProvider>
+                <RouterProvider router={router} />
+              </HomeFeedProvider>
             </UploadProvider>
           </NotificationProvider>
         </SocketProvider>

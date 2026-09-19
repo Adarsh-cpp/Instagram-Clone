@@ -17,6 +17,8 @@ const IconSidebar = () => {
 
   const [isLogoutPopupOpen, setIsLogoutPopupOpen] = useState(false);
   const [isConfirmingLogout, setIsConfirmingLogout] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const popupRef = useRef(null);
 
   useEffect(() => {
@@ -24,6 +26,7 @@ const IconSidebar = () => {
       if (popupRef.current && !popupRef.current.contains(event.target)) {
         setIsLogoutPopupOpen(false);
         setIsConfirmingLogout(false);
+        setIsConfirmingDelete(false);
       }
     };
 
@@ -59,14 +62,38 @@ const IconSidebar = () => {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (isDeleting) return;
+    try {
+      setIsDeleting(true);
+      const token = localStorage.getItem("authToken");
+
+      const response = await axios.delete(`${BASE_URL}/user/profile/delete-profile`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.status === 200) {
+        localStorage.removeItem("authToken");
+        navigate("/");
+      }
+    } catch (error) {
+      console.error("Delete account error:", error.message);
+      setIsDeleting(false);
+    }
+  };
+
   const toggleLogoutPopup = () => {
     setIsLogoutPopupOpen((prev) => !prev);
     setIsConfirmingLogout(false);
+    setIsConfirmingDelete(false);
   };
 
   const handleAboutClick = () => {
     setIsLogoutPopupOpen(false);
     setIsConfirmingLogout(false);
+    setIsConfirmingDelete(false);
     navigate("/about");
   };
 
@@ -238,7 +265,7 @@ const IconSidebar = () => {
                 overflow-hidden
               "
             >
-              {!isConfirmingLogout ? (
+              {!isConfirmingLogout && !isConfirmingDelete ? (
                 <>
                   {/* Theme toggle row */}
                   <div
@@ -374,8 +401,50 @@ const IconSidebar = () => {
                     </svg>
                     <span>Log out</span>
                   </button>
+
+                  <div className="h-[1px] bg-[var(--border-popup)] my-1 mx-1" />
+
+                  {/* Delete account row */}
+                  <button
+                    onClick={() => setIsConfirmingDelete(true)}
+                    className="
+                      w-full
+                      h-[48px]
+                      px-3
+                      flex
+                      items-center
+                      gap-3
+                      rounded-lg
+                      text-[var(--color-danger)]
+                      text-[14px]
+                      font-semibold
+                      transition-all
+                      duration-200
+                      hover:bg-[var(--bg-danger-hover)]
+                      active:scale-[0.98]
+                    "
+                  >
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="shrink-0"
+                    >
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      <path d="M10 11v6" />
+                      <path d="M14 11v6" />
+                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                    </svg>
+                    <span>Delete account</span>
+                  </button>
                 </>
-              ) : (
+              ) : isConfirmingLogout ? (
                 <div className="p-2">
                   <p className="text-[var(--text-primary)] text-[13px] font-medium px-1 pb-3 pt-1 text-center">
                     Log out of your account?
@@ -414,6 +483,62 @@ const IconSidebar = () => {
                         duration-200
                         hover:bg-[var(--bg-popup-hover)]
                         active:scale-[0.98]
+                      "
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-2">
+                  <p className="text-[var(--color-danger)] text-[13px] font-semibold px-1 pt-1 text-center">
+                    Delete your account?
+                  </p>
+                  <p className="text-[var(--text-primary)] text-[12px] px-1 pb-3 pt-1.5 text-center leading-snug">
+                    This is permanent. All your posts, reels, messages, chats,
+                    followers and profile data will be deleted forever and
+                    cannot be recovered.
+                  </p>
+
+                  <div className="flex flex-col gap-1">
+                    <button
+                      onClick={handleDeleteAccount}
+                      disabled={isDeleting}
+                      className="
+                        w-full
+                        h-[40px]
+                        rounded-lg
+                        bg-[var(--color-danger)]
+                        text-white
+                        text-[14px]
+                        font-semibold
+                        transition-all
+                        duration-200
+                        hover:bg-[var(--color-danger-hover)]
+                        active:scale-[0.98]
+                        disabled:opacity-60
+                        disabled:cursor-not-allowed
+                      "
+                    >
+                      {isDeleting ? "Deleting..." : "Yes, delete my account"}
+                    </button>
+
+                    <button
+                      onClick={() => setIsConfirmingDelete(false)}
+                      disabled={isDeleting}
+                      className="
+                        w-full
+                        h-[40px]
+                        rounded-lg
+                        text-[var(--text-primary)]
+                        text-[14px]
+                        font-medium
+                        transition-all
+                        duration-200
+                        hover:bg-[var(--bg-popup-hover)]
+                        active:scale-[0.98]
+                        disabled:opacity-60
+                        disabled:cursor-not-allowed
                       "
                     >
                       Cancel

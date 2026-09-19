@@ -8,12 +8,14 @@ import {
   bioRateLimit,
   commentRateLimit,
   chatRateLimit,
+  replyRateLimit,
 } from "../middlewares/aiRateLimit.js";
 import {
   createCaption,
   createBio,
   createComment,
   chat,
+  suggestReplies,
   getAIStatus,
 } from "../controllers/aiController.js";
 
@@ -46,5 +48,8 @@ router.post("/comment", commentRateLimit, createComment);
 
 // POST /api/ai/chat — JSON
 router.post("/chat", chatRateLimit, chat);
+
+// POST /api/ai/reply-suggestions — JSON: { messages: [{ sender, text }] }
+router.post("/reply-suggestions", replyRateLimit, suggestReplies);
 
 export default router;

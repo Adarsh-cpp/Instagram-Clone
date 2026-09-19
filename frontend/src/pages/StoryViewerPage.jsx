@@ -56,6 +56,14 @@ const StoryViewerPage = () => {
   const [playing, setPlaying] = useState(true);
   const [muted, setMuted] = useState(false);
   const [progress, setProgress] = useState(0);
+  // Whether the CURRENT story's own media (the image or video the user is
+  // actually looking at) has finished loading enough to display. The
+  // progress timer and the story's song are both gated on this — without
+  // it, the timer/song used to start counting the instant the story
+  // became "current", even while the image/video was still downloading,
+  // so a slow-loading story would silently burn through its duration (and
+  // its song) before the user ever saw it.
+  const [mediaReady, setMediaReady] = useState(false);
   const [reply, setReply] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
   const [likedMap, setLikedMap] = useState({});
@@ -72,6 +80,7 @@ const StoryViewerPage = () => {
   const videoRef = useRef(null);
   const audioRef = useRef(null);
   const playingRef = useRef(true);
+  const mediaReadyRef = useRef(false);
   const holdTimerRef = useRef(null);
   const wasHeldRef = useRef(false);
   const markedViewedRef = useRef(new Set());
@@ -82,6 +91,7 @@ const StoryViewerPage = () => {
   const singleTapTimerRef = useRef(null);
 
   playingRef.current = playing;
+  mediaReadyRef.current = mediaReady;
 
   useEffect(() => {
     const resolveAccounts = async () => {
@@ -158,6 +168,17 @@ const StoryViewerPage = () => {
     return () => clearTimeout(singleTapTimerRef.current);
   }, [accountIndex, storyIndex]);
 
+  // Reset the "is this story's media ready?" flag every time the active
+  // story changes, so the timer/song gate below starts closed again for
+  // the new image/video. Guarded on `loading` (and re-run once it flips
+  // to false) for the same reason as every other story-lifecycle effect
+  // in this file — see the big comment on the song-loading effect further
+  // down for the full explanation of that race.
+  useEffect(() => {
+    if (loading) return;
+    setMediaReady(false);
+  }, [accountIndex, storyIndex, loading]);
+
   // ---- within-account story navigation ----
   // NOTE: these no longer fall through to the adjacent account. Per spec,
   // only the chevrons (handleNextAccount/handlePrevAccount) cross accounts.
@@ -207,15 +228,21 @@ const StoryViewerPage = () => {
 
   // ---- mark as viewed (skip for own stories) ----
   useEffect(() => {
+    if (loading) return;
     if (!currentStory || isOwnAccount) return;
     if (markedViewedRef.current.has(currentStory._id)) return;
     markedViewedRef.current.add(currentStory._id);
     axiosInstance.post(`/story/${currentStory._id}/view`).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStory?._id]);
+  }, [currentStory?._id, loading]);
 
   // ---- progress: image timer ----
+  // `elapsed` only accumulates once BOTH the story is "playing" and its
+  // media has actually finished loading (mediaReadyRef) — otherwise a
+  // slow-loading image would burn through its whole duration (and the
+  // attached song, further down) before it was even visible.
   useEffect(() => {
+    if (loading) return;
     if (!currentStory || currentStory.mediaType === "video") return;
     setProgress(0);
     const durationMs = (currentStory.duration || DEFAULT_IMAGE_SECONDS) * 1000;
@@ -224,7 +251,7 @@ const StoryViewerPage = () => {
     let last = performance.now();
 
     const tick = (now) => {
-      if (playingRef.current) elapsed += now - last;
+      if (playingRef.current && mediaReadyRef.current) elapsed += now - last;
       last = now;
       const pct = Math.min(100, (elapsed / durationMs) * 100);
       setProgress(pct);
@@ -236,10 +263,14 @@ const StoryViewerPage = () => {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [accountIndex, storyIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [accountIndex, storyIndex, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- progress: video ----
+  // Playback itself is kicked off from the video's onCanPlay handler (see
+  // JSX + handleVideoCanPlay below) rather than immediately here, so the
+  // video only actually starts once it's buffered enough to play smoothly.
   useEffect(() => {
+    if (loading) return;
     if (!currentStory || currentStory.mediaType !== "video") return;
     setProgress(0);
     const video = videoRef.current;
@@ -254,26 +285,61 @@ const StoryViewerPage = () => {
     video.addEventListener("timeupdate", onTimeUpdate);
     video.addEventListener("ended", onEnded);
     video.currentTime = 0;
-    if (playingRef.current) video.play().catch(() => {});
 
     return () => {
       video.removeEventListener("timeupdate", onTimeUpdate);
       video.removeEventListener("ended", onEnded);
     };
-  }, [accountIndex, storyIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [accountIndex, storyIndex, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video || currentStory?.mediaType !== "video") return;
-    if (playing) video.play().catch(() => {});
+    if (playing && mediaReady) video.play().catch(() => {});
     else video.pause();
-  }, [playing, currentStory?.mediaType]);
+  }, [playing, mediaReady, currentStory?.mediaType]);
+
+  // Fired once the video has buffered enough to actually play. This is
+  // what starts video playback for a freshly-opened story, and it's also
+  // what flips mediaReady — which in turn is what allows the progress
+  // timer (video uses its own timeupdate, so this mostly matters for the
+  // song below) and the story's song to start.
+  const handleVideoCanPlay = () => {
+    setMediaReady(true);
+    const video = videoRef.current;
+    if (video && playingRef.current) {
+      video.play().catch(() => {});
+    }
+  };
+
+  // Fired once the story's image has fully loaded (or failed to — we
+  // still flip mediaReady on error so a broken image doesn't leave the
+  // story stuck on a spinner forever).
+  const handleImageLoad = () => setMediaReady(true);
+  const handleImageError = () => setMediaReady(true);
 
   // ---- story song: load the selected track, seek to the saved clip start,
   // and attempt playback. The loadedmetadata listener matters for remote
   // Jamendo/Cloudinary audio because duration/seek state may not be ready
-  // when the effect first runs. ----
+  // when the effect first runs.
+  //
+  // Guarded on `loading`, and with `loading` in the dependency array,
+  // because of a real race: on the very first story a user opens, this
+  // component renders once with `loading` still true (it returns `null`
+  // near the bottom while resolving which account index to land on), so
+  // the <audio> element hasn't actually mounted yet and audioRef.current
+  // is null. That render still runs this effect (hooks always run,
+  // return value or not) — it just does nothing because of the `!audio`
+  // check. Once resolving finishes and `loading` flips to false, the real
+  // <audio> element mounts — but if accountIndex/storyIndex/currentSong
+  // happened to be identical across both renders (typical when opening
+  // the very first story in the list), this effect's dependency array
+  // hadn't changed and it would never fire again — which is exactly why
+  // the song used to stay silent until navigating to another story and
+  // back (a dependency change that forced a re-run against the
+  // now-mounted audio element). Including `loading` fixes that directly.
   useEffect(() => {
+    if (loading) return;
     const audio = audioRef.current;
     if (!audio || !currentSong) return;
 
@@ -287,7 +353,11 @@ const StoryViewerPage = () => {
         // The media may not be seekable yet; loadedmetadata can run again.
       }
 
-      if (playingRef.current) {
+      // Only actually start playback if the story's own image/video is
+      // also ready — otherwise this just cues the track up (seeks it to
+      // the right spot) and leaves it paused; the mediaReady-triggered
+      // effect below picks up playback once the visible media catches up.
+      if (playingRef.current && mediaReadyRef.current) {
         audio.play().catch(() => {
           // Browsers can block unmuted autoplay. A user interaction inside
           // the story viewer retries playback through ensureAudioPlayback().
@@ -306,23 +376,40 @@ const StoryViewerPage = () => {
       audio.removeEventListener("loadedmetadata", startPlayback);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountIndex, storyIndex, currentSong?._id]);
+  }, [accountIndex, storyIndex, currentSong?._id, loading]);
+
+  // ---- story song: start it once the visible media becomes ready ----
+  // Covers the case where the song finished loading/cueing (above) before
+  // the image/video did — startPlayback deliberately skipped the actual
+  // .play() call in that case, so this picks it back up the moment
+  // mediaReady flips true.
+  useEffect(() => {
+    if (loading || !mediaReady) return;
+    const audio = audioRef.current;
+    if (!audio || !currentSong) return;
+    if (playingRef.current && audio.paused) {
+      audio.muted = muted;
+      audio.play().catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediaReady, loading, currentSong?._id]);
 
   // ---- story song: mirror play/pause with the rest of the story ----
   useEffect(() => {
+    if (loading) return;
     const audio = audioRef.current;
     if (!audio || !currentSong) return;
 
     audio.muted = muted;
 
-    if (playing) {
+    if (playing && mediaReady) {
       audio.play().catch(() => {
         // If unmuted autoplay was blocked, the next user interaction retries it.
       });
     } else {
       audio.pause();
     }
-  }, [playing, muted, currentSong?._id]);
+  }, [playing, muted, mediaReady, currentSong?._id, loading]);
 
   // ---- story song: loop just the saved clip window (songStartTime to
   // songStartTime + clip length). The clip length now comes straight from
@@ -331,6 +418,7 @@ const StoryViewerPage = () => {
   // replaces the old fixed 15s, which is why the song used to keep
   // playing well past a short image's progress bar finishing. ----
   useEffect(() => {
+    if (loading) return;
     const audio = audioRef.current;
     if (!audio || !currentSong) return;
 
@@ -352,7 +440,7 @@ const StoryViewerPage = () => {
     audio.addEventListener("timeupdate", handleTimeUpdate);
     return () => audio.removeEventListener("timeupdate", handleTimeUpdate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountIndex, storyIndex, currentSong?._id, currentStory?.duration]);
+  }, [accountIndex, storyIndex, currentSong?._id, currentStory?.duration, loading]);
 
   // ---- story song: keep muted state in sync ----
   useEffect(() => {
@@ -365,7 +453,7 @@ const StoryViewerPage = () => {
   // when the browser rejected the initial autoplay attempt.
   const ensureAudioPlayback = () => {
     const audio = audioRef.current;
-    if (!audio || !currentSong || !playingRef.current) return;
+    if (!audio || !currentSong || !playingRef.current || !mediaReadyRef.current) return;
 
     audio.muted = muted;
     audio.play().catch(() => {});
@@ -589,9 +677,13 @@ const StoryViewerPage = () => {
       `}</style>
 
       {/* story song — hidden audio element, driven entirely by the effects
-          above; nothing else in the tree needs to know it's here */}
+          above; nothing else in the tree needs to know it's here.
+          Keyed by song id so a fresh story with a different song always
+          gets a brand-new <audio> node instead of reusing one whose
+          in-flight loadedmetadata listener belongs to the previous song. */}
       {currentSong && (
         <audio
+          key={currentSong._id}
           ref={audioRef}
           src={currentSong.audioUrl}
           muted={muted}
@@ -728,7 +820,7 @@ const StoryViewerPage = () => {
                         const audio = audioRef.current;
                         if (audio) {
                           audio.muted = nextMuted;
-                          if (!nextMuted && playingRef.current) {
+                          if (!nextMuted && playingRef.current && mediaReadyRef.current) {
                             audio.play().catch(() => {});
                           }
                         }
@@ -765,22 +857,46 @@ const StoryViewerPage = () => {
                 </div>
               )}
 
-              {/* media */}
+              {/* media — keyed by story id so React remounts a fresh
+                  <img>/<video> per story instead of reusing one whose
+                  onLoad/onCanPlay from the PREVIOUS story could otherwise
+                  fire late and falsely mark the new story as ready. Kept
+                  invisible (opacity 0) until mediaReady flips true so a
+                  half-loaded image never flashes on screen. */}
               {currentStory.mediaType === "video" ? (
                 <video
+                  key={currentStory._id}
                   ref={videoRef}
                   src={currentStory.mediaUrl}
                   muted={muted}
                   playsInline
+                  onCanPlay={handleVideoCanPlay}
                   className="w-full h-full object-cover"
+                  style={{ opacity: mediaReady ? 1 : 0, transition: "opacity 0.15s ease" }}
                 />
               ) : (
                 <img
+                  key={currentStory._id}
                   src={currentStory.mediaUrl}
                   alt=""
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
                   className="w-full h-full object-cover"
-                  style={{ backgroundColor: currentStory.bgColor || "#000" }}
+                  style={{
+                    backgroundColor: currentStory.bgColor || "#000",
+                    opacity: mediaReady ? 1 : 0,
+                    transition: "opacity 0.15s ease",
+                  }}
                 />
+              )}
+
+              {/* loading spinner — shown behind nothing but the media
+                  itself while it buffers; the timer and song both stay
+                  gated on mediaReady until this disappears */}
+              {!mediaReady && (
+                <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                  <div className="w-10 h-10 border-[3px] border-white/30 border-t-white rounded-full animate-spin" />
+                </div>
               )}
 
               {/* The song is represented only by its small cover square in

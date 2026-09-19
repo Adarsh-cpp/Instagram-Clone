@@ -121,3 +121,11 @@ export const chatRateLimit = createAiRateLimit({
   maxPerWindow: 12,
   maxPerDay: 200,
 });
+
+// Reply suggestions are text-only and users tend to tap them a few times
+// per conversation, so the budget sits between chat and comment.
+export const replyRateLimit = createAiRateLimit({
+  name: "reply",
+  maxPerWindow: 10,
+  maxPerDay: 150,
+});

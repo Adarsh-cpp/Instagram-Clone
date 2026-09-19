@@ -72,7 +72,7 @@ export const createReel = async (req, res) => {
       )
     );
 
-    const populated = await reel.populate("author", "username avatar isVerified");
+    const populated = await reel.populate("author", "username profilePic isVerified");
     return res.status(201).json({ reel: populated });
   } catch (err) {
     return res.status(400).json({ message: err.message || "Failed to upload reel" });
@@ -123,13 +123,25 @@ export const deleteReel = async (req, res) => {
     const reel = await Reel.findById(req.params.id);
     if (!reel) return res.status(404).json({ message: "Reel not found" });
 
-    if (reel.author.toString() !== req.user._id.toString()) {
+    const isOwner = reel.author.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === "admin";
+
+    if (!isOwner && !isAdmin) {
       return res.status(403).json({ message: "Not authorized to delete this reel" });
     }
 
     // fire-and-forget with retry — doesn't block the response, but keeps
-    // trying in the background until Cloudinary actually confirms deletion
+    // trying in the background until Cloudinary actually confirms deletion.
+    // (thumbnailUrl is derived from the same publicId, so it's covered.)
     deleteCloudinaryAssetWithRetry(reel.media.publicId, "video", 1, 5, cloudinary);
+
+    // comments AND replies both store `reel`, so one query covers both.
+    // Collect the ids first so their notifications can be removed too.
+    const commentIds = await ReelComment.distinct("_id", { reel: reel._id });
+
+    await notificationModel.deleteMany({
+      $or: [{ reel: reel._id }, { reelComment: { $in: commentIds } }],
+    });
 
     await ReelComment.deleteMany({ reel: reel._id });
 
@@ -143,8 +155,14 @@ export const deleteReel = async (req, res) => {
       }
     );
 
-    await userModel.findByIdAndUpdate(reel.author, { $inc: { reelsCount: -1 } });
+    // messageType stays "reel_share", so the client can still render
+    // "Reel no longer available" (same treatment deletePost gives sharedPost)
+    await messageModel.updateMany(
+      { sharedReel: reel._id },
+      { $set: { sharedReel: null } }
+    );
 
+    await userModel.findByIdAndUpdate(reel.author, { $inc: { reelsCount: -1 } });
 
     await reel.deleteOne();
 
@@ -154,6 +172,7 @@ export const deleteReel = async (req, res) => {
     return res.status(500).json({ message: "Failed to delete reel" });
   }
 };
+
 
 export const toggleLikeReel = async (req, res) => {
   try {

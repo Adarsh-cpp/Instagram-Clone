@@ -5,7 +5,7 @@ import Chat from '../components/Chat'
 import axios from 'axios'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { BadgeCheck } from 'lucide-react'
+import { BadgeCheck, Search } from 'lucide-react'
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
@@ -62,11 +62,7 @@ const DirectMessagePage = () => {
             <div className="searchbar w-[90%] h-[60%] flex justify-center items-center bg-[var(--bg-elevated)] rounded-3xl overflow-hidden">
 
               <div className="searchIcon w-[15%] sm:w-[10%] h-full flex justify-center items-center">
-                <img
-                  src="/images/search-icon-1.png"
-                  alt="search"
-                  className="w-5 h-5 sm:w-7 sm:h-7"
-                />
+                <Search className="w-5 h-5 sm:w-7 sm:h-7 text-[var(--text-primary)]" />
               </div>
 
               <div className="searchText flex-1 h-full flex justify-center items-center">

@@ -56,7 +56,7 @@ const DobPage = () => {
         <div className="topPart h-[84%] w-full border border-[var(--border-container)]">
 
           <div className="cake w-full h-[180px] flex flex-col items-center ">
-            <img src="/images/bday-cake.png" alt="" className="h-[100px] w-[140px] mt-2" />
+            <Cake size={100} strokeWidth={1.25} className="text-[var(--text-primary)] mt-2" />
             <div className="text mt-1 text-[var(--text-primary)] text-[14px] font-bold">Add your date of birth</div>
             <div className="text2 mt-3 text-[var(--text-primary)] text-[16px]">This won't be part of your public profile</div>
           </div>

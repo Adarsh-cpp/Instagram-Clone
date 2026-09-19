@@ -52,6 +52,10 @@ export const COMMENT_TONES = [
 // side — this just avoids shipping a huge payload over the wire.
 export const AI_CHAT_CONTEXT_SIZE = 16;
 
+// How many recent DM text messages are sent as context when asking for
+// reply suggestions. The backend clips again on its side.
+export const AI_REPLY_CONTEXT_SIZE = 8;
+
 // ---------------------------------------------------------------------------
 // Error handling
 //
@@ -176,6 +180,33 @@ export const sendAiChatMessage = async ({ messages, signal }) => {
   );
 
   return data.reply || "";
+};
+
+// ---------------------------------------------------------------------------
+// POST /api/ai/reply-suggestions  (JSON)
+//
+// `messages` is the recent text of a real DM, oldest first, newest LAST, as
+// [{ sender: "me" | "friend", text }]. Returns an array of suggested reply
+// strings in the same language/script as the friend's latest message.
+// Nothing is sent to the friend — the user picks one and sends it normally.
+// ---------------------------------------------------------------------------
+
+export const generateAiReplySuggestions = async ({ messages, signal }) => {
+  const trimmed = (messages || [])
+    .filter((m) => m && typeof m.text === "string" && m.text.trim())
+    .slice(-AI_REPLY_CONTEXT_SIZE)
+    .map((m) => ({
+      sender: m.sender === "me" ? "me" : "friend",
+      text: m.text.trim(),
+    }));
+
+  const { data } = await axios.post(
+    `${BASE_URL}/api/ai/reply-suggestions`,
+    { messages: trimmed },
+    { headers: getAuthHeaders(), signal }
+  );
+
+  return Array.isArray(data.suggestions) ? data.suggestions : [];
 };
 
 // ---------------------------------------------------------------------------

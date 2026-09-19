@@ -44,6 +44,13 @@ const HomepagePostCard = ({ ...props }) => {
   // for this to resolve to true.
   const isAdminAuthor = props.authorRole === "admin";
 
+  // Whether the currently logged-in user (viewing the feed) is an admin —
+  // separate from isAdminAuthor above, which is about the post's author.
+  // Admins can delete any post, not just their own.
+  const isCurrentUserAdmin = user?.role === "admin";
+
+  const canDeletePost = isOwnPost || isCurrentUserAdmin;
+
   const animatedLikeRef = useRef();
   const touchStartX = useRef(null);
   const menuRef = useRef(null);
@@ -245,24 +252,30 @@ const HomepagePostCard = ({ ...props }) => {
     <div className="postCard w-full mt-4 ">
       {/* Header */}
       <div className="header w-full h-[50px] flex items-center px-2 bg-[var(--bg-app)]">
-        <div className="profilePic w-[45px] h-[45px] rounded-full overflow-hidden cursor-pointer">
+        <div className="profilePic w-[45px] h-[45px] rounded-full overflow-hidden cursor-pointer shrink-0">
           <img src={props.profileImgSrc ? props.profileImgSrc : "/images/default-profile-pic.jpg"} alt="" />
         </div>
         <div className="profileInfo min-w-[70%] h-full px-2 text-[var(--text-primary)]">
-          <div className="info w-full h-[50%] flex justify-start items-center">
-            <NavLink to={profileURL} className="w-[40%] h-full">
-              <div className="name w-full h-full cursor-pointer flex items-center gap-1">
-                {props.author}
+          {/* Name + badge + date + follow.
+              Uses flex-shrink instead of fixed % widths so the badge and
+              date never get squeezed together on narrow (mobile) screens:
+              the name truncates first; badge, date and Follow stay intact. */}
+          <div className="info w-full h-[50%] flex justify-start items-center gap-2 min-w-0">
+            <NavLink to={profileURL} className="h-full min-w-0 max-w-[55%]">
+              <div className="name h-full cursor-pointer flex items-center gap-1 min-w-0">
+                <span className="truncate">{props.author}</span>
                 {isAdminAuthor && (
                   <BadgeCheck size={14} className="text-sky-400 shrink-0" />
                 )}
               </div>
             </NavLink>
-            <div className="day w-[20%] h-full text-[var(--text-muted)]">{getTimeAgo(props.createdAt)}</div>
+            <div className="day h-full flex items-center shrink-0 whitespace-nowrap text-[var(--text-muted)]">
+              {getTimeAgo(props.createdAt)}
+            </div>
             {followDisplay && (
               <div
                 onClick={handleFollowToggle}
-                className="follow w-[40%] h-full text-[var(--link-muted)] hover:text-[var(--link-muted-hover)] cursor-pointer"
+                className="follow h-full flex items-center shrink-0 whitespace-nowrap text-[var(--link-muted)] hover:text-[var(--link-muted-hover)] cursor-pointer"
               >
                 Follow
               </div>
@@ -273,8 +286,8 @@ const HomepagePostCard = ({ ...props }) => {
           </div>
         </div>
 
-        {/* 3-dot menu — only visible on the logged-in user's own post */}
-        {isOwnPost && (
+        {/* 3-dot menu — visible on the logged-in user's own post, or for admins on any post */}
+        {canDeletePost && (
           <div ref={menuRef} className="relative ml-auto pr-1">
             <button
               onClick={() => setIsMenuOpen((prev) => !prev)}

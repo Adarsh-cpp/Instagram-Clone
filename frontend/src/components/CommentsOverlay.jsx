@@ -62,6 +62,10 @@ const CommentsOverlay = ({
   const isOwnItem =
     String(user?._id) === String(authorId);
 
+  // Whether the logged-in user can moderate (delete) ANY comment on this
+  // post/reel — true if they own it, or if they're an admin.
+  const canModerateComments = isOwnItem || user?.role === "admin";
+
   const profileURL = isOwnItem
     ? "/user/get-profile"
     : `/user/get-profile/${authorId}`;
@@ -719,7 +723,7 @@ const CommentsOverlay = ({
                       : undefined
                   }
                   currentUserId={user?._id}
-                  canModerate={isOwnItem}
+                  canModerate={canModerateComments}
                   onDeleted={(id) =>
                     setFetchedComments(
                       (previousComments) =>

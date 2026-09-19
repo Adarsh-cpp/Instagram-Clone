@@ -3,6 +3,7 @@ import axios from 'axios';
 import React, { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
+import { KeyRound, Eye, EyeOff } from 'lucide-react';
 
 const OTP_LENGTH = 6;
 
@@ -91,7 +92,7 @@ const ResetPasswordPage = () => {
       <div className="resetPasswordcontainer w-[350px] h-[520px] border border-[var(--border-container)] ">
 
     <div className="lockPic w-full h-[120px] flex justify-center items-center ">
-            <img src="/images/pw-forget-logo.png" alt="" className="w-[14p0px] h-[100px] " />
+            <KeyRound size={100} strokeWidth={1.25} className="text-[var(--text-primary)]" />
     </div>
 
     <div className="text w-full h-[60px] px-2 text-[var(--text-primary)] text-center ">Reset your account's password by filling the OTP sent to your email. </div>
@@ -130,11 +131,11 @@ const ResetPasswordPage = () => {
         {/* Input field for reset password */}
                 <div className="passwordContainer relative mt-4 ">
           <button type="button" onClick={handlePwVisibility} className="visibility absolute right-[10px] top-[25%] cursor-pointer z-10 ">
-            <img
-              src={pwVisibility ? "/images/visibility-off.png" : "/images/visibility-on.png"}
-              alt=""
-              className="w-[20px] h-[20px] "
-            />
+            {pwVisibility ? (
+              <EyeOff size={20} className="text-[var(--text-muted)]" />
+            ) : (
+              <Eye size={20} className="text-[var(--text-muted)]" />
+            )}
             </button>
           <input
             type={pwVisibility ? "text" : "password"}
@@ -158,11 +159,11 @@ const ResetPasswordPage = () => {
         {/* Input field for confirm password */}
         <div className="passwordContainer relative">
           <button type="button" onClick={handleConfirmPwVisibility} className="visibility absolute right-[10px] top-[25%] cursor-pointer z-10 ">
-            <img
-              src={confirmPwVisibility ? "/images/visibility-off.png" : "/images/visibility-on.png"}
-              alt=""
-              className="w-[20px] h-[20px] "
-            />
+            {confirmPwVisibility ? (
+              <EyeOff size={20} className="text-[var(--text-muted)]" />
+            ) : (
+              <Eye size={20} className="text-[var(--text-muted)]" />
+            )}
             </button>
           <input
             type={confirmPwVisibility ? "text" : "password"}

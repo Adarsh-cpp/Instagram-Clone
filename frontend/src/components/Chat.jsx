@@ -1,7 +1,7 @@
 // Chat.jsx
 import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { Image, Send, Smile, X, ArrowLeft, Sticker, Info, BadgeCheck } from "lucide-react";
+import { Image, Send, Smile, X, ArrowLeft, Sticker, Info, BadgeCheck, Sparkles, RotateCw } from "lucide-react";
 import socket from '../socket';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -14,6 +14,11 @@ import { useSocket } from '../context/SocketContext';
 import { getTimeAgo } from '../utils/timeAgo';
 import { formatDateHeader, isSameDay } from '../utils/dateTime';
 import { CHAT_THEMES, getFontById, loadChatFont } from "../data/chatTheme";
+import {
+  generateAiReplySuggestions,
+  getAiErrorMessage,
+  AI_REPLY_CONTEXT_SIZE,
+} from "../api/aiApi";
 
 const MAX_IMAGES = 4;
 const MESSAGE_PAGE_SIZE = 30;
@@ -22,7 +27,11 @@ const LOAD_OLDER_THRESHOLD_PX = 300;
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
-const Chat = () => {
+// `onConversationActivity` comes from MessagesPage. The server only pushes
+// "newMessage" to the OTHER participant, so when WE send something we tell
+// the parent directly, and it updates the conversation list on the left
+// (last message, time, and move-to-top).
+const Chat = ({ onConversationActivity }) => {
 
   const { onlineUsers, lastSeenMap } = useSocket()
 
@@ -49,6 +58,14 @@ const Chat = () => {
   // info ("i") popup menu + chat settings overlay
   const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false);
   const [isThemeOverlayOpen, setIsThemeOverlayOpen] = useState(false);
+
+  // AI reply suggestions — the blue sparkle button in the input bar opens a
+  // small panel of suggested replies to the friend's latest message
+  const [isSuggestionPanelOpen, setIsSuggestionPanelOpen] = useState(false);
+  const [replySuggestions, setReplySuggestions] = useState([]);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestionError, setSuggestionError] = useState("");
+  const suggestAbortRef = useRef(null);
 
   const typingTimeoutRef = useRef(null);
   const containerRef = useRef(null);
@@ -205,6 +222,20 @@ const Chat = () => {
     } catch (error) {
       // silent: marking seen failing shouldn't interrupt the chat
     }
+  };
+
+  // Tells the parent list that a message WE sent just succeeded, so the
+  // conversation card on the left updates (last message + time) and jumps
+  // to the top. Guarantees the fields the parent relies on are present even
+  // if the API response omits them.
+  const notifyMessageSent = (sentMessage) => {
+    if (!sentMessage) return;
+    onConversationActivity?.({
+      ...sentMessage,
+      conversationId: sentMessage.conversationId || conversationId,
+      senderId: sentMessage.senderId || user?._id,
+      createdAt: sentMessage.createdAt || new Date().toISOString(),
+    });
   };
 
   // fetch conversation (for friend details)
@@ -543,6 +574,20 @@ const Chat = () => {
     return () => clearTimeout(typingTimeoutRef.current);
   }, []);
 
+  // switching to another conversation must not carry over the previous
+  // chat's suggestions (or leave a request running for it)
+  useEffect(() => {
+    suggestAbortRef.current?.abort();
+    setIsSuggestionPanelOpen(false);
+    setReplySuggestions([]);
+    setSuggestionError("");
+    setIsSuggesting(false);
+  }, [conversationId]);
+
+  useEffect(() => {
+    return () => suggestAbortRef.current?.abort();
+  }, []);
+
   const handleTyping = (e) => {
     setMessage(e.target.value);
 
@@ -593,6 +638,7 @@ const Chat = () => {
       if (response.status === 201) {
         pendingActionRef.current = "append";
         setMessages((prev) => [...prev, response.data.data]);
+        notifyMessageSent(response.data.data); // update the list on the left
         setMessage("");
         clearSelectedImages();
         messageInputRef.current?.focus();
@@ -627,6 +673,7 @@ const Chat = () => {
       if (response.status === 201) {
         pendingActionRef.current = "append";
         setMessages((prev) => [...prev, response.data.data]);
+        notifyMessageSent(response.data.data); // update the list on the left
         messageInputRef.current?.focus();
       } else {
         toast.error("Error sending sticker");
@@ -748,6 +795,89 @@ const Chat = () => {
       );
       toast.error("Could not update chat appearance");
     }
+  };
+
+  // ---- AI reply suggestions ----
+  // Builds the recent TEXT context (stickers / bare images have no text to
+  // work from), asks the backend for replies, and shows them in a panel
+  // above the input. Nothing is auto-sent: tapping a suggestion only fills
+  // the input so the user can edit it first.
+  const fetchReplySuggestions = async () => {
+    const senderIdOf = (msg) =>
+      typeof msg.senderId === "object" ? msg.senderId?._id : msg.senderId;
+
+    const context = messages
+      .filter((msg) => typeof msg.text === "string" && msg.text.trim())
+      .slice(-AI_REPLY_CONTEXT_SIZE)
+      .map((msg) => ({
+        sender: senderIdOf(msg) === user?._id ? "me" : "friend",
+        text: msg.text.trim(),
+      }));
+
+    if (!context.some((item) => item.sender === "friend")) {
+      toast.info("No message from your friend to reply to yet");
+      return;
+    }
+
+    suggestAbortRef.current?.abort();
+    const controller = new AbortController();
+    suggestAbortRef.current = controller;
+
+    setIsSuggestionPanelOpen(true);
+    setIsSuggesting(true);
+    setSuggestionError("");
+    setReplySuggestions([]);
+
+    try {
+      const suggestions = await generateAiReplySuggestions({
+        messages: context,
+        signal: controller.signal,
+      });
+
+      if (controller.signal.aborted) return;
+
+      if (suggestions.length === 0) {
+        setSuggestionError("No suggestions this time. Please try again.");
+      } else {
+        setReplySuggestions(suggestions);
+      }
+    } catch (error) {
+      const errorMessage = getAiErrorMessage(
+        error,
+        "Unable to get suggestions. Please try again."
+      );
+      // an aborted request returns "" — stay quiet in that case
+      if (errorMessage) setSuggestionError(errorMessage);
+    } finally {
+      if (suggestAbortRef.current === controller) {
+        setIsSuggesting(false);
+      }
+    }
+  };
+
+  const handleSuggestButtonClick = () => {
+    // tapping the sparkle again while the panel is open closes it
+    if (isSuggestionPanelOpen) {
+      suggestAbortRef.current?.abort();
+      setIsSuggestionPanelOpen(false);
+      setIsSuggesting(false);
+      return;
+    }
+
+    setIsStickerPickerOpen(false);
+    fetchReplySuggestions();
+  };
+
+  const closeSuggestionPanel = () => {
+    suggestAbortRef.current?.abort();
+    setIsSuggestionPanelOpen(false);
+    setIsSuggesting(false);
+  };
+
+  const handlePickSuggestion = (text) => {
+    setMessage(text);
+    setIsSuggestionPanelOpen(false);
+    messageInputRef.current?.focus();
   };
 
     return (
@@ -963,6 +1093,77 @@ const Chat = () => {
             sits ON the theme — it needs no background of its own */}
         <div className="footer shrink-0 relative w-full flex flex-col justify-center px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
 
+          {/* AI reply suggestions — opened by the blue sparkle button */}
+          {isSuggestionPanelOpen && (
+            <div className="aiSuggestions w-[98%] mx-auto mb-2 rounded-2xl p-3 bg-[var(--bg-elevated)] border border-[var(--border-soft)]">
+
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5 text-[13px] text-[var(--text-muted)]">
+                  <Sparkles size={15} className="text-[var(--accent-blue)]" />
+                  <span>Suggested replies</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeSuggestionPanel}
+                  aria-label="Close suggestions"
+                  className="w-[24px] h-[24px] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {isSuggesting && (
+                <div className="flex items-center gap-1.5 px-1 py-2">
+                  <span className="w-[7px] h-[7px] rounded-full bg-[var(--text-muted)] animate-bounce [animation-delay:-0.3s]" />
+                  <span className="w-[7px] h-[7px] rounded-full bg-[var(--text-muted)] animate-bounce [animation-delay:-0.15s]" />
+                  <span className="w-[7px] h-[7px] rounded-full bg-[var(--text-muted)] animate-bounce" />
+                </div>
+              )}
+
+              {!isSuggesting && suggestionError && (
+                <div className="flex flex-col items-start gap-1">
+                  <p className="text-[var(--color-error)] text-[13px] leading-snug">
+                    {suggestionError}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={fetchReplySuggestions}
+                    className="flex items-center gap-1 text-[13px] text-[var(--accent-blue)] cursor-pointer hover:underline"
+                  >
+                    <RotateCw size={13} />
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {!isSuggesting && !suggestionError && replySuggestions.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {replySuggestions.map((suggestion, idx) => (
+                    <button
+                      key={`${idx}-${suggestion}`}
+                      type="button"
+                      onClick={() => handlePickSuggestion(suggestion)}
+                      className="w-full text-left px-4 py-2.5 rounded-2xl bg-[var(--bg-app)] hover:bg-[var(--bg-menu-hover)] text-[var(--text-primary)] text-[14px] leading-snug break-words cursor-pointer transition-colors"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={fetchReplySuggestions}
+                    className="self-start mt-0.5 flex items-center gap-1 text-[13px] text-[var(--accent-blue)] cursor-pointer hover:underline"
+                  >
+                    <RotateCw size={13} />
+                    More suggestions
+                  </button>
+                </div>
+              )}
+
+            </div>
+          )}
+
           {selectedImages.length > 0 && (
             <div className="imagePreview w-[98%] mx-auto mb-2 flex flex-wrap items-center gap-3 sm:gap-4 bg-[var(--bg-elevated)] rounded-2xl p-3">
 
@@ -1047,11 +1248,21 @@ const Chat = () => {
             <div className="gllerySection shrink-0 h-full flex justify-center items-center gap-1 sm:gap-2 pr-2 sm:pr-3">
               <button
                 type="button"
+                onClick={handleSuggestButtonClick}
+                disabled={initialLoading}
+                aria-label="Suggest replies with AI"
+                title="Suggest replies"
+                className="aiSuggest w-[36px] h-[36px] flex justify-center items-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <Sparkles size={22} className="text-[var(--accent-blue)]" />
+              </button>
+              <button
+                type="button"
                 onClick={handleSendMessage}
                 aria-label="Send message"
                 className="send w-[36px] h-[36px] flex justify-center items-center cursor-pointer"
               >
-                <Send size={22} style={{ color: inputBarText }} />
+                <Send size={22} className="text-[var(--accent-blue)]" />
               </button>
               <button
                 type="button"

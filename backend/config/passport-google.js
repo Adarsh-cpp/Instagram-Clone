@@ -1,13 +1,7 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import { v2 as cloudinary } from "cloudinary";
+import cloudinary from "./cloudinary.js"; // shared, already-configured instance — do NOT call cloudinary.config() again here
 import userModel from "../models/user.model.js";
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 /**
  * Takes a Google profile photo URL, uploads it to Cloudinary,

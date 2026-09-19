@@ -245,26 +245,20 @@ export const deleteConversation = async (req, res) => {
       (p) => p.toString() !== userId.toString()
     );
 
+    // Only `image` / `images` are files this chat owns. sharedStory /
+    // repliedStory snapshots point at STORY files — never delete those here.
     const messages = await messageModel
       .find({ conversationId })
       .select("image images");
 
-    const mediaUrls = [];
-    messages.forEach((msg) => {
-      if (msg.image) mediaUrls.push(msg.image);
-      if (Array.isArray(msg.images)) mediaUrls.push(...msg.images);
-    });
+    const mediaUrls = messages
+      .flatMap((m) => [m.image, ...(m.images || [])])
+      .filter(Boolean);
 
     if (mediaUrls.length > 0) {
-      // Best-effort cleanup — a Cloudinary hiccup shouldn't block the
-      // deletion the user actually asked for. Log failures instead of
-      // throwing.
-      const results = await Promise.allSettled(mediaUrls.map((url) => deleteMedia(url)));
-      results.forEach((r, i) => {
-        if (r.status === "rejected") {
-          console.log("Failed to delete media from Cloudinary:", mediaUrls[i], r.reason);
-        }
-      });
+      // Best-effort: converts URLs -> publicIds, logs failures, never throws,
+      // so Cloudinary trouble can't block the deletion the user asked for.
+      await deleteMediaByUrls(mediaUrls);
     }
 
     await messageModel.deleteMany({ conversationId });

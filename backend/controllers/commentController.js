@@ -215,15 +215,7 @@ export const replyToComment = async (req, res) => {
   }
 };
 
-// A user can delete a comment if either:
-// 1. They wrote the comment themselves (existing behavior), OR
-// 2. They are the author of the post the comment belongs to
-//    (new: post owners can moderate/remove any comment on their post).
-//
-// We now always look up the post (previously this only happened for
-// top-level comments, to decrement commentsCount) because we need
-// post.author for the ownership check regardless of whether this is
-// a top-level comment or a reply.
+
 export const deleteComment = async (req, res) => {
   try {
     const userId = req.user?._id;
@@ -238,20 +230,27 @@ export const deleteComment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Comment not found" });
     }
 
-    // comment.post is always set (top-level comments AND replies both
-    // store it — see postComment and replyToComment above), so this
-    // works even when the route doesn't pass a :postId param.
-    const post = await postModel.findById(postId || comment.post);
+    // SECURITY: never trust :postId from the URL for the permission check.
+    // Otherwise a user could pass their own post id with someone else's
+    // commentId and pass the isPostAuthor check. The comment's own `post`
+    // field is the source of truth.
+    if (postId && postId !== comment.post.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: "Comment does not belong to this post",
+      });
+    }
+
+    const post = await postModel.findById(comment.post);
     if (!post) {
       return res.status(404).json({ success: false, message: "Post not found" });
     }
 
-    const isCommentAuthor =
-      comment.author.toString() === userId.toString();
-    const isPostAuthor =
-      post.author.toString() === userId.toString();
+    const isCommentAuthor = comment.author.toString() === userId.toString();
+    const isPostAuthor = post.author.toString() === userId.toString();
+    const isAdmin = req.user.role === "admin";
 
-    if (!isCommentAuthor && !isPostAuthor) {
+    if (!isCommentAuthor && !isPostAuthor && !isAdmin) {
       return res.status(403).json({
         success: false,
         message: "You can only delete your own comments",
@@ -260,22 +259,44 @@ export const deleteComment = async (req, res) => {
 
     const isReply = Boolean(comment.parentComment);
 
+    // every comment id that is going away (used for notification cleanup)
+    let idsToRemove;
+
     if (isReply) {
       // detach this reply from its parent's replies array
       await commentModel.findByIdAndUpdate(comment.parentComment, {
         $pull: { replies: comment._id },
       });
+      idsToRemove = [comment._id];
     } else {
-      // top-level comment — cascade-delete its replies too
-      if (comment.replies?.length) {
-        await commentModel.deleteMany({ _id: { $in: comment.replies } });
+      // top-level comment — cascade-delete its replies too. Look them up via
+      // BOTH replies[] and parentComment so nothing is orphaned if the array
+      // ever drifted out of sync.
+      const linkedReplyIds = await commentModel.distinct("_id", {
+        parentComment: comment._id,
+      });
+      const replyIds = [
+        ...new Set([
+          ...(comment.replies || []).map(String),
+          ...linkedReplyIds.map(String),
+        ]),
+      ];
+
+      if (replyIds.length) {
+        await commentModel.deleteMany({ _id: { $in: replyIds } });
       }
+      idsToRemove = [comment._id, ...replyIds];
 
       // replies never incremented commentsCount (see replyToComment),
       // so only decrement when a top-level comment is removed
-      post.commentsCount = Math.max(0, post.commentsCount - 1);
-      await post.save();
+      await postModel.updateOne(
+        { _id: post._id, commentsCount: { $gt: 0 } },
+        { $inc: { commentsCount: -1 } }
+      );
     }
+
+    // comment / reply / comment_like notifications pointing at what we deleted
+    await notificationModel.deleteMany({ comment: { $in: idsToRemove } });
 
     await commentModel.findByIdAndDelete(commentId);
 

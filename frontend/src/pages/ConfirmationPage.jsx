@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
+import { MessageCircle } from 'lucide-react';
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
@@ -89,7 +90,7 @@ const ConfirmationPage = () => {
         <div className="topPart h-[84%] w-full border border-[var(--border-container)]">
 
           <div className="messagePic w-full h-[120px] flex justify-center items-center">
-            <img src="/images/message-logo.png" alt="" className="h-[100px] w-[140px]" />
+            <MessageCircle size={100} strokeWidth={1.25} className="text-[var(--text-primary)]" />
           </div>
 
           <div className="text w-full h-[90px]">

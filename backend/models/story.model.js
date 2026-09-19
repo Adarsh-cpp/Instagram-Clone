@@ -105,17 +105,13 @@ const storySchema = new mongoose.Schema(
     },
 
     // Always the story's real, original 24h expiry from creation — this
-    // field is NEVER rewritten by the highlight controllers anymore.
+    // field is NEVER rewritten by the highlight controllers.
     // Whether a story shows up as an "active" story is governed purely by
     // comparing this to Date.now() (see getStoryFeed / getUserStories).
-    // Whether Mongo is actually ALLOWED to delete the document once this
-    // passes is a completely separate concern, handled by the partial TTL
-    // index below — that's the fix for the two bugs this used to cause:
-    //   1) bumping this to "now + 24h" when a story left a highlight made
-    //      old stories look brand new in the active feed again.
-    //   2) $unset-ing this the moment a story joined a highlight made it
-    //      disappear from the active feed immediately instead of at its
-    //      real 24h mark.
+    // Whether a story is actually DELETED once this passes is a separate
+    // concern, handled by jobs/storySweeper.js (see the index note below):
+    // it removes the Cloudinary file AND the document for every expired
+    // story that is not part of a highlight.
     expiresAt: {
       type: Date,
       default: () => Date.now() + 24 * 60 * 60 * 1000,
@@ -124,25 +120,23 @@ const storySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// TTL index — Mongo deletes a document once expiresAt is in the past, BUT
-// only for documents matching the partialFilterExpression, i.e. only ones
-// that are NOT currently part of a highlight. A highlighted story is fully
-// protected from this deletion no matter how old expiresAt gets; the moment
-// it's unlinked from its highlight (isHighlighted -> false), it becomes
-// eligible again and Mongo's TTL monitor cleans it up on its next sweep
-// using whatever expiresAt it already has — no manual timestamp juggling
-// needed anywhere in the controllers.
+// Plain index on expiresAt — NOT a TTL index any more.
 //
-// IMPORTANT (one-time, on deploy): if this index already existed in your
-// database without partialFilterExpression, Mongo/Mongoose will NOT alter
-// it in place. Either drop it manually once —
-//   db.stories.dropIndex("expiresAt_1")
-// — and let the app recreate it (e.g. via mongoose.syncIndexes()), or run
-// syncIndexes() yourself; otherwise the old, unscoped TTL behavior stays live.
-storySchema.index(
-  { expiresAt: 1 },
-  { expireAfterSeconds: 0, partialFilterExpression: { isHighlighted: false } }
-);
+// Mongo's TTL monitor deletes documents silently, without running any
+// application code, so the Cloudinary file of every naturally-expired story
+// was left orphaned. Deletion is now done by jobs/storySweeper.js, which
+// destroys the Cloudinary asset first and the document second (and skips
+// stories where isHighlighted is true, so highlighted stories stay protected).
+//
+// This index keeps the sweeper's query (expiresAt <= now, isHighlighted:false)
+// and the feed's "active stories" queries fast.
+//
+// One-time migration: the old TTL version of this index has the same name
+// (expiresAt_1) but different options. connectDB.js runs Story.syncIndexes()
+// on startup, which drops the old TTL index and creates this one. If
+// db.stories.getIndexes() still shows expireAfterSeconds afterwards, drop it
+// manually once: db.stories.dropIndex("expiresAt_1")
+storySchema.index({ expiresAt: 1 });
 
 // helpful for querying "all active stories by users I follow" quickly
 storySchema.index({ author: 1, createdAt: -1 });
