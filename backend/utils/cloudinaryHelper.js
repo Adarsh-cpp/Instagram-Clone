@@ -75,9 +75,9 @@ export const deleteMediaByUrls = async (urls = []) => {
 
   results.forEach((r, i) => {
     if (r.status === "rejected") {
-      console.log("Cloudinary delete failed:", publicIds[i], r.reason);
+      console.error("Cloudinary delete failed:", publicIds[i], r.reason);
     } else if (r.value && !["ok", "not found"].includes(r.value.result)) {
-      console.log("Cloudinary unexpected result:", publicIds[i], r.value);
+      console.error("Cloudinary unexpected result:", publicIds[i], r.value);
     }
   });
 };

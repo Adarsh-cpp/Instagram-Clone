@@ -10,6 +10,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useUpload } from '../context/UploadContext';
 import { useHomeFeedStore } from '../context/HomeFeedContext';
+import PostCardSkeleton from '../components/PostCardSkeleton'
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
@@ -198,9 +199,11 @@ const HomePage = () => {
           >
 
             {initialLoading ? (
-              <div className="w-full h-[300px] flex justify-center items-center text-[var(--text-primary)]">
-                Loading posts...
-              </div>
+               <div className="flex flex-col">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <PostCardSkeleton key={i} />
+                    ))}
+                  </div>
             ) : posts.length === 0 ? (
               <div className="w-full h-[300px] flex justify-center items-center text-[var(--text-primary)]">
                 No posts available

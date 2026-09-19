@@ -41,12 +41,17 @@ export const createNotification = async ({
     { path: "reel", select: "media" },
   ]);
 
-  const receiverSocketId = onlineUsers.get(recipientId.toString());
-  if (receiverSocketId) {
+  // onlineUsers stores a Set of socket ids per user (multiple tabs/devices),
+  // so we loop over it — io.to() needs a string room name, not a Set.
+  const receiverSockets = onlineUsers.get(recipientId.toString());
+  if (receiverSockets && receiverSockets.size > 0) {
     const io = getIO();
-    io.to(receiverSocketId).emit("newNotification", populated);
     const unreadCount = await Notification.countDocuments({ recipient: recipientId, isRead: false });
-    io.to(receiverSocketId).emit("unreadNotificationCount", unreadCount);
+
+    receiverSockets.forEach((sid) => {
+      io.to(sid).emit("newNotification", populated);
+      io.to(sid).emit("unreadNotificationCount", unreadCount);
+    });
   }
 
   return populated;
@@ -55,10 +60,13 @@ export const createNotification = async ({
 export const removeNotification = async ({ recipientId, senderId, type, postId = null, reelId = null }) => {
   await Notification.findOneAndDelete({ recipient: recipientId, sender: senderId, type, post: postId, reel: reelId });
 
-  const receiverSocketId = onlineUsers.get(recipientId.toString());
-  if (receiverSocketId) {
+  const receiverSockets = onlineUsers.get(recipientId.toString());
+  if (receiverSockets && receiverSockets.size > 0) {
     const io = getIO();
     const unreadCount = await Notification.countDocuments({ recipient: recipientId, isRead: false });
-    io.to(receiverSocketId).emit("unreadNotificationCount", unreadCount);
+
+    receiverSockets.forEach((sid) => {
+      io.to(sid).emit("unreadNotificationCount", unreadCount);
+    });
   }
 };

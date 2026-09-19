@@ -34,6 +34,10 @@ import aiRoutes from "./routes/aiRoutes.js";
 const app = express();
 const server = http.createServer(app);
 
+// Needed so secure cookies work correctly behind Render's proxy in production.
+// Harmless locally — does nothing when not behind a proxy.
+app.set("trust proxy", 1);
+
 initializeSocket(server);
 
 app.use(express.json({ limit: "1mb" }));
@@ -42,16 +46,23 @@ app.use(cookieParser());
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: process.env.FRONTEND_URL,
     credentials: true,
   })
 );
 
 app.use(
   session({
-    secret: "your_secret_key",
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: true,
+    cookie: {
+      // In production (different domains for frontend/backend), cookies must be
+      // secure + sameSite:"none" to be sent cross-site. Locally, both are on
+      // http://localhost, so we keep the old relaxed behavior there.
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    },
   })
 );
 
@@ -82,4 +93,3 @@ app.get("/", (req, res) => {
 server.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
-

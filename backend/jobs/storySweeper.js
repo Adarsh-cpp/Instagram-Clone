@@ -43,14 +43,14 @@ export const startStorySweeper = () => {
           if (result.result === "ok" || result.result === "not found") {
             await Story.deleteOne({ _id: story._id });
           } else {
-            console.log("Story sweep: unexpected Cloudinary result", story._id, result);
+            console.error("Story sweep: unexpected Cloudinary result", story._id, result);
           }
         } catch (err) {
-          console.log("Story sweep failed, will retry:", story._id, err.message);
+          console.error("Story sweep failed, will retry:", story._id, err.message);
         }
       }
     } catch (err) {
-      console.log("Story sweeper error:", err.message);
+      console.error("Story sweeper error:", err.message);
     } finally {
       running = false;
     }

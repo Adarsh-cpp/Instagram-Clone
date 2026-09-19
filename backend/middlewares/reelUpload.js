@@ -9,11 +9,11 @@ const videoFileFilter = (req, file, cb) => {
   const mimetype = (file.mimetype || "").toLowerCase();
   const ext = path.extname(file.originalname || "").toLowerCase();
 
-  console.log("Incoming video upload:", {
-    originalname: file.originalname,
-    mimetype: file.mimetype,
-    ext,
-  });
+  // console.log("Incoming video upload:", {
+  //   originalname: file.originalname,
+  //   mimetype: file.mimetype,
+  //   ext,
+  // });
 
   const isVideoMime = mimetype.startsWith("video/");
   const hasAllowedExt = allowedExtensions.includes(ext);
