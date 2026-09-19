@@ -1,6 +1,6 @@
 import express from "express";
 import { authUser } from "../middlewares/authMiddleware.js";
-import { addStoryToHighlight, createHighlight, deleteHighlight, getHighlightById, getUserHighlights, removeStoryFromHighlight } from "../controllers/highlightcontroller.js";
+import { addStoryToHighlight, createHighlight, deleteHighlight, getHighlightById, getUserHighlights, removeStoryFromHighlight } from "../controllers/highlightController.js";
 
 
 const router = express.Router();
