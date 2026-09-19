@@ -124,8 +124,11 @@ export const login = async (req, res) => {
           path: "/",
           maxAge: 3600000,
         });
+      
+        const safeUser = user.toObject();
+        delete safeUser.password;
 
-        res.status(200).json({ success:true, token, message: 'Logged in successfully', user});
+        res.status(200).json({ success:true, token, message: 'Logged in successfully', safeUser});
         
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
@@ -148,58 +151,91 @@ export const logout = (req, res) => {
 };
 
 export const sendOTP = async (req, res) => {
-
   const userId = req.user._id;
-  // console.log(userId);
 
-  if(!userId) {
-    return res.status(400).json({ message: 'Please sign in by filling necessary details' });
+  if (!userId) {
+    return res
+      .status(400)
+      .json({ message: "Please sign in by filling necessary details" });
   }
 
   try {
-
     const user = await userModel.findById(userId);
-   
-    if(!user) {
-      return res.status(404).json({ message: 'Please sign in by filling necessary details' });
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ message: "Please sign in by filling necessary details" });
     }
 
-    if(user.isAccountVerified) {
-      return res.status(401).json({ success:false, message:"User Already Verified" })
+    if (user.isAccountVerified) {
+      return res
+        .status(401)
+        .json({
+          success: false,
+          message: "User Already Verified",
+        });
     }
 
+    // Generate 6-digit OTP
+    const otp = String(
+      Math.floor(100000 + Math.random() * 900000)
+    );
 
-    //Generating 6-digit OTP
-    const otp = String(Math.floor(100000 + Math.random() * 900000));
     user.verifyOTP = otp;
-    user.verifyOTPExpiresAt = Date.now() + 24 * 60 * 1000;  // 1 minute expiry
+
+    // OTP expires in 1 minute
+    user.verifyOTPExpiresAt = Date.now() + 1 * 60 * 1000;
+
     await user.save();
 
-    // Send OTP via SMS or email
-    if(user.email){
+    // Send OTP through email
+    if (user.email) {
       const mailOptions = {
-      from: process.env.ADMIN_EMAIL || "adarshpattanayak2004@gmail.com",
-      to: user.email,
-      subject: 'Verify OTP',
-      html :`
-      <h4>Hi,</h4>
-      <h4>Someone tried to sign up for an Instgram-clone account with <span style="font-style: italic;">${user.email}.</span>If it was you,enter this OTP.</h4>
-      <h2>${otp}</h2>
-      <h5 style="color:#0095f6;">This OTP will expire in 1 minute.</h5>
-      `
-    }
-  
-    await transporter.sendMail(mailOptions);
+        from:
+          process.env.ADMIN_EMAIL ||
+          "adarshpattanayak2004@gmail.com",
+
+        to: user.email,
+
+        subject: "Verify OTP",
+
+        html: `
+          <h4>Hi,</h4>
+
+          <h4>
+            Someone tried to sign up for an Instagram-clone account
+            with <span style="font-style: italic;">${user.email}</span>.
+            If it was you, enter this OTP.
+          </h4>
+
+          <h2>${otp}</h2>
+
+          <h5 style="color:#0095f6;">
+            This OTP will expire in 1 minute.
+          </h5>
+        `,
+      };
+
+      await transporter.sendMail(mailOptions);
+    } else {
+      return res.status(400).json({
+        message: "Email is required to send OTP.",
+      });
     }
 
-    return res.status(200).json({ message: 'OTP sent successfully' });
-
+    return res
+      .status(200)
+      .json({ message: "OTP sent successfully" });
 
   } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    console.error("Send OTP Error:", error);
 
-}
+    return res
+      .status(500)
+      .json({ message: error.message });
+  }
+};
 
 export const verifyOTP = async (req, res) => {
   
