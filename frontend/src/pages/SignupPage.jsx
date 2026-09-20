@@ -79,11 +79,11 @@ const SignupPage = () => {
               required: "This field is required",
               pattern: {
                 value: emailOrMobileRegex,
-                message: "Mobile number or email address is required",
+                message: "email address is required",
               },
             })}
            className={`h-[36px] w-[270px] bg-[var(--bg-input)] text-[12px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px]  px-[10px] my-[3px] ${errors.contact ? " border border-[var(--color-error)]" : "border border-[var(--border-input)]" }`}
-            placeholder="Mobile number or email address"
+            placeholder="email address"
           />
           {errors.contact && (
             <p className="text-[var(--color-error)] text-sm mt-1">

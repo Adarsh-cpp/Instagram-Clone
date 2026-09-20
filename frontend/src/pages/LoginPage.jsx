@@ -72,11 +72,11 @@ const LoginPage = () => {
               required: "This field is required",
               pattern: {
                 value: userRegex,
-                message: "Enter valid username, email, or phone number",
+                message: "Enter valid username or email",
               },
             })}
             className={`h-[36px] w-[270px] bg-[var(--bg-input)] text-[12px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px]  px-[10px] my-[3px] ${errors.contact ? " border border-[var(--color-error)]" : "border border-[var(--border-input)]" }`}
-            placeholder="Phone number, username or email address"
+            placeholder="Username or email address"
           />
           {errors.contact && (
             <p className="text-red-500 text-sm mt-1">
