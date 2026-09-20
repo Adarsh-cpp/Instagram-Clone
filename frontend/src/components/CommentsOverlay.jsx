@@ -809,7 +809,7 @@ const CommentsOverlay = ({
                     ? "Suggest a comment with AI"
                     : "AI comments need a photo, not a video"
                 }
-                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                className="text-[var(--accent-blue)] hover:opacity-80 transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {isSuggesting ? (
                   <Loader2 size={20} className="animate-spin" />

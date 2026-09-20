@@ -24,6 +24,158 @@ const MAX_IMAGES = 4;
 const MESSAGE_PAGE_SIZE = 30;
 const LOAD_OLDER_THRESHOLD_PX = 300;
 
+// ---- emoji picker data ----
+// Self-contained (no extra package). `icon` is what shows on the category
+// tab; "Recent" is added on top automatically once the user has picked some.
+const RECENT_EMOJIS_KEY = "chatRecentEmojis";
+const MAX_RECENT_EMOJIS = 24;
+
+const EMOJI_CATEGORIES = [
+  {
+    id: "smileys",
+    label: "Smileys",
+    icon: "😀",
+    emojis: [
+      "😀","😃","😄","😁","😆","😅","😂","🤣","😊","😇","🙂","🙃","😉","😌","😍","🥰",
+      "😘","😗","😙","😚","😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🤩","🥳","😏",
+      "😒","😞","😔","😟","😕","🙁","😣","😖","😫","😩","🥺","😢","😭","😤","😠","😡",
+      "🤬","🤯","😳","🥵","🥶","😱","😨","😰","😥","😓","🤗","🤔","🤭","🤫","🤥","😶",
+      "😐","😑","😬","🙄","😯","😦","😧","😮","😲","🥱","😴","🤤","😪","😵","🤐","🥴",
+      "🤢","🤮","🤧","😷","🤒","🤕","🤑","🤠","😈","👿","👹","👺","🤡","💩","👻","💀",
+      "👽","🤖","🎃",
+    ],
+  },
+  {
+    id: "people",
+    label: "People",
+    icon: "👋",
+    emojis: [
+      "👋","🤚","✋","🖖","👌","🤌","🤏","✌️","🤞","🤟","🤘","🤙","👈","👉","👆","👇",
+      "☝️","👍","👎","✊","👊","🤛","🤜","👏","🙌","👐","🤲","🤝","🙏","✍️","💅","🤳",
+      "💪","🦾","🦵","🦶","👂","👃","🧠","👀","👅","👄","💋","🧑","👶","👦","👧","👨",
+      "👩","🧔","👴","👵","🙋","🙆","🙅","🤷","🤦","💁","🙇","🕺","💃","🏃","🚶",
+    ],
+  },
+  {
+    id: "hearts",
+    label: "Hearts & symbols",
+    icon: "❤️",
+    emojis: [
+      "❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❣️","💕","💞","💓","💗","💖",
+      "💘","💝","💟","✨","⭐","🌟","💫","🔥","💥","💯","✅","❌","❗","❓","‼️","⁉️",
+      "💢","💤","💬","💭","🔔","🎵","🎶","➕","➖","➗","✔️","♻️","⚠️","🚫","🔞","🆗",
+      "🆒","🆕","🔝","💲","™️","©️","®️",
+    ],
+  },
+  {
+    id: "nature",
+    label: "Animals & nature",
+    icon: "🐶",
+    emojis: [
+      "🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐸","🐵","🙈",
+      "🙉","🙊","🐔","🐧","🐦","🐤","🦆","🦅","🦉","🦇","🐺","🐗","🐴","🦄","🐝","🐛",
+      "🦋","🐌","🐞","🐜","🐢","🐍","🦎","🐙","🦑","🦀","🐠","🐟","🐬","🐳","🦈","🐊",
+      "🐘","🦒","🦓","🐪","🌵","🌲","🌳","🌴","🌱","🌿","🍀","🍁","🍂","🌸","🌼","🌻",
+      "🌹","🌷","🌺","🌈","☀️","⛅","☁️","⚡","❄️","🌙","🌊","🔥",
+    ],
+  },
+  {
+    id: "food",
+    label: "Food & drink",
+    icon: "🍔",
+    emojis: [
+      "🍎","🍐","🍊","🍋","🍌","🍉","🍇","🍓","🍒","🍑","🥭","🍍","🥥","🥝","🍅","🥑",
+      "🥦","🥕","🌽","🥔","🍞","🥐","🥖","🧀","🥚","🍳","🥞","🥓","🍗","🍖","🌭","🍔",
+      "🍟","🍕","🥪","🌮","🌯","🍜","🍝","🍣","🍤","🍙","🍚","🍛","🍦","🍧","🍨","🍩",
+      "🍪","🎂","🍰","🧁","🍫","🍬","🍭","🍿","☕","🍵","🥤","🍺","🍷","🥂","🍹",
+    ],
+  },
+  {
+    id: "activities",
+    label: "Activities",
+    icon: "⚽",
+    emojis: [
+      "⚽","🏀","🏈","⚾","🎾","🏐","🏉","🎱","🏓","🏸","🥊","🥋","⛳","🏹","🎣","🎯",
+      "🎮","🎲","🧩","🎨","🎬","🎤","🎧","🎸","🎹","🥁","🎺","🎻","🏆","🥇","🥈","🥉",
+      "🏅","🎉","🎊","🎈","🎁","🏋️","🚴","🏊","🧘",
+    ],
+  },
+  {
+    id: "travel",
+    label: "Travel & objects",
+    icon: "🚗",
+    emojis: [
+      "🚗","🚕","🚌","🚓","🚑","🚒","🚲","🛵","🏍️","✈️","🚀","🛸","🚁","⛵","🚢","🏠",
+      "🏢","🏰","🗼","🗽","⛰️","🏖️","🏝️","🌍","🌎","📱","💻","⌨️","🖥️","📷","📸","🎥",
+      "📺","⏰","⌚","💡","🔋","🔑","🔒","💰","💳","💎","🎓","📚","✏️","📌","📎","✂️","🔍",
+    ],
+  },
+];
+
+// Emoji picker panel. Purely presentational: the parent owns open/close,
+// caret-aware insertion and the recents list. `onMouseDown` preventDefault on
+// the interactive bits keeps focus (and the caret) inside the message input.
+const EmojiPicker = ({ pickerRef, recentEmojis, onSelect }) => {
+  const [activeCategoryId, setActiveCategoryId] = useState(
+    recentEmojis.length > 0 ? "recent" : "smileys"
+  );
+
+  const categories =
+    recentEmojis.length > 0
+      ? [{ id: "recent", label: "Recent", icon: "🕘", emojis: recentEmojis }, ...EMOJI_CATEGORIES]
+      : EMOJI_CATEGORIES;
+
+  const activeCategory =
+    categories.find((category) => category.id === activeCategoryId) || categories[0];
+
+  return (
+    <div
+      ref={pickerRef}
+      className="emojiPicker absolute bottom-full left-2 mb-2 z-30 w-[340px] max-w-[96%] rounded-2xl overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-soft)] shadow-lg"
+    >
+      <div className="flex items-center border-b border-[var(--border-soft)] px-1">
+        {categories.map((category) => (
+          <button
+            key={category.id}
+            type="button"
+            title={category.label}
+            aria-label={category.label}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setActiveCategoryId(category.id)}
+            className={`flex-1 h-[38px] flex items-center justify-center text-[18px] cursor-pointer border-b-2 transition-colors ${
+              activeCategory.id === category.id
+                ? "border-[var(--accent-blue)]"
+                : "border-transparent opacity-60 hover:opacity-100"
+            }`}
+          >
+            {category.icon}
+          </button>
+        ))}
+      </div>
+
+      <div className="no-scrollbar h-[220px] overflow-y-auto p-2">
+        <div className="px-1 pb-1.5 text-[12px] text-[var(--text-muted)]">
+          {activeCategory.label}
+        </div>
+
+        <div className="grid grid-cols-8 gap-0.5">
+          {activeCategory.emojis.map((emoji) => (
+            <button
+              key={`${activeCategory.id}-${emoji}`}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onSelect(emoji)}
+              className="aspect-square flex items-center justify-center text-[22px] leading-none rounded-lg hover:bg-[var(--bg-menu-hover)] cursor-pointer"
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
@@ -55,6 +207,18 @@ const Chat = ({ onConversationActivity }) => {
   // sticker/animated-sticker/GIF picker overlay
   const [isStickerPickerOpen, setIsStickerPickerOpen] = useState(false);
 
+  // emoji picker (the smiley on the left of the input bar) + the user's
+  // most recently used emojis, remembered across sessions
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [recentEmojis, setRecentEmojis] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(RECENT_EMOJIS_KEY) || "[]");
+      return Array.isArray(stored) ? stored.slice(0, MAX_RECENT_EMOJIS) : [];
+    } catch (error) {
+      return [];
+    }
+  });
+
   // info ("i") popup menu + chat settings overlay
   const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false);
   const [isThemeOverlayOpen, setIsThemeOverlayOpen] = useState(false);
@@ -71,6 +235,8 @@ const Chat = ({ onConversationActivity }) => {
   const containerRef = useRef(null);
   const listStartRef = useRef(null);
   const messageInputRef = useRef(null);
+  const emojiPickerRef = useRef(null);
+  const emojiButtonRef = useRef(null);
 
   // pagination refs — kept in sync with state for use inside callbacks
   // that shouldn't be re-created every render
@@ -588,6 +754,40 @@ const Chat = ({ onConversationActivity }) => {
     return () => suggestAbortRef.current?.abort();
   }, []);
 
+  // emoji picker: close it when switching to another conversation
+  useEffect(() => {
+    setIsEmojiPickerOpen(false);
+  }, [conversationId]);
+
+  // emoji picker: close on outside press or Escape. Presses on the picker
+  // itself and on the smiley button are ignored here (the button toggles it
+  // on its own). Pressing the sticker / sparkle / attach buttons or the chat
+  // area counts as "outside", so the picker never stacks with those panels.
+  useEffect(() => {
+    if (!isEmojiPickerOpen) return;
+
+    const handlePointerDown = (e) => {
+      if (
+        emojiPickerRef.current?.contains(e.target) ||
+        emojiButtonRef.current?.contains(e.target)
+      ) {
+        return;
+      }
+      setIsEmojiPickerOpen(false);
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setIsEmojiPickerOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isEmojiPickerOpen]);
+
   const handleTyping = (e) => {
     setMessage(e.target.value);
 
@@ -878,6 +1078,50 @@ const Chat = ({ onConversationActivity }) => {
     setMessage(text);
     setIsSuggestionPanelOpen(false);
     messageInputRef.current?.focus();
+  };
+
+  // ---- emoji picker ----
+  // The smiley toggles the picker; opening it closes the sticker picker and
+  // the AI suggestions panel so only one panel sits above the input at a time.
+  const handleEmojiButtonClick = () => {
+    if (isEmojiPickerOpen) {
+      setIsEmojiPickerOpen(false);
+      return;
+    }
+
+    setIsStickerPickerOpen(false);
+    if (isSuggestionPanelOpen) closeSuggestionPanel();
+    setIsEmojiPickerOpen(true);
+  };
+
+  // Inserts the emoji at the caret (or replaces the current selection) and
+  // puts the caret right after it, so several emojis can be added in a row.
+  // The picker stays open on purpose for the same reason.
+  const handleEmojiSelect = (emoji) => {
+    const input = messageInputRef.current;
+    const start = Math.min(input?.selectionStart ?? message.length, message.length);
+    const end = Math.min(input?.selectionEnd ?? message.length, message.length);
+
+    setMessage(message.slice(0, start) + emoji + message.slice(end));
+
+    const nextRecent = [emoji, ...recentEmojis.filter((item) => item !== emoji)].slice(
+      0,
+      MAX_RECENT_EMOJIS
+    );
+    setRecentEmojis(nextRecent);
+    try {
+      localStorage.setItem(RECENT_EMOJIS_KEY, JSON.stringify(nextRecent));
+    } catch (error) {
+      // silent: recents are a nicety, not worth interrupting the chat
+    }
+
+    requestAnimationFrame(() => {
+      const el = messageInputRef.current;
+      if (!el) return;
+      el.focus();
+      const caret = start + emoji.length;
+      el.setSelectionRange(caret, caret);
+    });
   };
 
     return (
@@ -1223,7 +1467,19 @@ const Chat = ({ onConversationActivity }) => {
           >
 
             <div className="emojiSection w-[42px] sm:w-[48px] shrink-0 flex justify-center items-center">
-              <Smile size={24} style={{ color: inputBarText }} className="cursor-pointer" />
+              <button
+                type="button"
+                ref={emojiButtonRef}
+                onClick={handleEmojiButtonClick}
+                aria-label="Emojis"
+                aria-expanded={isEmojiPickerOpen}
+                className="emoji w-[36px] h-[36px] flex justify-center items-center cursor-pointer"
+              >
+                <Smile
+                  size={24}
+                  style={{ color: isEmojiPickerOpen ? "var(--accent-blue)" : inputBarText }}
+                />
+              </button>
             </div>
 
             <div className="messageInput flex-1 min-w-0 h-full">
@@ -1298,6 +1554,17 @@ const Chat = ({ onConversationActivity }) => {
             </div>
 
           </div>
+
+          {/* emoji picker — sibling of messageBar for the same reason as the
+              sticker picker below: messageBar has overflow-hidden, which
+              would clip it. Anchored to the footer, above the input. */}
+          {isEmojiPickerOpen && (
+            <EmojiPicker
+              pickerRef={emojiPickerRef}
+              recentEmojis={recentEmojis}
+              onSelect={handleEmojiSelect}
+            />
+          )}
 
           {/* sibling of messageBar (not a child of it) — messageBar has
               overflow-hidden for its rounded corners, which would clip this

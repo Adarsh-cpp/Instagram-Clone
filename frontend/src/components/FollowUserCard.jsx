@@ -2,8 +2,14 @@
 import React, { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { BadgeCheck } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 const FollowUserCard = ({ userId, profilePic, username, fullName, isFollowing, role, onToggleFollow, onCardClick }) => {
+
+  const { user } = useAuth()
+
+  // you can't follow yourself — no follow button on your own card
+  const isSelf = !!user?._id && String(user._id) === String(userId)
 
   const handleFollowClick = (e) => {
     // Prevent the click from bubbling up to the Link and navigating away
@@ -40,18 +46,20 @@ const FollowUserCard = ({ userId, profilePic, username, fullName, isFollowing, r
         </div>
       </div>
 
-      <div className="removeSide">
-        <button
-          onClick={handleFollowClick}
-          className={`px-4 py-1.5 rounded-lg text-[13px] font-semibold cursor-pointer ${
-            isFollowing
-              ? "bg-[var(--bg-secondary-btn)] text-[var(--text-primary)] hover:bg-[var(--bg-secondary-btn-hover)]"
-              : "bg-[var(--brand-blue)] text-[var(--text-on-brand)] hover:bg-[var(--brand-blue-hover)]"
-          }`}
-        >
-          {isFollowing ? "Following" : "Follow"}
-        </button>
-      </div>
+      {!isSelf && (
+        <div className="removeSide">
+          <button
+            onClick={handleFollowClick}
+            className={`px-4 py-1.5 rounded-lg text-[13px] font-semibold cursor-pointer ${
+              isFollowing
+                ? "bg-[var(--bg-secondary-btn)] text-[var(--text-primary)] hover:bg-[var(--bg-secondary-btn-hover)]"
+                : "bg-[var(--brand-blue)] text-[var(--text-on-brand)] hover:bg-[var(--brand-blue-hover)]"
+            }`}
+          >
+            {isFollowing ? "Following" : "Follow"}
+          </button>
+        </div>
+      )}
     </Link>
   )
 }

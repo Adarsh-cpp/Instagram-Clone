@@ -22,6 +22,18 @@ const edgeFadeMask = {
     "linear-gradient(to right, transparent 0, black 0px, black calc(100% - 0px), transparent 100%)",
 };
 
+// Swiper layout per screen size.
+// - Mobile (< 768px): exactly 4 equal-width slides fit across the row, like
+//   Instagram. Extra stories are reached by swiping.
+// - md and up (>= 768px): original behaviour — auto-width slides, 20px gap.
+// 768 matches Tailwind's `md` breakpoint (same one StoryCircle uses).
+const SWIPER_BREAKPOINTS = {
+  768: {
+    slidesPerView: "auto",
+    spaceBetween: 20,
+  },
+};
+
 const isGroupSeen = (group, myId) =>
   group.stories.length > 0 &&
   group.stories.every((s) => s.viewers.some((v) => v.user === myId));
@@ -180,7 +192,7 @@ const StoryContainer = () => {
     hasOwnStory && ownGroup.stories.every((s) => viewedOwnIds.includes(s._id));
 
   return (
-    <div className="storyContainer relative w-full h-[130px] px-10 flex items-center mt-4">
+    <div className="storyContainer relative w-full h-[130px] px-2 md:px-10 flex items-center mt-4">
       <input
         ref={fileInputRef}
         type="file"
@@ -189,10 +201,11 @@ const StoryContainer = () => {
         onChange={handleFileSelected}
       />
 
+      {/* arrows are desktop-only — on mobile you just swipe, like Instagram */}
       {hasPrev && !showEmptyRowOnly && (
         <button
           onClick={() => swiperRef.current?.slidePrev()}
-          className="absolute left-0 z-10 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white"
+          className="absolute left-0 z-10 w-8 h-8 rounded-full bg-black/60 hidden md:flex items-center justify-center text-white"
           aria-label="Previous stories"
         >
           <ChevronLeft size={18} />
@@ -207,14 +220,16 @@ const StoryContainer = () => {
         onSlideChange={updateNavState}
         onReachEnd={updateNavState}
         onReachBeginning={updateNavState}
-        slidesPerView="auto"
-        spaceBetween={20}
+        slidesPerView={4}
+        spaceBetween={0}
+        breakpoints={SWIPER_BREAKPOINTS}
         grabCursor={true}
         style={edgeFadeMask}
         className="w-full h-full flex items-center"
       >
         {/* own story is ALWAYS the first slide — same swiper, same alignment as everyone else */}
-        <SwiperSlide className="!w-auto relative">
+        {/* mobile: Swiper sizes each slide to 1/4 of the row. md+: auto width as before. */}
+        <SwiperSlide className="md:!w-auto relative">
           <StoryCircle
             imgSrc={user.profilePic ? user.profilePic : "images/default-profile-pic.jpg"}
             username="Your story"
@@ -232,7 +247,7 @@ const StoryContainer = () => {
         </SwiperSlide>
 
         {feed.map((group) => (
-          <SwiperSlide key={group.author._id} className="!w-auto">
+          <SwiperSlide key={group.author._id} className="md:!w-auto">
             <StoryCircle
               imgSrc={group.author.profilePic ? group.author.profilePic : "images/default-profile-pic.jpg" }
               username={group.author.username}
@@ -247,7 +262,7 @@ const StoryContainer = () => {
       {hasNext && !showEmptyRowOnly && (
         <button
           onClick={() => swiperRef.current?.slideNext()}
-          className="absolute right-0 z-10 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white"
+          className="absolute right-0 z-10 w-8 h-8 rounded-full bg-black/60 hidden md:flex items-center justify-center text-white"
           aria-label="Next stories"
         >
           <ChevronRight size={18} />

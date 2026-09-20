@@ -31,6 +31,8 @@ import HighlightViewerPage from "../pages/HighlightViewerPage.jsx";
 import AboutPage from "../pages/AboutPage.jsx";
 import GoogleAuthCallback from "../pages/GoogleAuthCallback.jsx";
 import CompleteProfile from "../pages/CompleteProfile.jsx";
+import PrivacyPolicy from "../pages/Legal/PrivacyPolicy";
+import Terms from "../pages/Legal/Terms";
 
 
 
@@ -74,7 +76,10 @@ const router = createBrowserRouter([
       {path: "/story/view/:userId", element: <StoryViewerPage /> },
       {path: "/highlight/view/:highlightId", element: <HighlightViewerPage/> },
 
-      {path: "/about", element: <AboutPage/> }
+      {path: "/about", element: <AboutPage/> },
+
+      { path: "/privacy-policy", element: <PrivacyPolicy />},
+      { path: "/terms", element: <Terms /> },
 
     ],
   },

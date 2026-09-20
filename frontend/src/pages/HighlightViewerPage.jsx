@@ -4,12 +4,18 @@ import { useNavigate, useParams } from "react-router-dom";
 import { X, MoreHorizontal } from "lucide-react";
 import { toast } from "react-toastify";
 import axiosInstance from "../utils/axiosInstance";
+import { useAuth } from "../context/AuthContext";
 
 const DEFAULT_IMAGE_SECONDS = 5;
+
+// the owner field can come back either as a plain id string or as a
+// populated user object — normalise both to an id string
+const getId = (v) => (v && typeof v === "object" ? v._id : v);
 
 const HighlightViewerPage = () => {
   const { highlightId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [highlight, setHighlight] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -49,6 +55,13 @@ const HighlightViewerPage = () => {
 
   const stories = highlight?.stories || [];
   const currentStory = stories[storyIndex];
+
+  // only the person who created this highlight may remove stories from it
+  // or delete it — everyone else just watches
+  const ownerId = getId(
+    highlight?.user ?? highlight?.author ?? highlight?.owner ?? highlight?.userId
+  );
+  const isOwner = !!user?._id && !!ownerId && String(ownerId) === String(user._id);
 
   const handleNext = () => {
     if (storyIndex < stories.length - 1) setStoryIndex((i) => i + 1);
@@ -217,18 +230,21 @@ const HighlightViewerPage = () => {
           <p className="text-white text-sm font-semibold truncate">{highlight.title}</p>
 
           <div className="relative flex items-center gap-4">
-            <button
-              onClick={() => setMenuOpen((o) => !o)}
-              className="text-white"
-              aria-label="More options"
-            >
-              <MoreHorizontal size={22} />
-            </button>
+            {/* three-dot menu is owner-only */}
+            {isOwner && (
+              <button
+                onClick={() => setMenuOpen((o) => !o)}
+                className="text-white"
+                aria-label="More options"
+              >
+                <MoreHorizontal size={22} />
+              </button>
+            )}
             <button onClick={() => navigate(-1)} className="text-white" aria-label="Close">
               <X size={22} />
             </button>
 
-            {menuOpen && (
+            {isOwner && menuOpen && (
               <>
                 {/* full-screen backdrop so a tap anywhere else closes the menu */}
                 <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
