@@ -1,5 +1,6 @@
 import postModel from "../models/post.model.js";
 import commentModel from "../models/comment.model.js";
+import notificationModel from "../models/notification.model.js";
 import { createNotification } from "../services/notification.service.js";
 
 
