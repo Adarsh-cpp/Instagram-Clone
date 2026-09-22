@@ -6,12 +6,25 @@ import LocationPicker from "../components/LocationPicker";
 import TagPeoplePicker from "../components/TagPeoplePicker";
 import AiCaptionAssistant from "../components/AiCaptionAssistant";
 
+// Maps the aspect value chosen in TrimVideoPage (or CropImagePage) to a
+// numeric ratio so the video preview box can match it. Falls back to a
+// sensible default if something unexpected comes through.
+const ASPECT_RATIO_MAP = {
+  "9:16": 9 / 16,
+  "16:9": 16 / 9,
+  "1:1": 1,
+  "4:5": 4 / 5,
+};
+
+const getVideoAspectRatio = (aspectRatio) => ASPECT_RATIO_MAP[aspectRatio] || 9 / 16;
+
 const CaptionSharePage = ({
   images,
   video,
   mediaType,
   trimData,
   isPreTrimmed,
+  aspectRatio,
   back,
   handlePost,
   user,
@@ -35,6 +48,12 @@ const CaptionSharePage = ({
   const touchStartX = useRef(null);
 
   const isCarousel = mediaType === "image" && mediaUrls.length > 1;
+
+  // The video preview needs to be boxed into the same aspect ratio the
+  // user picked in TrimVideoPage and rendered with object-cover, so the
+  // review actually shows how the final cropped clip will look — not the
+  // raw, untouched source video dimensions.
+  const videoAspectRatio = getVideoAspectRatio(aspectRatio);
 
   // The File the AI should look at: whichever slide is currently on screen.
   // These are the already-cropped Files from CropImagePage, so the caption
@@ -179,41 +198,56 @@ const CaptionSharePage = ({
               onTouchEnd={isCarousel ? handleTouchEnd : undefined}
             >
               {mediaType === "video" ? (
-                mediaUrls[0] &&
-                (isPreTrimmed ? (
-                  <video
-                    ref={videoRef}
-                    src={mediaUrls[0]}
-                    className="w-full h-full object-contain"
-                    controls
-                    muted
-                    loop
-                    playsInline
-                  />
-                ) : (
+                mediaUrls[0] && (
+                  // Boxed to the chosen crop aspect ratio, video fills it
+                  // with object-cover — this is what makes the review match
+                  // how the reel will actually be cropped, instead of just
+                  // showing the untouched source video's own dimensions.
                   <div
-                    className="relative w-full h-full flex items-center justify-center cursor-pointer"
-                    onClick={togglePlay}
+                    className="relative overflow-hidden bg-black"
+                    style={{
+                      aspectRatio: videoAspectRatio,
+                      height: "100%",
+                      maxWidth: "100%",
+                      maxHeight: "100%",
+                    }}
                   >
-                    <video
-                      ref={videoRef}
-                      src={mediaUrls[0]}
-                      className="w-full h-full object-contain"
-                      muted
-                      loop
-                      playsInline
-                      onLoadedMetadata={handleLoadedMetadata}
-                      onTimeUpdate={handleTimeUpdate}
-                    />
-                    {!isPlaying && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="w-14 h-14 rounded-full bg-black/50 flex items-center justify-center">
-                          <Play size={22} fill="white" className="ml-0" />
-                        </div>
+                    {isPreTrimmed ? (
+                      <video
+                        ref={videoRef}
+                        src={mediaUrls[0]}
+                        className="w-full h-full object-cover"
+                        controls
+                        muted
+                        loop
+                        playsInline
+                      />
+                    ) : (
+                      <div
+                        className="relative w-full h-full flex items-center justify-center cursor-pointer"
+                        onClick={togglePlay}
+                      >
+                        <video
+                          ref={videoRef}
+                          src={mediaUrls[0]}
+                          className="w-full h-full object-cover"
+                          muted
+                          loop
+                          playsInline
+                          onLoadedMetadata={handleLoadedMetadata}
+                          onTimeUpdate={handleTimeUpdate}
+                        />
+                        {!isPlaying && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-14 h-14 rounded-full bg-black/50 flex items-center justify-center">
+                              <Play size={22} fill="white" className="ml-0" />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                ))
+                )
               ) : (
                 mediaUrls[activeSlide] && (
                   <img src={mediaUrls[activeSlide]} alt="Preview" className="w-full h-full object-contain" />

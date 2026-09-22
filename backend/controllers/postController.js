@@ -96,10 +96,22 @@ export const createPost = async (req, res) => {
       )
     );
 
+    // Populate the author so the client gets the same shape the feed
+    // endpoint returns (username, profilePic, role) and can render the
+    // new post immediately without a refresh.
+    await post.populate("author", "username profilePic role");
+
+    const postResponse = {
+      ...post.toObject(),
+      likes: post.likes || [],
+      commentsCount: post.commentsCount ?? 0,
+      isSaved: false,
+    };
+
     return res.status(201).json({
       success: true,
       message: "Post created successfully",
-      post,
+      post: postResponse,
     });
   } catch (error) {
     console.error("Create Post Error:", error);
@@ -110,7 +122,6 @@ export const createPost = async (req, res) => {
     });
   }
 };
-
 export const getFeedPosts = async (req, res) => {
   try {
     const userId = req.user._id;

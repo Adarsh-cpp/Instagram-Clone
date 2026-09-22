@@ -12,6 +12,7 @@ import {
   Plus,
   Copy,
   Check,
+  Reply as ReplyIcon,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -29,6 +30,12 @@ const LONG_PRESS_MS = 500;
 const MENU_WIDTH = 260;
 const MENU_HEIGHT_ESTIMATE = 210; // quick-reactions row + timestamp row (+ unsend row)
 
+// swipe-to-reply (mobile) tuning — only enabled on the friend's (received)
+// messages, matching the right-click "Reply" option on desktop
+const SWIPE_REPLY_THRESHOLD_PX = 60;
+const SWIPE_REPLY_MAX_PX = 80;
+const SWIPE_MOVE_CANCEL_PX = 8; // below this, a touch still counts as a long-press candidate
+
 // Instagram-style quick reaction row. The "+" next to these opens the
 // full EmojiPickerPanel for anything else.
 const QUICK_REACTIONS = ["❤️", "😆", "😮", "😢", "👍"];
@@ -38,6 +45,18 @@ const QUICK_REACTIONS = ["❤️", "😆", "😮", "😢", "👍"];
 // the others are accepted so any older/alternate naming still resolves.
 const POST_SHARE_TYPES = ["post_share", "post", "sharedPost"];
 const REEL_SHARE_TYPES = ["reel_share", "reel", "sharedReel"];
+
+// labels for the small quoted-reply preview when the original message had
+// no text of its own (mirrors the same mapping used to build the
+// "Replying to ..." bar above the input in Chat.jsx)
+const REPLY_TYPE_LABELS = {
+  image: "Photo",
+  sticker: "Sticker",
+  post_share: "Post",
+  reel_share: "Reel",
+  story_share: "Story",
+  story_reply: "Story reply",
+};
 
 const trimCaption = (text) => {
   if (!text) return "";
@@ -52,6 +71,7 @@ const MessageBox = ({
   showSeen,
   onDelete,
   onReact,
+  onReply,
   senderBubbleColor,
   receiverBubbleColor,
   senderTextColor,
@@ -77,6 +97,12 @@ const MessageBox = ({
   // brief "Copied!" confirmation state after using the Copy option
   const [isCopied, setIsCopied] = useState(false);
 
+  // swipe-right-to-reply (mobile, received messages only) — dragX drives
+  // the live transform while the finger is down; reset to 0 on release
+  const [dragX, setDragX] = useState(0);
+  const isSwipingRef = useRef(false);
+  const touchStartRef = useRef({ x: 0, y: 0 });
+
   const longPressTimerRef = useRef(null);
   const menuRef = useRef(null);
 
@@ -86,6 +112,11 @@ const MessageBox = ({
       : message?.senderId;
 
   const isSenderMessage = senderId === user?._id;
+
+  // Reply is only offered on the friend's (received) messages — matches
+  // "on right clicking on receiver's msg" / "sliding right on a msg" for
+  // the receiver's message, as requested.
+  const canReply = !isSenderMessage;
 
   // Resolved theme colors for THIS bubble. These are applied as inline
   // styles — they're runtime hex values from the theme catalog, so they
@@ -139,6 +170,16 @@ const MessageBox = ({
   const isSharedContentDeleted = isSharedPostDeleted || isSharedReelDeleted;
 
   const sharedItem = sharedPost || sharedReel || sharedStory;
+
+  // ---- reply-to-message snapshot (the "replyTo" field on this message —
+  // this message IS a reply to an earlier one) ----
+  const replySnapshot = message?.replyTo;
+
+  const replyQuoteText = useMemo(() => {
+    if (!replySnapshot) return "";
+    if (replySnapshot.text) return trimCaption(replySnapshot.text);
+    return REPLY_TYPE_LABELS[replySnapshot.messageType] || "Message";
+  }, [replySnapshot]);
 
   // ---- reply-to-story snapshot (separate from sharedStory/forwarding) ----
   const repliedStory = message?.repliedStory;
@@ -274,8 +315,9 @@ const MessageBox = ({
 
   // ---- info menu: right-click on desktop, long-press on mobile ----
   // Opens for both sender and receiver messages. What's inside it
-  // (reaction row + timestamp always; Unsend only for own messages) is
-  // decided at render time by `isSenderMessage`.
+  // (reaction row + timestamp always; Reply for received messages; Unsend
+  // only for own messages) is decided at render time by `isSenderMessage`
+  // / `canReply`.
 
   const openMenuAt = (x, y) => {
     const left = Math.max(8, Math.min(x - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8));
@@ -295,9 +337,51 @@ const MessageBox = ({
   const handleTouchStart = (e) => {
     const touch = e.touches[0];
 
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    isSwipingRef.current = false;
+
     longPressTimerRef.current = setTimeout(() => {
       openMenuAt(touch.clientX, touch.clientY);
     }, LONG_PRESS_MS);
+  };
+
+  // Tracks a right-drag on received messages to reveal the reply icon and,
+  // past the threshold, fire the reply on release. Any other direction of
+  // movement just cancels the long-press timer, same as before.
+  const handleTouchMove = (e) => {
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - touchStartRef.current.x;
+    const deltaY = touch.clientY - touchStartRef.current.y;
+
+    if (Math.abs(deltaX) > SWIPE_MOVE_CANCEL_PX || Math.abs(deltaY) > SWIPE_MOVE_CANCEL_PX) {
+      clearTimeout(longPressTimerRef.current);
+    }
+
+    if (!canReply) return;
+
+    // ignore mostly-vertical drags (scrolling the message list)
+    if (Math.abs(deltaY) > Math.abs(deltaX)) return;
+
+    if (deltaX > SWIPE_MOVE_CANCEL_PX) {
+      isSwipingRef.current = true;
+      // rubber-band past the max so it doesn't feel like it hit a wall
+      const clamped =
+        deltaX <= SWIPE_REPLY_MAX_PX
+          ? deltaX
+          : SWIPE_REPLY_MAX_PX + (deltaX - SWIPE_REPLY_MAX_PX) * 0.25;
+      setDragX(clamped);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    clearTimeout(longPressTimerRef.current);
+
+    if (isSwipingRef.current && dragX >= SWIPE_REPLY_THRESHOLD_PX) {
+      onReply?.(message);
+    }
+
+    isSwipingRef.current = false;
+    setDragX(0);
   };
 
   const cancelLongPress = () => {
@@ -346,6 +430,11 @@ const MessageBox = ({
   const handleReact = (emoji) => {
     setIsMenuOpen(false);
     onReact?.(message._id, emoji);
+  };
+
+  const handleReplyClick = () => {
+    setIsMenuOpen(false);
+    onReply?.(message);
   };
 
   // Copies the message's text to the clipboard. Only rendered for
@@ -425,22 +514,62 @@ const MessageBox = ({
         isSenderMessage ? "items-end" : "items-start"
       } px-3 sm:px-4`}
     >
-      <div
-        onContextMenu={handleContextMenu}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={cancelLongPress}
-        onTouchMove={cancelLongPress}
-        // media messages keep a transparent bubble (the image/card IS the
-        // bubble); text-only messages get the themed background + text color
-        style={
-          hasMedia
-            ? undefined
-            : { backgroundColor: bubbleBg, color: bubbleText }
-        }
-        className={`messageBox relative max-w-[85%] sm:max-w-[75%] md:max-w-[70%] w-fit min-h-[40px] rounded-3xl my-1 select-none break-words ${
-          hasMedia ? "px-0 py-2 bg-transparent" : "px-4 py-2"
-        } ${groupedReactions.length > 0 ? "mb-3" : ""}`}
-      >
+      {/* swipe-to-reply wrapper — only received messages get the reply icon
+          revealed behind them and the live drag transform */}
+      <div className="relative w-full max-w-full flex" style={{ justifyContent: isSenderMessage ? "flex-end" : "flex-start" }}>
+
+        {canReply && (
+          <div
+            aria-hidden="true"
+            style={{ opacity: Math.min(dragX / SWIPE_REPLY_THRESHOLD_PX, 1) }}
+            className="absolute left-1 top-1/2 -translate-y-1/2 text-[var(--accent-blue)] pointer-events-none"
+          >
+            <ReplyIcon size={20} />
+          </div>
+        )}
+
+        <div
+          onContextMenu={handleContextMenu}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onTouchMove={canReply ? handleTouchMove : cancelLongPress}
+          style={{
+            ...(hasMedia
+              ? undefined
+              : { backgroundColor: bubbleBg, color: bubbleText }),
+            transform: dragX ? `translateX(${dragX}px)` : undefined,
+            transition: dragX ? "none" : "transform 150ms ease-out",
+          }}
+          // media messages keep a transparent bubble (the image/card IS the
+          // bubble); text-only messages get the themed background + text color
+          className={`messageBox relative max-w-[85%] sm:max-w-[75%] md:max-w-[70%] w-fit min-h-[40px] rounded-3xl my-1 select-none break-words ${
+            hasMedia ? "px-0 py-2 bg-transparent" : "px-4 py-2"
+          } ${groupedReactions.length > 0 ? "mb-3" : ""}`}
+        >
+        {/* quoted preview of the message this one replies to — sits above
+            the actual content of the bubble, Instagram-style */}
+        {replySnapshot && (
+          <div
+            style={
+              hasMedia
+                ? { backgroundColor: "rgba(0,0,0,0.35)", color: "#FFFFFF" }
+                : { backgroundColor: "rgba(0,0,0,0.18)", color: bubbleText }
+            }
+            className="replyQuote flex items-center gap-2 mb-1.5 max-w-full rounded-xl px-2.5 py-1.5 border-l-2 border-[var(--accent-blue)]"
+          >
+            {replySnapshot.image && (
+              <img
+                src={replySnapshot.image}
+                alt=""
+                className="w-[32px] h-[32px] rounded-md object-cover shrink-0"
+              />
+            )}
+            <span className="text-[12px] leading-snug truncate opacity-90">
+              {replyQuoteText}
+            </span>
+          </div>
+        )}
+
         {sticker && sticker.type === "sticker" && (
           <div className="stickerMessage w-[96px] h-[96px] sm:w-[130px] sm:h-[130px] flex items-center justify-center text-[62px] sm:text-[84px] leading-none">
             {sticker.emoji}
@@ -764,6 +893,7 @@ const MessageBox = ({
             )}
           </button>
         )}
+        </div>
       </div>
 
       {showSeen && (
@@ -846,6 +976,17 @@ const MessageBox = ({
                     Copy
                   </>
                 )}
+              </button>
+            )}
+
+            {/* Reply — only for the friend's (received) messages */}
+            {canReply && (
+              <button
+                onClick={handleReplyClick}
+                className="w-full flex items-center gap-2 text-left px-4 py-2.5 text-[var(--text-primary)] text-[14px] hover:bg-[var(--bg-popup-hover)] cursor-pointer border-b border-[var(--border-popup)]"
+              >
+                <ReplyIcon size={15} />
+                Reply
               </button>
             )}
 

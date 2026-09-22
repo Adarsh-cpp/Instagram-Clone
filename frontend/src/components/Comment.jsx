@@ -57,7 +57,7 @@ const Comment = ({
   const isRealComment = Boolean(comment?._id);
 
   const displayAuthor = comment?.author?.username || author;
-  const displayDP = comment?.author?.profilePic || authorDP;
+  const displayDP = comment?.author?.profilePic || "images/default-profile-pic.jpg";
   const displayText = comment?.text ?? text;
   const displayTime = comment?.createdAt ?? createdAt;
   const commentTime = getTimeAgo(displayTime);

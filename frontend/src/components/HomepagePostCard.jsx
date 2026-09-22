@@ -27,22 +27,49 @@ const authConfig = () => ({
 const HomepagePostCard = ({ ...props }) => {
   const { user } = useAuth();
 
-  // Compare ids as strings — user._id and props.authorId may be different
+  // The author id can arrive as a flat `authorId`, or inside a populated
+  // `author` object (e.g. right after creating a post, before any refetch).
+  const resolvedAuthorId =
+    props?.authorId ||
+    (typeof props?.author === "object" ? props.author?._id : null);
+
+  // Compare ids as strings — user._id and the author id may be different
   // types (ObjectId vs string) depending on where they came from, so a
   // strict === can silently fail even when they refer to the same user.
   const isOwnPost =
     !!user?._id &&
-    !!props?.authorId &&
-    user._id.toString() === props.authorId.toString();
+    !!resolvedAuthorId &&
+    user._id.toString() === resolvedAuthorId.toString();
 
-  const profileURL = isOwnPost ? "/user/get-profile" : `/user/get-profile/${props?.authorId}`;
+  // Resolve the display name. `props.author` may be a string, a populated
+  // object, or missing entirely on a freshly created post. In that last case
+  // (and only for the logged-in user's own post) fall back to their own
+  // username from context so it shows immediately without a refresh.
+  const authorName =
+    (typeof props?.author === "string"
+      ? props.author
+      : props?.author?.username) ||
+    (isOwnPost ? user?.username || user?.name : "") ||
+    "";
+
+  // Same idea for the avatar.
+  const authorProfileImg =
+    props.profileImgSrc ||
+    (typeof props?.author === "object" ? props.author?.profilePic : null) ||
+    (isOwnPost ? user?.profilePic : null) ||
+    null;
+
+  const profileURL = isOwnPost ? "/user/get-profile" : `/user/get-profile/${resolvedAuthorId}`;
 
   // Blue verified tick, shown only for the admin account. This component
   // only ever receives a flat `authorId`/`author` (username string) via
   // props, never the full author document, so the parent that renders
   // this card needs to also pass `authorRole` (e.g. authorRole={post.author.role})
-  // for this to resolve to true.
-  const isAdminAuthor = props.authorRole === "admin";
+  // for this to resolve to true. For your own post we can read it from context.
+  const isAdminAuthor =
+    props.authorRole === "admin" ||
+    (typeof props?.author === "object" && props.author?.role === "admin") ||
+    (isOwnPost && user?.role === "admin");
 
   // Whether the currently logged-in user (viewing the feed) is an admin —
   // separate from isAdminAuthor above, which is about the post's author.
@@ -82,10 +109,10 @@ const HomepagePostCard = ({ ...props }) => {
   // following list (or the post's author) changes.
   useEffect(() => {
     const following = user?.following?.some(
-      (id) => id?.toString() === props?.authorId?.toString()
+      (id) => id?.toString() === resolvedAuthorId?.toString()
     );
     setIsFollowing(!!following);
-  }, [user?.following, props?.authorId]);
+  }, [user?.following, resolvedAuthorId]);
 
   const followDisplay = !isOwnPost && !isFollowing;
 
@@ -190,7 +217,7 @@ const HomepagePostCard = ({ ...props }) => {
   const handleFollowToggle = useCallback(
     async (e) => {
       e?.stopPropagation();
-      if (isOwnPost || !props?.authorId || isFollowLoading) return;
+      if (isOwnPost || !resolvedAuthorId || isFollowLoading) return;
 
       const prevValue = isFollowing;
       setIsFollowing(!prevValue);
@@ -198,7 +225,7 @@ const HomepagePostCard = ({ ...props }) => {
 
       try {
         const { data } = await axios.post(
-          `${BASE_URL}/user/profile/${props.authorId}/follow-toggle`,
+          `${BASE_URL}/user/profile/${resolvedAuthorId}/follow-toggle`,
           {},
           authConfig()
         );
@@ -210,7 +237,7 @@ const HomepagePostCard = ({ ...props }) => {
         setIsFollowLoading(false);
       }
     },
-    [props?.authorId, isOwnPost, isFollowing, isFollowLoading]
+    [resolvedAuthorId, isOwnPost, isFollowing, isFollowLoading]
   );
 
   const handleDeletePost = async () => {
@@ -233,15 +260,15 @@ const HomepagePostCard = ({ ...props }) => {
       _id: props.postId,
       media: mediaList,
       author: {
-        username: props.author,
-        profilePic: props.profileImgSrc,
+        username: authorName,
+        profilePic: authorProfileImg,
       },
       caption: props.caption,
       createdAt: props.createdAt,
       likes: Array(likesCount).fill(null),
       location: props.location,
     }),
-    [props.postId, mediaList, props.author, props.profileImgSrc, props.caption, props.createdAt, likesCount, props.location]
+    [props.postId, mediaList, authorName, authorProfileImg, props.caption, props.createdAt, likesCount, props.location]
   );
 
   // once deleted, this card just disappears — the parent list should also
@@ -253,7 +280,7 @@ const HomepagePostCard = ({ ...props }) => {
       {/* Header */}
       <div className="header w-full h-[50px] flex items-center px-2 bg-[var(--bg-app)]">
         <div className="profilePic w-[45px] h-[45px] rounded-full overflow-hidden cursor-pointer shrink-0">
-          <img src={props.profileImgSrc ? props.profileImgSrc : "/images/default-profile-pic.jpg"} alt="" />
+          <img src={authorProfileImg ? authorProfileImg : "/images/default-profile-pic.jpg"} alt="" />
         </div>
         <div className="profileInfo min-w-[70%] h-full px-2 text-[var(--text-primary)]">
           {/* Name + badge + date + follow.
@@ -263,7 +290,7 @@ const HomepagePostCard = ({ ...props }) => {
           <div className="info w-full h-[50%] flex justify-start items-center gap-2 min-w-0">
             <NavLink to={profileURL} className="h-full min-w-0 max-w-[55%]">
               <div className="name h-full cursor-pointer flex items-center gap-1 min-w-0">
-                <span className="truncate">{props.author}</span>
+                <span className="truncate">{authorName}</span>
                 {isAdminAuthor && (
                   <BadgeCheck size={14} className="text-sky-400 shrink-0" />
                 )}
@@ -434,7 +461,7 @@ const HomepagePostCard = ({ ...props }) => {
         </div>
 
         <div className="captionSection w-full px-2">
-          <span className="font-semibold">{props.author}&nbsp;</span>
+          <span className="font-semibold">{authorName}&nbsp;</span>
           {!showFullCaption ? (
             <>
               <span>{props.caption?.slice(0, 50)}</span>
@@ -471,7 +498,7 @@ const HomepagePostCard = ({ ...props }) => {
       {isCommentsOpen && (
         <CommentsOverlay
           post={post}
-          authorId={props.authorId}
+          authorId={resolvedAuthorId}
           authorRole={props.authorRole}
           onClose={() => setIsCommentsOpen(false)}
           onLikesCountChange={(count) => setLikesCount(count)}

@@ -104,6 +104,7 @@ function CreatePostPage() {
           video={mediaType === "video" ? trimmedMedia || originalMedia : null}
           trimData={trimData}
           isPreTrimmed={mediaType === "video" && !!trimmedMedia}
+          aspectRatio={aspectRatio}
           back={() => setStep(2)}
           handlePost={handlePost}
           user={user}

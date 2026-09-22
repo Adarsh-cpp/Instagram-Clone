@@ -25,14 +25,14 @@ const StoryCircle = ({
       className="story w-full h-[120px] flex flex-col justify-center items-center cursor-pointer"
     >
       <div
-        className={`storyRing relative w-[85px] h-[85px] md:w-[100px] md:h-[100px] rounded-full flex justify-center items-center bg-center bg-cover ${ringClass}`}
+        className={`storyRing relative w-[90px] h-[90px] md:w-[100px] md:h-[100px] rounded-full flex justify-center items-center bg-center bg-cover ${ringClass}`}
       >
-        <div className="blackCircle w-[80px] h-[80px] md:w-[93px] md:h-[93px] flex justify-center items-center rounded-full bg-[var(--bg-app)]">
+        <div className="blackCircle w-[85px] h-[85px] md:w-[93px] md:h-[93px] flex justify-center items-center rounded-full bg-[var(--bg-app)]">
           <img
             src={imgSrc || "/images/default-profile-pic.jpg"}
             onError={(e) => { e.currentTarget.src = FALLBACK_AVATAR; }}
             alt=""
-            className="w-[75px] h-[75px] md:w-[88px] md:h-[88px] rounded-full object-cover"
+            className="w-[80px] h-[80px] md:w-[88px] md:h-[88px] rounded-full object-cover"
           />
         </div>
 

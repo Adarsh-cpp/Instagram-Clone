@@ -359,7 +359,7 @@ export const postMessage = async (req, res) => {
   try {
     const senderId = req.user._id;
     const conversationId = req.params.conversationId;
-    const { message, sharedPost, sharedReel, sharedStoryId, sticker } = req.body;
+    const { message, sharedPost, sharedReel, sharedStoryId, sticker, replyTo } = req.body;
     const files = req.files || []; // now an array (upload.array), not req.file
 
     const conversation = await conversationModel.findById(conversationId);
@@ -440,6 +440,29 @@ export const postMessage = async (req, res) => {
       }
     }
 
+    // Reply-to-message: only a SNAPSHOT of the original is stored (mirrors
+    // sharedStorySnapshot above), so the quoted preview keeps working even
+    // if the original message is later unsent. Silently ignored if the id
+    // is missing, malformed, or points at a message from another
+    // conversation — a broken/foreign reply id shouldn't fail the send.
+    let replyToSnapshot;
+    if (replyTo) {
+      const originalMessage = await messageModel.findById(replyTo);
+
+      if (
+        originalMessage &&
+        originalMessage.conversationId.toString() === conversationId.toString()
+      ) {
+        replyToSnapshot = {
+          messageId: originalMessage._id,
+          senderId: originalMessage.senderId,
+          text: originalMessage.text || "",
+          image: originalMessage.images?.[0] || originalMessage.image || "",
+          messageType: originalMessage.messageType || "text",
+        };
+      }
+    }
+
     // Stamped once, never mutated. This is what survives the shared post/reel
     // being deleted later — see the field's comment in message.model.js.
     const messageType = resolveMessageType({
@@ -462,6 +485,7 @@ export const postMessage = async (req, res) => {
       sharedPost: sharedPost || undefined,
       sharedReel: sharedReel || undefined,
       sharedStory: sharedStorySnapshot || undefined,
+      replyTo: replyToSnapshot || undefined,
     });
 
     const preview = buildLastMessagePreview(newMessage);
@@ -489,6 +513,7 @@ export const postMessage = async (req, res) => {
     return res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
+
 
 
 export const deleteMessage = async (req, res) => {

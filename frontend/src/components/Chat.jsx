@@ -179,6 +179,24 @@ const EmojiPicker = ({ pickerRef, recentEmojis, onSelect }) => {
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
+// What the "Replying to ..." bar above the input shows for the message being
+// replied to: its text if it has any, otherwise a short label for what kind
+// of message it is (plus a thumbnail when it carried an image).
+const getReplyPreviewInfo = (msg) => {
+  const text = typeof msg?.text === "string" ? msg.text.trim() : "";
+  const image = msg?.images?.[0] || msg?.image || "";
+
+  let label = "Message";
+  if (image) label = "Photo";
+  else if (msg?.sticker) label = "Sticker";
+  else if (msg?.messageType === "post_share" || msg?.sharedPost) label = "Post";
+  else if (msg?.messageType === "reel_share" || msg?.sharedReel) label = "Reel";
+  else if (msg?.messageType === "story_share" || msg?.sharedStory) label = "Story";
+  else if (msg?.messageType === "story_reply" || msg?.repliedStory) label = "Story reply";
+
+  return { text, image, label };
+};
+
 // `onConversationActivity` comes from MessagesPage. The server only pushes
 // "newMessage" to the OTHER participant, so when WE send something we tell
 // the parent directly, and it updates the conversation list on the left
@@ -222,6 +240,11 @@ const Chat = ({ onConversationActivity }) => {
   // info ("i") popup menu + chat settings overlay
   const [isInfoMenuOpen, setIsInfoMenuOpen] = useState(false);
   const [isThemeOverlayOpen, setIsThemeOverlayOpen] = useState(false);
+
+  // the message currently being replied to (set by the Reply option in the
+  // message popup / swipe-right on mobile, cleared on send, cancel, or when
+  // the conversation changes)
+  const [replyingTo, setReplyingTo] = useState(null);
 
   // AI reply suggestions — the blue sparkle button in the input bar opens a
   // small panel of suggested replies to the friend's latest message
@@ -592,6 +615,18 @@ const Chat = ({ onConversationActivity }) => {
     }
   }, [messages, initialLoading, virtualizer]);
 
+  // The "Replying to ..." bar makes the footer taller, which shrinks the
+  // scroll area from the bottom. If the user was already at the bottom, keep
+  // them there so the latest message doesn't slip under the bar.
+  useEffect(() => {
+    if (!replyingTo || !isNearBottomRef.current || messages.length === 0) return;
+
+    requestAnimationFrame(() => {
+      virtualizer.scrollToIndex(messages.length - 1, { align: "end" });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replyingTo]);
+
   // handle the seen feature when new messages arrive
   useEffect(() => {
     const handleNewMessage = (incomingMessage) => {
@@ -627,6 +662,19 @@ const Chat = ({ onConversationActivity }) => {
     socket.on("messageDeleted", handleMessageDeleted);
     return () => socket.off("messageDeleted", handleMessageDeleted);
   }, [conversationId]);
+
+  // if the friend unsends the very message we're about to reply to, drop the
+  // pending reply instead of sending a reply to something that no longer exists
+  useEffect(() => {
+    if (!replyingTo) return;
+
+    const handleReplyTargetDeleted = ({ messageId }) => {
+      if (messageId === replyingTo._id) setReplyingTo(null);
+    };
+
+    socket.on("messageDeleted", handleReplyTargetDeleted);
+    return () => socket.off("messageDeleted", handleReplyTargetDeleted);
+  }, [replyingTo]);
 
   // handle the seen feature during a tab switch
   useEffect(() => {
@@ -754,6 +802,67 @@ const Chat = ({ onConversationActivity }) => {
     return () => suggestAbortRef.current?.abort();
   }, []);
 
+  // a pending reply belongs to the conversation it was started in
+  useEffect(() => {
+    setReplyingTo(null);
+  }, [conversationId]);
+
+  // MOBILE ONLY: while a chat is open on a phone-sized screen, stop the
+  // document itself from scrolling / rubber-banding. The chat area is its own
+  // scroll container, so when you drag past the last message the leftover
+  // scroll used to "chain" up to the page, lifting the whole screen and
+  // exposing a gap at the bottom. Restored as soon as the chat is left, and
+  // never applied on desktop.
+  useEffect(() => {
+    if (!conversationId) return;
+
+    const mobileQuery = window.matchMedia("(max-width: 767px)");
+    const html = document.documentElement;
+    const body = document.body;
+
+    const original = {
+      htmlOverflow: html.style.overflow,
+      htmlOverscroll: html.style.overscrollBehavior,
+      bodyOverflow: body.style.overflow,
+      bodyOverscroll: body.style.overscrollBehavior,
+    };
+
+    const restore = () => {
+      html.style.overflow = original.htmlOverflow;
+      html.style.overscrollBehavior = original.htmlOverscroll;
+      body.style.overflow = original.bodyOverflow;
+      body.style.overscrollBehavior = original.bodyOverscroll;
+    };
+
+    const apply = () => {
+      if (mobileQuery.matches) {
+        html.style.overflow = "hidden";
+        html.style.overscrollBehavior = "none";
+        body.style.overflow = "hidden";
+        body.style.overscrollBehavior = "none";
+      } else {
+        restore();
+      }
+    };
+
+    apply();
+
+    if (mobileQuery.addEventListener) {
+      mobileQuery.addEventListener("change", apply);
+    } else {
+      mobileQuery.addListener(apply);
+    }
+
+    return () => {
+      if (mobileQuery.removeEventListener) {
+        mobileQuery.removeEventListener("change", apply);
+      } else {
+        mobileQuery.removeListener(apply);
+      }
+      restore();
+    };
+  }, [conversationId]);
+
   // emoji picker: close it when switching to another conversation
   useEffect(() => {
     setIsEmojiPickerOpen(false);
@@ -827,12 +936,18 @@ const Chat = ({ onConversationActivity }) => {
         const formData = new FormData();
         selectedImages.forEach(({ file }) => formData.append("images", file));
         if (message.trim()) formData.append("message", message.trim());
+        // only the id travels — the server builds the quoted snapshot itself
+        if (replyingTo?._id) formData.append("replyTo", replyingTo._id);
 
         response = await axios.post(url, formData, {
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
         });
       } else {
-        response = await axios.post(url, { message }, { headers: { Authorization: `Bearer ${token}` } });
+        response = await axios.post(
+          url,
+          { message, ...(replyingTo?._id ? { replyTo: replyingTo._id } : {}) },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
       }
 
       if (response.status === 201) {
@@ -840,6 +955,7 @@ const Chat = ({ onConversationActivity }) => {
         setMessages((prev) => [...prev, response.data.data]);
         notifyMessageSent(response.data.data); // update the list on the left
         setMessage("");
+        setReplyingTo(null);
         clearSelectedImages();
         messageInputRef.current?.focus();
       } else {
@@ -866,7 +982,7 @@ const Chat = ({ onConversationActivity }) => {
 
       const response = await axios.post(
         url,
-        { sticker },
+        { sticker, ...(replyingTo?._id ? { replyTo: replyingTo._id } : {}) },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -874,6 +990,7 @@ const Chat = ({ onConversationActivity }) => {
         pendingActionRef.current = "append";
         setMessages((prev) => [...prev, response.data.data]);
         notifyMessageSent(response.data.data); // update the list on the left
+        setReplyingTo(null);
         messageInputRef.current?.focus();
       } else {
         toast.error("Error sending sticker");
@@ -1124,6 +1241,23 @@ const Chat = ({ onConversationActivity }) => {
     });
   };
 
+  // ---- reply to a message ----
+  // Called by MessageBox (Reply in the right-click / long-press popup, or a
+  // swipe-right on mobile). It only stages the reply: the "Replying to ..."
+  // bar appears above the input and the actual send happens through the
+  // normal send flow, which attaches the message id.
+  const handleReplyToMessage = (msg) => {
+    if (!msg?._id) return;
+
+    setReplyingTo(msg);
+    setIsStickerPickerOpen(false);
+    setIsEmojiPickerOpen(false);
+    if (isSuggestionPanelOpen) closeSuggestionPanel();
+    messageInputRef.current?.focus();
+  };
+
+  const replyingToPreview = replyingTo ? getReplyPreviewInfo(replyingTo) : null;
+
     return (
     <div className={`messageDisplay ${conversationId ? "flex" : "hidden"} md:flex flex-col relative w-full md:w-[65%] lg:w-[70%] h-[100dvh] md:h-full bg-[var(--bg-app)] overflow-hidden`}>
 
@@ -1225,10 +1359,12 @@ const Chat = ({ onConversationActivity }) => {
         }}
       >
 
+        {/* overscroll-none: dragging past the last message must not bounce
+            or chain up to the page on mobile (see the mobile effect above) */}
         <div
           ref={containerRef}
           onScroll={handleScroll}
-          className="chatContainer no-scrollbar flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden"
+          className="chatContainer no-scrollbar overscroll-none flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden"
         >
 
           <div className="viewProfileSection w-full h-[220px] sm:h-[250px] flex flex-col justify-center items-center">
@@ -1314,6 +1450,7 @@ const Chat = ({ onConversationActivity }) => {
                       showSeen={msg._id === lastSeenMessageId}
                       onDelete={handleDeleteMessage}
                       onReact={handleReactToMessage}
+                      onReply={handleReplyToMessage}
                       senderBubbleColor={activeTheme?.senderBubble}
                       receiverBubbleColor={activeTheme?.receiverBubble}
                       senderTextColor={activeTheme?.senderText}
@@ -1457,6 +1594,39 @@ const Chat = ({ onConversationActivity }) => {
                 className="ml-auto text-[var(--text-primary)] text-[13px] px-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer hover:text-[var(--text-muted)]"
               >
                 Clear all
+              </button>
+            </div>
+          )}
+
+          {/* "Replying to ..." bar — shows what the next message will be a
+              reply to. Cleared on send or with the X. */}
+          {replyingTo && replyingToPreview && (
+            <div className="replyPreview w-[98%] mx-auto mb-2 flex items-center gap-3 bg-[var(--bg-elevated)] rounded-2xl px-3 py-2">
+
+              <div className="min-w-0 flex-1 border-l-2 border-[var(--accent-blue)] pl-2.5">
+                <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">
+                  Replying to {friend?.fullname}
+                </div>
+                <div className="text-[13px] text-[var(--text-muted)] truncate">
+                  {replyingToPreview.text || replyingToPreview.label}
+                </div>
+              </div>
+
+              {replyingToPreview.image && (
+                <img
+                  src={replyingToPreview.image}
+                  alt=""
+                  className="w-[36px] h-[36px] shrink-0 rounded-lg object-cover"
+                />
+              )}
+
+              <button
+                type="button"
+                onClick={() => setReplyingTo(null)}
+                aria-label="Cancel reply"
+                className="w-[24px] h-[24px] shrink-0 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+              >
+                <X size={18} />
               </button>
             </div>
           )}

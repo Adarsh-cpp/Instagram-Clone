@@ -19,6 +19,30 @@ const authConfig = () => ({
   headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
 });
 
+// A post returned straight from the create endpoint may have `author` as a
+// bare ObjectId/string (unpopulated) and may lack fields the feed endpoint
+// normally adds. Fill those in from the logged-in user so the card renders
+// correctly immediately, without needing a refresh.
+const normalizeNewPost = (post, user) => {
+  const author = post.author;
+  const isPopulated = author && typeof author === "object" && !!author.username;
+
+  return {
+    ...post,
+    author: isPopulated
+      ? author
+      : {
+          _id: user._id,
+          username: user.username,
+          profilePic: user.profilePic,
+          role: user.role,
+        },
+    likes: post.likes || [],
+    commentsCount: post.commentsCount ?? 0,
+    isSaved: post.isSaved || false,
+  };
+};
+
 const HomePage = () => {
 
   const store = useHomeFeedStore();
@@ -100,16 +124,25 @@ const HomePage = () => {
   }, [location, navigate]);
 
   useEffect(() => {
+    // Wait until the logged-in user is loaded so we can fill in the author
+    // details of a freshly created post.
+    if (!user) return;
+
     const unconsumed = uploads.filter((u) => u.status === "success" && !u.consumed);
     if (unconsumed.length === 0) return;
 
     unconsumed.forEach((u) => {
       if (u.type === "image" && u.resultData?.post) {
-        setPosts((prev) => [u.resultData.post, ...prev]);
+        const newPost = normalizeNewPost(u.resultData.post, user);
+        setPosts((prev) => {
+          // guard against adding the same post twice
+          if (prev.some((p) => p._id === newPost._id)) return prev;
+          return [newPost, ...prev];
+        });
       }
       markConsumed(u.id);
     });
-  }, [uploads, markConsumed]);
+  }, [uploads, markConsumed, user]);
 
   useLayoutEffect(() => {
     if (listStartRef.current) {
@@ -237,17 +270,17 @@ const HomePage = () => {
                         postId={post._id}
                         onDeleted={handlePostDeleted}
                         media={post.media}
-                        profileImgSrc={post.author.profilePic}
-                        authorId={post.author._id}
-                        author={post.author.username}
-                        authorRole={post.author.role}
+                        profileImgSrc={post.author?.profilePic}
+                        authorId={post.author?._id}
+                        author={post.author?.username}
+                        authorRole={post.author?.role}
                         caption={post.caption}
                         aspectRatio={post.aspectRatio}
-                        isLiked={post.likes.some(
+                        isLiked={(post.likes || []).some(
                           (id) => id.toString() === user?._id
                         )}
-                        likesCount={post.likes.length}
-                        commentsCount={post.commentsCount}
+                        likesCount={(post.likes || []).length}
+                        commentsCount={post.commentsCount ?? 0}
                         isSaved={post.isSaved}
                         location={post.location}
                         createdAt={post.createdAt}

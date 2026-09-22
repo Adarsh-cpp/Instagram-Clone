@@ -52,6 +52,13 @@ const CommentsOverlay = ({
   onSaveChange,
   initialIsLiked,
   initialIsSaved,
+  // When true, the media (image/video) panel is also shown on mobile,
+  // stacked above the comments instead of being hidden below the `lg`
+  // breakpoint. Used for entry points where the user hasn't already
+  // seen the media elsewhere (e.g. opening a shared post/reel straight
+  // from a chat message) — the normal home-feed → comment-icon flow
+  // leaves this false/unset since the user already saw the post there.
+  showMediaOnMobile = false,
 }) => {
   const { user, refreshUser } = useAuth();
   const { theme } = useTheme();
@@ -516,7 +523,9 @@ const CommentsOverlay = ({
         onClick={(e) =>
           e.stopPropagation()
         }
-        className="mobile-sheet-anim relative mx-auto flex h-[75vh] w-full flex-col overflow-hidden rounded-t-2xl bg-[var(--bg-surface)] shadow-2xl lg:h-[92vh] lg:w-[90vw] lg:flex-row lg:rounded-2xl"
+        className={`mobile-sheet-anim relative mx-auto flex w-full flex-col overflow-hidden rounded-t-2xl bg-[var(--bg-surface)] shadow-2xl lg:h-[92vh] lg:w-[90vw] lg:flex-row lg:rounded-2xl ${
+          showMediaOnMobile ? "h-[88vh]" : "h-[75vh]"
+        }`}
       >
         <div
           onDoubleClick={doubleClickToLike}
@@ -530,7 +539,9 @@ const CommentsOverlay = ({
               ? handleTouchEnd
               : undefined
           }
-          className="relative hidden w-full shrink-0 select-none items-center justify-center overflow-hidden bg-black lg:flex lg:h-full lg:w-1/2"
+          className={`relative w-full shrink-0 select-none items-center justify-center overflow-hidden bg-black lg:flex lg:h-full lg:w-1/2 ${
+            showMediaOnMobile ? "flex h-[38vh]" : "hidden"
+          }`}
         >
           <div
             ref={animatedLikeRef}

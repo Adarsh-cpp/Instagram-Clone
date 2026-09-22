@@ -97,6 +97,20 @@ const IconSidebar = () => {
     navigate("/about");
   };
 
+  const handlePrivacyPolicyClick = () => {
+    setIsLogoutPopupOpen(false);
+    setIsConfirmingLogout(false);
+    setIsConfirmingDelete(false);
+    navigate("/privacy-policy");
+  };
+
+  const handleTermsClick = () => {
+    setIsLogoutPopupOpen(false);
+    setIsConfirmingLogout(false);
+    setIsConfirmingDelete(false);
+    navigate("/terms");
+  };
+
   return (
     <div className="iconSection hidden md:block md:w-[12%] 2xl:w-[20%] h-full border-r border-r-[var(--border-soft)] overflow-visible">
       
@@ -360,6 +374,81 @@ const IconSidebar = () => {
                       <circle cx="12" cy="8" r="0.6" fill="currentColor" stroke="none" />
                     </svg>
                     <span>About this project</span>
+                  </button>
+
+                  {/* Privacy Policy row */}
+                  <button
+                    onClick={handlePrivacyPolicyClick}
+                    className="
+                      w-full
+                      h-[48px]
+                      px-3
+                      flex
+                      items-center
+                      gap-3
+                      rounded-lg
+                      text-[var(--text-primary)]
+                      text-[14px]
+                      font-medium
+                      transition-all
+                      duration-200
+                      hover:bg-[var(--bg-popup-hover)]
+                      active:scale-[0.98]
+                    "
+                  >
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="shrink-0"
+                    >
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    </svg>
+                    <span>Privacy Policy</span>
+                  </button>
+
+                  {/* Terms row */}
+                  <button
+                    onClick={handleTermsClick}
+                    className="
+                      w-full
+                      h-[48px]
+                      px-3
+                      flex
+                      items-center
+                      gap-3
+                      rounded-lg
+                      text-[var(--text-primary)]
+                      text-[14px]
+                      font-medium
+                      transition-all
+                      duration-200
+                      hover:bg-[var(--bg-popup-hover)]
+                      active:scale-[0.98]
+                    "
+                  >
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="shrink-0"
+                    >
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="8" y1="13" x2="16" y2="13" />
+                      <line x1="8" y1="17" x2="16" y2="17" />
+                    </svg>
+                    <span>Terms</span>
                   </button>
 
                   <div className="h-[1px] bg-[var(--border-popup)] my-1 mx-1" />

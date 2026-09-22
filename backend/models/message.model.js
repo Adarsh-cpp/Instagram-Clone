@@ -119,6 +119,27 @@ const messageSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Reply-to-message. A small SNAPSHOT of the message being replied to
+    // (same idea as repliedStory above), written by the server at send time.
+    // Because it's a snapshot, the quoted preview keeps rendering even if the
+    // original message is later unsent, and no populate is needed anywhere.
+    replyTo: {
+      type: new mongoose.Schema(
+        {
+          messageId: { type: mongoose.Schema.Types.ObjectId, ref: "Message" },
+          // who wrote the ORIGINAL message
+          senderId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+          text: { type: String, default: "" },
+          // first image of the original (if it had any), used as a thumbnail
+          image: { type: String, default: "" },
+          // original's messageType, used for "Photo" / "Sticker" / "Reel"... labels
+          messageType: { type: String, default: "text" },
+        },
+        { _id: false }
+      ),
+      default: null,
+    },
+
     reactions: {
       type: [
         new mongoose.Schema(
