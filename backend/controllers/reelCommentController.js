@@ -1,6 +1,7 @@
 import Reel from "../models/reel.model.js";
 import reelCommentModel from "../models/reelComment.model.js";
 import ReelComment from "../models/reelComment.model.js";
+import notificationModel from "../models/notification.model.js";
 import { createNotification, removeNotification } from "../services/notification.service.js";
 
 export const addComment = async (req, res) => {

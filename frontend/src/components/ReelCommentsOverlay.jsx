@@ -18,7 +18,7 @@ const authConfig = () => ({
  * every row — top-level comments and their replies both render through
  * that component, exactly like the feed post card does.
  */
-const ReelCommentsOverlay = ({ reelId, authorId, authorRole, isOpen = true, onClose }) => {
+const ReelCommentsOverlay = ({ reelId, authorId, authorRole, isOpen = true, onClose, onCommentCountChange }) => {
   const { user } = useAuth();
 
   const [comments, setComments] = useState([]);
@@ -64,7 +64,13 @@ const ReelCommentsOverlay = ({ reelId, authorId, authorRole, isOpen = true, onCl
       if (response.data.success) {
         setComments((prev) => [...prev, response.data.comment]);
         setCommentText("");
-        
+
+        // This overlay only ever posts TOP-LEVEL comments (no
+        // parentComment is sent above), and the backend only increments
+        // reel.commentsCount for top-level comments — so every successful
+        // post here always corresponds to a +1 on the reel's count.
+        onCommentCountChange?.({ delta: 1 });
+
         inputRef.current?.focus();
       }
     } catch (error) {
@@ -72,6 +78,21 @@ const ReelCommentsOverlay = ({ reelId, authorId, authorRole, isOpen = true, onCl
     } finally {
       setPosting(false);
     }
+  };
+
+  // A comment being deleted here could be a top-level comment OR a reply
+  // (both render through <Comment />, and its onDeleted below doesn't
+  // distinguish). The reel's commentsCount only counts top-level comments
+  // on the backend, so we only decrement when the deleted row was
+  // top-level — i.e. it has no parentComment.
+  const handleCommentDeleted = (id) => {
+    setComments((prev) => {
+      const deleted = prev.find((c) => c._id === id);
+      if (deleted && !deleted.parentComment) {
+        onCommentCountChange?.({ delta: -1 });
+      }
+      return prev.filter((c) => c._id !== id);
+    });
   };
 
   if (!isOpen) return null;
@@ -116,9 +137,7 @@ const ReelCommentsOverlay = ({ reelId, authorId, authorRole, isOpen = true, onCl
                 currentUserId={user?._id}
                 verified={isAdmin}
                 canModerate={canModerateComments}
-                onDeleted={(id) =>
-                  setComments((prev) => prev.filter((c) => c._id !== id))
-                }
+                onDeleted={handleCommentDeleted}
               />
             ))}
         </div>

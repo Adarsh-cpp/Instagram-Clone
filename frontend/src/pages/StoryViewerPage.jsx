@@ -38,6 +38,20 @@ const CARD_SCALE_BY_DIST = { 0: 1, 1: 0.82, 2: 0.6, 3: 0.45 };
 const CARD_OPACITY_BY_DIST = { 0: 1, 1: 0.85, 2: 0.45, 3: 0 };
 const CARD_Z_BY_DIST = { 0: 20, 1: 15, 2: 10, 3: 5 };
 
+// Full-bleed style for the active card on mobile — the story should fill
+// the entire viewport there instead of sitting inside the scaled carousel
+// card, with no rounded corners/scale/opacity animation.
+const mobileCenterCardStyle = {
+  position: "fixed",
+  inset: 0,
+  width: "100vw",
+  height: "100vh",
+  transform: "none",
+  opacity: 1,
+  zIndex: 20,
+  transition: "none",
+};
+
 const StoryViewerPage = () => {
   const { user } = useAuth();
   const location = useLocation();
@@ -52,6 +66,10 @@ const StoryViewerPage = () => {
   // accountIndex for the clicked profile before anything is allowed to
   // render or re-sync the URL — see the guard in the effect below for why.
   const [loading, setLoading] = useState(true);
+
+  // Whether we're on a mobile-width viewport — the active story card is
+  // rendered full-screen there instead of as a scaled carousel card.
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
 
   const [playing, setPlaying] = useState(true);
   const [muted, setMuted] = useState(false);
@@ -178,6 +196,13 @@ const StoryViewerPage = () => {
     if (loading) return;
     setMediaReady(false);
   }, [accountIndex, storyIndex, loading]);
+
+  // Keep isMobile in sync if the viewport is resized/rotated.
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // ---- within-account story navigation ----
   // NOTE: these no longer fall through to the adjacent account. Per spec,
@@ -692,17 +717,19 @@ const StoryViewerPage = () => {
         />
       )}
 
-      {/* desktop chevrons — the only way to cross accounts */}
+      {/* chevrons — the only way to cross accounts. Always visible (mobile
+          included) and layered above the story card (z-30 > card's z-20),
+          so they sit on top of the image. */}
       <button
         onClick={handlePrevAccount}
         disabled={accountIndex === 0}
-        className="hidden md:flex absolute left-4 lg:left-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white disabled:opacity-0 z-30"
+        className="flex absolute left-4 lg:left-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white disabled:opacity-0 z-30"
       >
         <ChevronLeft size={30} />
       </button>
       <button
         onClick={handleNextAccount}
-        className="hidden md:flex absolute right-4 lg:right-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white z-30"
+        className="flex absolute right-4 lg:right-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white z-30"
       >
         <ChevronRight size={30} />
       </button>
@@ -759,8 +786,8 @@ const StoryViewerPage = () => {
           return (
             <div
               key={acc.author._id}
-              style={cardStyle(dist, d)}
-              className="rounded-2xl overflow-hidden bg-neutral-900"
+              style={isMobile ? mobileCenterCardStyle : cardStyle(dist, d)}
+              className={`overflow-hidden bg-neutral-900 ${isMobile ? "" : "rounded-2xl"}`}
             >
               {/* progress segments — one per story this account has */}
               <div className="absolute top-2 left-2 right-2 flex gap-1 z-20">

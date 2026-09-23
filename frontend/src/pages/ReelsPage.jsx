@@ -303,6 +303,25 @@ const ReelsPage = () => {
     )
   }
 
+  // Keeps the reel's commentsCount in sync with the comments overlay —
+  // mirrors handleShared above. ReelCommentsOverlay is responsible for
+  // calling this (via onCommentCountChange) whenever a comment is added
+  // or removed, passing either the new absolute count or a delta; both
+  // shapes are supported here so this works regardless of which the
+  // overlay emits.
+  const handleCommentCountChange = (payload) => {
+    setReels((prev) =>
+      prev.map((r, i) => {
+        if (i !== currentIndex) return r
+        const newCount =
+          typeof payload === "number"
+            ? payload
+            : Math.max(0, (r.commentsCount || 0) + (payload?.delta || 0))
+        return { ...r, commentsCount: newCount }
+      })
+    )
+  }
+
   const handleDeleteReel = async () => {
     if (!currentReel) return
     setIsDeleting(true)
@@ -426,6 +445,7 @@ const ReelsPage = () => {
                   authorId={currentReel?.author?._id}
                   authorRole={currentReel?.author?.role}
                   onClose={() => setIsCommentsOpen(false)}
+                  onCommentCountChange={handleCommentCountChange}
                 />
               )}
 

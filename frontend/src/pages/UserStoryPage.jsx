@@ -210,9 +210,22 @@ const UserStoryPage = () => {
   }, []);
 
   useEffect(() => {
+    const isMobile = window.innerWidth < 768;
+
+    if (isMobile) {
+      // Full-screen, edge-to-edge on mobile — the top/bottom bars and the
+      // toolbar are overlaid directly on top of the media instead of each
+      // reserving their own space, so the media itself fills the viewport.
+      const w = Math.round(window.innerWidth);
+      const h = Math.round(window.innerHeight);
+      setDims({ width: w, height: h });
+      setVideoBox({ x: 0, y: 0, width: w, height: h });
+      return;
+    }
+
     const topBar = 56;
     const bottomBar = 88;
-    const toolbarWidth = window.innerWidth < 768 ? 60 : 76;
+    const toolbarWidth = 76;
     const sidePadding = 24;
 
     const availHeight = window.innerHeight - topBar - bottomBar - 24;
@@ -599,9 +612,9 @@ const UserStoryPage = () => {
       )}
 
       {dims.width > 0 && (
-        <div className="relative flex items-center gap-3">
+        <div className="relative flex items-center gap-3 md:gap-3">
           <div
-            className="relative rounded-2xl overflow-hidden bg-black shadow-2xl shadow-black/60 ring-1 ring-white/10"
+            className="relative overflow-hidden bg-black rounded-none shadow-none ring-0 md:rounded-2xl md:shadow-2xl md:shadow-black/60 md:ring-1 md:ring-white/10"
             style={{ width: dims.width, height: dims.height }}
           >
             {mediaType === "video" && mediaUrl && (
@@ -700,7 +713,14 @@ const UserStoryPage = () => {
             </div>
           </div>
 
-          <div className="flex flex-col items-center gap-4 z-40">
+          {/* Toolbar — floats on top of the media on mobile (top-right,
+              fixed to the viewport since the media already fills it), and
+              reverts to a normal side column next to the media from md
+              upward, same as before. */}
+          <div
+            className="fixed z-40 flex flex-col items-center gap-3 md:static md:gap-4"
+            style={{ top: "calc(env(safe-area-inset-top, 0px) + 6rem)", right: "0.75rem" }}
+          >
             <button
               onClick={addText}
               className={toolbarBtnBase}
