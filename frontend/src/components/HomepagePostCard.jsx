@@ -85,6 +85,7 @@ const HomepagePostCard = ({ ...props }) => {
   const [isLiked, setIsLiked] = useState(props.isLiked || false);
   const [likesCount, setLikesCount] = useState(props.likesCount || 0);
   const [isSaved, setIsSaved] = useState(props.isSaved || false);
+  const [commentsCount, setCommentsCount] = useState(props.commentsCount || 0);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [showFullCaption, setShowFullCaption] = useState(false);
@@ -104,6 +105,15 @@ const HomepagePostCard = ({ ...props }) => {
   useEffect(() => {
     setIsLiked(props.isLiked);
   }, [props.isLiked]);
+
+  // Keeps the on-screen comment count correct even though it's owned by a
+  // prop: synced whenever the parent re-fetches/re-renders with a fresh
+  // value, but also bumped locally the instant a comment is posted (see
+  // onCommentAdded passed to CommentsOverlay below) so the footer updates
+  // immediately instead of waiting for a page refresh.
+  useEffect(() => {
+    setCommentsCount(props.commentsCount || 0);
+  }, [props.commentsCount]);
 
   // Keep local follow state in sync whenever the logged-in user's
   // following list (or the post's author) changes.
@@ -435,7 +445,7 @@ const HomepagePostCard = ({ ...props }) => {
                 color="var(--text-primary)"
                 strokeWidth={2}
               />
-              <span className="text-sm font-semibold">{props.commentsCount}</span>
+              <span className="text-sm font-semibold">{commentsCount}</span>
             </div>
 
             <div onClick={() => setIsShareOpen(true)} className="share flex items-center">
@@ -489,7 +499,7 @@ const HomepagePostCard = ({ ...props }) => {
             onClick={() => setIsCommentsOpen(true)}
             className="cmntsCount w-full h-[50%] px-2 text-[var(--text-muted)] cursor-pointer"
           >
-            View all {props.commentsCount} comments
+            View all {commentsCount} comments
           </div>
           <div className="allCmnts w-full h-[50%] px-2 text-[var(--text-muted)]">Add a comment...</div>
         </div>
@@ -503,6 +513,7 @@ const HomepagePostCard = ({ ...props }) => {
           onClose={() => setIsCommentsOpen(false)}
           onLikesCountChange={(count) => setLikesCount(count)}
           onSaveChange={(saved) => setIsSaved(saved)}
+          onCommentAdded={() => setCommentsCount((prev) => prev + 1)}
           initialIsLiked={isLiked}
           initialIsSaved={isSaved}
         />

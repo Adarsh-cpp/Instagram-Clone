@@ -425,15 +425,19 @@ const CaptionSharePage = ({
                 />
               )}
 
-              {isLoading && (
-                <div className="loadingSection absolute z-50 w-full h-full top-0">
-                  <div className="absolute inset-0 flex items-center justify-center bg-[rgb(0,0,0,0.4)]">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 via-red-500 to-yellow-500 animate-spin p-[3px]">
-                      <div className="w-full h-full relative bg-[var(--bg-loading)] rounded-full">
-                        <div className="block absolute top-[-7px] w-[20px] h-[20px] rounded-full bg-[var(--bg-loading)]"></div>
-                      </div>
-                    </div>
-                  </div>
+                          {isLoading && (
+                <div className="loadingSection absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]">
+                  <div
+                    className="w-12 h-12 sm:w-14 sm:h-14 rounded-full animate-spin"
+                    style={{
+                      background:
+                        "conic-gradient(from 90deg, #feda75, #fa7e1e, #d62976, #962fbf, #4f5bd5, #feda75)",
+                      WebkitMask:
+                        "radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px))",
+                      mask:
+                        "radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px))",
+                    }}
+                  />
                 </div>
               )}
             </div>

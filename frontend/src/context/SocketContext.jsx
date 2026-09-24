@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { io } from "socket.io-client";
+import { createContext, useContext, useEffect, useState } from "react";
+import socket from "../socket";
 import { useAuth } from "./AuthContext";
 
 const SocketContext = createContext(null);
@@ -9,11 +9,6 @@ export const SocketProvider = ({ children }) => {
   const { user } = useAuth();
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [lastSeenMap, setLastSeenMap] = useState({});
-
-  const socket = useMemo(
-    () => io(import.meta.env.VITE_SERVER_URL, { withCredentials: true, autoConnect: false }),
-    []
-  );
 
   useEffect(() => {
     if (!user?._id) {
@@ -37,7 +32,7 @@ export const SocketProvider = ({ children }) => {
       socket.off("getOnlineUsers");
       socket.off("userLastSeen", handleLastSeen);
     };
-  }, [user?._id, socket]);
+  }, [user?._id]);
 
   return (
     <SocketContext.Provider value={{ socket, onlineUsers, lastSeenMap }}>

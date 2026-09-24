@@ -50,6 +50,7 @@ const CommentsOverlay = ({
   onClose,
   onLikesCountChange,
   onSaveChange,
+  onCommentAdded,
   initialIsLiked,
   initialIsSaved,
   // When true, the media (image/video) panel is also shown on mobile,
@@ -450,6 +451,7 @@ const CommentsOverlay = ({
       if (response.status === 201) {
         setComment("");
         fetchComments();
+        onCommentAdded?.();
       }
     } catch (error) {
       console.log(error);
