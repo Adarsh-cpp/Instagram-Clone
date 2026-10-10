@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { trimVideoClientSide } from "../utils/trimVideoClient";
 import { ArrowLeft, Play } from "lucide-react";
 
 const MAX_DURATION = 15; // hard cap on clip length, seconds — matches the app's reel limit
@@ -102,7 +101,7 @@ const useFilmstrip = (file, duration) => {
   return { thumbnails, loading };
 };
 
-const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, next, back }) => {
+const TrimVideoPage = ({ video, setTrimData, setAspectRatio, next, back }) => {
   const videoRef = useRef(null);
   const trackRef = useRef(null);
   const dragOffsetRef = useRef(0);
@@ -110,9 +109,8 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
   const [videoUrl, setVideoUrl] = useState(null);
   const [duration, setDuration] = useState(0);
 
-  // The trim window is now: a position (start) + a length (clipSeconds),
-  // exactly like the song trimmer — drag the window to move it, use the
-  // slider to change how long it is.
+  // The trim window is: a position (start) + a length (clipSeconds) — drag
+  // the window to move it, use the slider to change how long it is.
   const [start, setStart] = useState(0);
   const [clipSeconds, setClipSeconds] = useState(MAX_DURATION);
 
@@ -120,7 +118,6 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
   const [isPlaying, setIsPlaying] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedAspect, setSelectedAspect] = useState(ASPECT_OPTIONS[0]);
-  const [isProcessing, setIsProcessing] = useState(false);
 
   const { thumbnails, loading: thumbsLoading } = useFilmstrip(video, duration);
 
@@ -240,32 +237,23 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
   };
 
   // ------------------------------------------------------------------------
-
-  const handleNext = async () => {
-    setIsProcessing(true);
-
+  // No more client-side re-encoding here. The old flow played the whole clip
+  // back in real time through MediaRecorder/captureStream just to "cut" it —
+  // that's what made Next feel slow (a 15s clip took ~15 real seconds before
+  // upload even started), and captureStream-recorded video is prone to
+  // dropped frames / audio drift, which is almost certainly why playback
+  // looked choppy afterwards. Cloudinary already trims server-side via
+  // start_offset/end_offset in uploadReelVideo.js, using its own proper
+  // encoder — so we just hand it the original file plus the trim points.
+  // ------------------------------------------------------------------------
+  const handleNext = () => {
     if (videoRef.current && !videoRef.current.paused) {
       videoRef.current.pause();
       setIsPlaying(false);
     }
-
-    try {
-      // Actually cut the file down to just the selected window — this is what
-      // shrinks the upload, not just recording start/end numbers.
-      const trimmedFile = await trimVideoClientSide(video, start, clipSeconds);
-      setTrimmedMedia(trimmedFile);
-      setTrimData({ trimStart: 0, trimDuration: clipSeconds }); // file is already trimmed
-    } catch (err) {
-      // Browser can't do client-side trimming (e.g. older Safari) — fall back
-      // to sending the original file + trim metadata, same as before.
-      console.warn("Client-side trim unavailable, falling back:", err.message);
-      setTrimmedMedia(null);
-      setTrimData({ trimStart: start, trimDuration: clipSeconds });
-    } finally {
-      setAspectRatio(selectedAspect.value);
-      setIsProcessing(false);
-      next();
-    }
+    setTrimData({ trimStart: start, trimDuration: clipSeconds });
+    setAspectRatio(selectedAspect.value);
+    next();
   };
 
   const windowLeftPct = duration ? (start / duration) * 100 : 0;
@@ -284,14 +272,10 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
               Trim
             </div>
             <div
-              onClick={isProcessing ? undefined : handleNext}
-              className={`next text-sm sm:text-base ${
-                isProcessing
-                  ? "text-[var(--text-muted)] cursor-not-allowed"
-                  : "text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] hover:underline cursor-pointer"
-              }`}
+              onClick={handleNext}
+              className="next text-sm sm:text-base text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] hover:underline cursor-pointer"
             >
-              {isProcessing ? "Processing..." : "Next"}
+              Next
             </div>
           </div>
 
@@ -330,16 +314,6 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
                     </div>
                   </button>
                 )}
-
-                {isProcessing && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 via-red-500 to-yellow-500 animate-spin p-[3px]">
-                      <div className="w-full h-full relative bg-[var(--bg-loading)] rounded-full">
-                        <div className="block absolute top-[-7px] w-[20px] h-[20px] rounded-full bg-[var(--bg-loading)]"></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -361,8 +335,7 @@ const TrimVideoPage = ({ video, setTrimmedMedia, setTrimData, setAspectRatio, ne
           </div>
 
           {/* --- Trim scrubber: drag the highlighted window to move it, use
-              the slider below to change how long the clip is. Same pattern
-              as the song trimmer. --- */}
+              the slider below to change how long the clip is. --- */}
           <div className="w-full px-4 py-3 bg-[var(--bg-panel)] shrink-0">
             <div className="flex justify-between text-xs text-[var(--text-secondary)] mb-2">
               <span>Start: {start.toFixed(1)}s</span>

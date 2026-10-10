@@ -20,26 +20,44 @@ function CreatePostPage() {
   const [editedImages, setEditedImages] = useState([]);
   const [aspectRatio, setAspectRatio] = useState("1:1");
 
-  const [trimmedMedia, setTrimmedMedia] = useState(null);
+  // Trimming happens server-side (Cloudinary transformation, applied via
+  // the signed upload), so this is just the two numbers describing the
+  // window — there's no separate "trimmed" File to track.
   const [trimData, setTrimData] = useState({ trimStart: 0, trimDuration: 0 });
 
   const navigate = useNavigate();
 
   const handlePost = (caption, location, taggedUsers) => {
-    const isVideo = mediaType === "video";
     const token = localStorage.getItem("authToken");
+
+    if (mediaType === "video") {
+      // UploadContext sends the video straight to Cloudinary and only
+      // tells our server the resulting publicId — no multipart body, no
+      // server-side size limit, and it shows up in the same upload
+      // pill/toast UI as image posts.
+      startUpload(
+        { type: mediaType, caption },
+        {
+          type: "directVideo",
+          file: originalMedia,
+          trimData,
+          aspectRatio,
+          caption,
+          location,
+          taggedUsers,
+          token,
+          baseUrl: BASE_URL,
+        }
+      );
+      setTimeout(() => navigate("/home"), 400);
+      return;
+    }
 
     const buildFormData = () => {
       const formData = new FormData();
-      if (isVideo) {
-        formData.append("video", trimmedMedia || originalMedia);
-        formData.append("trimStart", trimData.trimStart);
-        formData.append("trimDuration", trimData.trimDuration);
-      } else {
-        editedImages.forEach((file, i) => {
-          formData.append("images", file, file.name || `slide-${i}.jpg`);
-        });
-      }
+      editedImages.forEach((file, i) => {
+        formData.append("images", file, file.name || `slide-${i}.jpg`);
+      });
       formData.append("caption", caption);
       formData.append("ratio", aspectRatio);
 
@@ -56,8 +74,8 @@ function CreatePostPage() {
     startUpload(
       { type: mediaType, caption },
       {
-        url: isVideo ? `${BASE_URL}/reels/create-reel` : `${BASE_URL}/post/create-post`,
-        method: isVideo ? "post" : "put",
+        url: `${BASE_URL}/post/create-post`,
+        method: "put",
         buildFormData,
         headers: { Authorization: `Bearer ${token}` },
       }
@@ -89,7 +107,6 @@ function CreatePostPage() {
       {step === 2 && mediaType === "video" && (
         <TrimVideoPage
           video={originalMedia}
-          setTrimmedMedia={setTrimmedMedia}
           setTrimData={setTrimData}
           setAspectRatio={setAspectRatio}
           next={() => setStep(3)}
@@ -101,9 +118,8 @@ function CreatePostPage() {
         <CaptionSharePage
           mediaType={mediaType}
           images={editedImages}
-          video={mediaType === "video" ? trimmedMedia || originalMedia : null}
+          video={mediaType === "video" ? originalMedia : null}
           trimData={trimData}
-          isPreTrimmed={mediaType === "video" && !!trimmedMedia}
           aspectRatio={aspectRatio}
           back={() => setStep(2)}
           handlePost={handlePost}

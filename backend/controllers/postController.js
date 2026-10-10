@@ -4,6 +4,7 @@ import userModel from "../models/user.model.js";
 import reelModel from "../models/reel.model.js";
 import messageModel from "../models/message.model.js";
 import commentModel from "../models/comment.model.js";
+import notificationModel from "../models/notification.model.js";
 import { createNotification, removeNotification } from "../services/notification.service.js";
 import { uploadMultipleMedia } from "../services/upload.service.js";
 import { deleteCloudinaryAssetWithRetry } from "../utils/cloudinaryRetry.js";

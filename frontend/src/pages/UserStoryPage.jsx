@@ -25,6 +25,83 @@ const MAX_CLIP_SECONDS = 15;
 // their own real playback length instead, capped at MAX_CLIP_SECONDS).
 const DEFAULT_IMAGE_SECONDS = 6;
 
+// ---------------------------------------------------------------------------
+// FIX — "half of the image turns black when a filter is applied"
+//
+// Cause: fabric.js applies image filters through WebGL, which processes the
+// image in textures of `fabric.textureSize` (default 2048px). Large /
+// high-resolution photos exceed that, so only part of the image gets
+// filtered and the rest renders black.
+//
+// Fix (two parts):
+//   1. Raise fabric.textureSize to what this GPU actually supports
+//      (capped at 4096 to keep memory sane) and re-init the filter backend.
+//   2. Downscale any image whose longest side is bigger than that limit
+//      BEFORE handing it to fabric (see loadScaledImage below). The story
+//      is exported at 1080x1920, so we lose nothing visible.
+// ---------------------------------------------------------------------------
+const getSafeMaxImageSide = () => {
+  try {
+    const c = document.createElement("canvas");
+    const gl = c.getContext("webgl") || c.getContext("experimental-webgl");
+    const max = gl ? gl.getParameter(gl.MAX_TEXTURE_SIZE) : 2048;
+    gl?.getExtension?.("WEBGL_lose_context")?.loseContext();
+    return Math.max(2048, Math.min(max || 2048, 4096));
+  } catch (e) {
+    return 2048;
+  }
+};
+
+const MAX_IMAGE_SIDE = getSafeMaxImageSide();
+fabric.textureSize = MAX_IMAGE_SIDE;
+try {
+  fabric.filterBackend = fabric.initFilterBackend();
+} catch (e) {
+  // If WebGL isn't available fabric falls back to the 2D backend on its own.
+}
+
+// Loads `file`, and if either side is larger than MAX_IMAGE_SIDE, redraws it
+// onto a smaller canvas. Resolves with an object URL (caller must revoke it).
+const loadScaledImage = (file) =>
+  new Promise((resolve, reject) => {
+    const srcUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const longest = Math.max(img.naturalWidth, img.naturalHeight);
+      if (longest <= MAX_IMAGE_SIDE) {
+        // Small enough — use the original as-is.
+        resolve(srcUrl);
+        return;
+      }
+      const ratio = MAX_IMAGE_SIDE / longest;
+      const w = Math.round(img.naturalWidth * ratio);
+      const h = Math.round(img.naturalHeight * ratio);
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext("2d");
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, 0, 0, w, h);
+      c.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(srcUrl);
+          if (!blob) {
+            reject(new Error("Failed to downscale image"));
+            return;
+          }
+          resolve(URL.createObjectURL(blob));
+        },
+        "image/jpeg",
+        0.95
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(srcUrl);
+      reject(new Error("Failed to load image"));
+    };
+    img.src = srcUrl;
+  });
+
 const BG_SWATCHES = ["#000000", "#1a1a2e", "#4a5df9", "#ff6b0d", "#eb0089", "#0f9d58", "#ffffff"];
 const PEN_SWATCHES = ["#ffffff", "#000000", "#ffc600", "#ff6b0d", "#eb0089", "#4a5df9", "#0f9d58"];
 const TEXT_SWATCHES = ["#ffffff", "#000000", "#ffc600", "#ff6b0d", "#eb0089", "#4a5df9", "#0f9d58"];
@@ -167,7 +244,7 @@ const UserStoryPage = () => {
   const [songs, setSongs] = useState([]);
   const [selectedSong, setSelectedSong] = useState(null);
   const [songStartTime, setSongStartTime] = useState(0);
-  // NEW — how long the chosen song clip (and therefore the story) should
+  // How long the chosen song clip (and therefore the story) should
   // play for. Defaults to the largest possible clip for the song (capped at
   // MAX_CLIP_SECONDS) whenever a new song is picked, and the user can then
   // shorten it with the slider below the trimmer.
@@ -264,37 +341,66 @@ const UserStoryPage = () => {
     canvas.on("selection:updated", updateSelection);
     canvas.on("selection:cleared", () => setIsTextSelected(false));
 
-    // For the fabric background image we still create a dedicated one-off
-    // object URL, scoped to this effect and revoked on cleanup — that's
-    // fine because it's created exactly once per (file/dims) change, not
-    // on every render, so it never triggers the reload bug.
-    const objectUrl = URL.createObjectURL(file);
+    // Guards the async image load below: if the effect is cleaned up
+    // (unmount / resize / file change) before the image finishes loading,
+    // we must not touch the already-disposed canvas.
+    let cancelled = false;
+    let objectUrl = null;
 
     if (mediaType === "image") {
-      fabric.Image.fromURL(objectUrl, (img) => {
-        const scaleToCover = Math.max(dims.width / img.width, dims.height / img.height);
-        img.set({
-          left: dims.width / 2,
-          top: dims.height / 2,
-          originX: "center",
-          originY: "center",
-          scaleX: scaleToCover,
-          scaleY: scaleToCover,
-          selectable: true,
+      // FIX: load via loadScaledImage so oversized photos are downscaled to
+      // a size WebGL can filter in one piece (no more half-black images).
+      loadScaledImage(file)
+        .then((url) => {
+          if (cancelled) {
+            URL.revokeObjectURL(url);
+            return;
+          }
+          objectUrl = url;
+          fabric.Image.fromURL(url, (img) => {
+            if (cancelled || !img) return;
+            const scaleToCover = Math.max(dims.width / img.width, dims.height / img.height);
+            img.set({
+              left: dims.width / 2,
+              top: dims.height / 2,
+              originX: "center",
+              originY: "center",
+              scaleX: scaleToCover,
+              scaleY: scaleToCover,
+              selectable: true,
+            });
+            bgImageRef.current = img;
+            canvas.add(img);
+            canvas.setActiveObject(img);
+            // Re-apply whichever filter is currently selected (the image
+            // loads asynchronously, so the user may have picked one already).
+            if (activeFilterRef.current !== "none") {
+              img.filters = getImageFilterPreset(activeFilterRef.current);
+              img.applyFilters();
+            }
+            canvas.renderAll();
+          });
+        })
+        .catch((err) => {
+          console.error("Image load failed:", err);
+          if (!cancelled) toast.error("Couldn't load this image");
         });
-        bgImageRef.current = img;
-        canvas.add(img);
-        canvas.setActiveObject(img);
-        canvas.renderAll();
-      });
     }
 
     return () => {
+      cancelled = true;
       canvas.dispose();
-      URL.revokeObjectURL(objectUrl);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file, mediaType, dims.width, dims.height]);
+
+  // Mirror of `activeFilter` readable from inside the async image-load
+  // callback above (state captured in that closure would be stale).
+  const activeFilterRef = useRef("none");
+  useEffect(() => {
+    activeFilterRef.current = activeFilter;
+  }, [activeFilter]);
 
   useEffect(() => {
     const fetchSongs = async () => {
@@ -320,7 +426,7 @@ const UserStoryPage = () => {
   }, []);
 
   // play the selected song's clip on loop — same "loops until added"
-  // behavior as Instagram's music sticker preview. Now uses the adjustable
+  // behavior as Instagram's music sticker preview. Uses the adjustable
   // songClipSeconds instead of a fixed 15s window.
   useEffect(() => {
     const audio = audioRef.current;
@@ -533,7 +639,7 @@ const UserStoryPage = () => {
     });
   };
 
-  // NEW — decides how long the finished story should play for.
+  // Decides how long the finished story should play for.
   //   - A song is attached  -> the chosen clip length wins.
   //   - Video, no song      -> the video's own real length (capped at 15s).
   //   - Image, no song      -> a flat 6s.
@@ -1018,7 +1124,7 @@ const UserStoryPage = () => {
                             trackWidth={220}
                           />
 
-                          {/* NEW — clip length control. Bounded between
+                          {/* Clip length control. Bounded between
                               MIN_CLIP_SECONDS and whichever is smaller of
                               MAX_CLIP_SECONDS or the song's own real length,
                               so the slider's max can never exceed the track. */}

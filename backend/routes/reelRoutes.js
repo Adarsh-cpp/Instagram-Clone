@@ -9,6 +9,7 @@ import {
   toggleLikeReel,
   shareReel,
   toggleSaveReel,
+  getReelUploadSignature,
 } from "../controllers/reelController.js";
 import { addComment, deleteComment, getComments, toggleCommentLike } from "../controllers/reelCommentController.js";
 
@@ -16,7 +17,8 @@ const router = express.Router();
 
 router.get("/get-reels", authUser, getReels);
 router.get("/:id", authUser, getReelById);
-router.post("/create-reel", authUser, uploadReel.single("video"), createReel);
+router.post("/sign-upload", authUser, getReelUploadSignature);
+router.post("/create-reel", authUser, createReel);
 router.delete("/:id/delete", authUser, deleteReel);
 router.post("/:id/like", authUser, toggleLikeReel);
 router.post("/:id/share", authUser, shareReel);

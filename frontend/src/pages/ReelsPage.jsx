@@ -3,7 +3,6 @@ import IconSidebar from '../components/IconSidebar'
 import {
   Heart,
   MessageCircle,
-  Repeat2,
   Bookmark,
   MoreHorizontal,
   Volume2,
@@ -25,6 +24,9 @@ import ShareOverlay from '../components/ShareOverlay'
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 const LIMIT = 5
 
+// Swipe distance (px) needed to move to the next / previous reel on touch screens
+const SWIPE_THRESHOLD = 50
+
 const authHeaders = () => ({
   headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
 })
@@ -33,6 +35,8 @@ const formatCount = (n = 0) => {
   if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}K`
   return n
 }
+
+const stop = (e) => e.stopPropagation()
 
 const ReelsPage = () => {
 
@@ -43,6 +47,8 @@ const ReelsPage = () => {
   const clickTimer = useRef(null)
   const isFetchingRef = useRef(false)
   const menuRef = useRef(null)
+  const touchStartY = useRef(null)
+  const wheelLock = useRef(false)
 
   const [reels, setReels] = useState([])
   const [page, setPage] = useState(1)
@@ -60,6 +66,9 @@ const ReelsPage = () => {
   const [videoAspect, setVideoAspect] = useState(9 / 16)
   const [isLandscape, setIsLandscape] = useState(false)
   const [dims, setDims] = useState({ width: 0, height: 0 })
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  )
 
   const [isCommentsOpen, setIsCommentsOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
@@ -72,18 +81,21 @@ const ReelsPage = () => {
   const isOwnReel = currentReel && user?._id?.toString() === currentReel?.author?._id?.toString()
   const canDeleteReel = isOwnReel || user?.role === "admin"
 
+  // Desktop only: size the reel "card" to fit the available space while keeping
+  // the video's aspect ratio. On mobile the reel simply fills the screen, so
+  // no sizing is needed.
   const computeDims = useCallback(() => {
+    setIsMobile(window.innerWidth < 768)
+
     const section = sectionRef.current
     if (!section) return
 
-    const isMobile = window.innerWidth < 768
     const rect = section.getBoundingClientRect()
 
-    const railSpace = isMobile ? 0 : 72
-    const horizontalPadding = isMobile ? 16 : 48
-    const verticalPadding = isMobile ? 96 : 64
+    const horizontalPadding = 48
+    const verticalPadding = 32
 
-    const availWidth = rect.width - railSpace - horizontalPadding
+    const availWidth = rect.width - horizontalPadding
     const availHeight = rect.height - verticalPadding
 
     let width = availHeight * videoAspect
@@ -94,7 +106,7 @@ const ReelsPage = () => {
       height = width / videoAspect
     }
 
-    const maxWidth = isMobile ? availWidth : Math.min(availWidth, 780)
+    const maxWidth = Math.min(availWidth, 780)
     if (width > maxWidth) {
       width = maxWidth
       height = width / videoAspect
@@ -169,6 +181,46 @@ const ReelsPage = () => {
     if (currentIndex > 0) {
       setCurrentIndex((i) => i - 1)
     }
+  }
+
+  // Keyboard navigation (desktop)
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      const tag = e.target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (isCommentsOpen || isShareOpen || isDeleteConfirmOpen) return
+      if (e.key === 'ArrowDown') goToNext()
+      if (e.key === 'ArrowUp') goToPrev()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  })
+
+  // Mouse wheel / trackpad navigation (desktop), throttled so one scroll = one reel
+  const handleWheel = (e) => {
+    if (isCommentsOpen || isShareOpen || isDeleteConfirmOpen) return
+    if (wheelLock.current || Math.abs(e.deltaY) < 20) return
+    wheelLock.current = true
+    if (e.deltaY > 0) goToNext()
+    else goToPrev()
+    window.setTimeout(() => {
+      wheelLock.current = false
+    }, 600)
+  }
+
+  // Swipe up / down navigation (touch)
+  const handleTouchStart = (e) => {
+    touchStartY.current = e.touches[0].clientY
+  }
+
+  const handleTouchEnd = (e) => {
+    if (touchStartY.current == null) return
+    const delta = e.changedTouches[0].clientY - touchStartY.current
+    touchStartY.current = null
+    if (isCommentsOpen) return
+    if (Math.abs(delta) < SWIPE_THRESHOLD) return
+    if (delta < 0) goToNext()
+    else goToPrev()
   }
 
   useEffect(() => {
@@ -260,40 +312,40 @@ const ReelsPage = () => {
   }
 
   const triggerSave = async () => {
-  if (!currentReel) return
-  const reelId = currentReel._id
-  const wasSaved = currentReel.isSaved
+    if (!currentReel) return
+    const reelId = currentReel._id
+    const wasSaved = currentReel.isSaved
 
-  setReels((prev) =>
-    prev.map((r, i) =>
-      i === currentIndex
-        ? {
-            ...r,
-            isSaved: !wasSaved,
-            savesCount: wasSaved ? r.savesCount - 1 : r.savesCount + 1,
-          }
-        : r
-    )
-  )
-
-  try {
-    await axios.post(`${BASE_URL}/reels/${reelId}/toggle-save`, {}, authHeaders())
-    await refreshUser()
-  } catch (error) {
     setReels((prev) =>
       prev.map((r, i) =>
         i === currentIndex
           ? {
               ...r,
-              isSaved: wasSaved,
-              savesCount: wasSaved ? r.savesCount + 1 : r.savesCount - 1,
+              isSaved: !wasSaved,
+              savesCount: wasSaved ? r.savesCount - 1 : r.savesCount + 1,
             }
           : r
       )
     )
-    toast.error('Failed to update save')
+
+    try {
+      await axios.post(`${BASE_URL}/reels/${reelId}/toggle-save`, {}, authHeaders())
+      await refreshUser()
+    } catch (error) {
+      setReels((prev) =>
+        prev.map((r, i) =>
+          i === currentIndex
+            ? {
+                ...r,
+                isSaved: wasSaved,
+                savesCount: wasSaved ? r.savesCount + 1 : r.savesCount - 1,
+              }
+            : r
+        )
+      )
+      toast.error('Failed to update save')
+    }
   }
-}
 
   const handleShared = (newSharesCount) => {
     setReels((prev) =>
@@ -304,11 +356,7 @@ const ReelsPage = () => {
   }
 
   // Keeps the reel's commentsCount in sync with the comments overlay —
-  // mirrors handleShared above. ReelCommentsOverlay is responsible for
-  // calling this (via onCommentCountChange) whenever a comment is added
-  // or removed, passing either the new absolute count or a delta; both
-  // shapes are supported here so this works regardless of which the
-  // overlay emits.
+  // mirrors handleShared above. Supports both an absolute count and a delta.
   const handleCommentCountChange = (payload) => {
     setReels((prev) =>
       prev.map((r, i) => {
@@ -364,27 +412,38 @@ const ReelsPage = () => {
     }
   }, [])
 
+  // Mobile: the reel fills the whole screen (portrait = full width + height,
+  // landscape = full width, centered on black). Desktop: a sized "card".
+  const reelBoxStyle = isMobile
+    ? { width: '100%', height: '100%' }
+    : dims.width && dims.height
+      ? { width: dims.width, height: dims.height }
+      : { width: '90vw', maxWidth: 380, aspectRatio: '9 / 16' }
+
+  const overlayShadow = 'drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)]'
+
   return (
-    <div className="reelsPage w-[100vw] h-[100vh] bg-[var(--bg-app)] flex justify-center items-center text-[var(--text-primary)] overflow-x-hidden">
+    <div className="reelsPage w-[100vw] h-[100dvh] bg-[var(--bg-app)] flex justify-center items-center text-[var(--text-primary)] overflow-hidden">
       <IconSidebar />
 
       <div
         ref={sectionRef}
-        className="reelSection w-full md:w-[80%] min-h-full flex justify-center items-center overflow-y-auto bg-[var(--bg-app)] relative"
+        onWheel={handleWheel}
+        className="reelSection w-full md:w-[80%] h-full flex justify-center items-center overflow-hidden bg-[var(--bg-app)] relative overscroll-none"
       >
-        {/* up / down nav arrows — floating over media, stays fixed dark */}
-        <div className="hidden sm:flex fixed right-4 md:right-6 top-1/2 -translate-y-1/2 flex-col gap-3 md:gap-4 z-30">
+        {/* up / down nav arrows — desktop only, floating over media, stays fixed dark */}
+        <div className="hidden md:flex fixed right-6 top-1/2 -translate-y-1/2 flex-col gap-4 z-30">
           <button
             onClick={goToPrev}
             disabled={currentIndex === 0}
-            className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-neutral-800/70 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white"
+            className="w-10 h-10 rounded-full bg-neutral-800/70 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white"
           >
             <ChevronUp size={18} />
           </button>
           <button
             onClick={goToNext}
             disabled={currentIndex >= reels.length - 1}
-            className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-neutral-800/70 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white"
+            className="w-10 h-10 rounded-full bg-neutral-800/70 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white"
           >
             <ChevronDown size={18} />
           </button>
@@ -395,50 +454,186 @@ const ReelsPage = () => {
         )}
 
         {currentReel && (
-          <div className="relative flex items-end gap-2 md:gap-3 w-full h-full justify-center px-2">
-            {/* video container — backdrop behind the media itself */}
-            <div
-              className="relative bg-[var(--bg-elevated)] rounded-md overflow-hidden select-none cursor-pointer shrink-0"
-              style={
-                dims.width && dims.height
-                  ? { width: dims.width, height: dims.height }
-                  : { width: '90vw', maxWidth: 380, aspectRatio: '9 / 16' }
-              }
-              onClick={handleVideoClick}
+          // The reel box: full screen on mobile, a rounded card on desktop.
+          // Everything (video, action icons, creator info) lives inside it.
+          <div
+            className="relative bg-black md:rounded-md overflow-hidden select-none cursor-pointer shrink-0"
+            style={reelBoxStyle}
+            onClick={handleVideoClick}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            <video
+              ref={videoRef}
+              key={currentReel._id}
+              className={`w-full h-full ${isLandscape ? 'object-contain bg-black' : 'object-cover'}`}
+              src={currentReel.media.url}
+              poster={currentReel.media.thumbnailUrl}
+              loop
+              muted={isMuted}
+              playsInline
+              onLoadedMetadata={handleLoadedMetadata}
+              onClick={(e) => e.stopPropagation()}
+              style={{ pointerEvents: 'none' }}
+            />
+
+            {/* readability gradient behind the bottom overlays */}
+            <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
+
+            {showPlayIcon && !isPlaying && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-black/50 flex items-center justify-center">
+                  <Play size={22} fill="white" className="ml-1 text-white" />
+                </div>
+              </div>
+            )}
+
+            {showLikeBurst && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <img
+                  src="/images/gradient-like-icon.png"
+                  alt="like"
+                  className="w-32 sm:w-40 md:w-48 h-auto like-burst-anim"
+                />
+              </div>
+            )}
+
+            {/* mute toggle — top right so the bottom-right corner is free for the action icons */}
+            <button
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center z-10"
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsMuted((m) => !m)
+              }}
             >
-              <video
-                ref={videoRef}
-                key={currentReel._id}
-                className={`w-full h-full ${isLandscape ? 'object-contain bg-black' : 'object-cover'}`}
-                src={currentReel.media.url}
-                poster={currentReel.media.thumbnailUrl}
-                loop
-                muted={isMuted}
-                playsInline
-                onLoadedMetadata={handleLoadedMetadata}
-                onClick={(e) => e.stopPropagation()}
-                style={{ pointerEvents: 'none' }}
-              />
+              {isMuted ? <VolumeX size={16} className="text-white" /> : <Volume2 size={16} className="text-white" />}
+            </button>
 
-              {showPlayIcon && !isPlaying && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-black/50 flex items-center justify-center">
-                    <Play size={22} fill="white" className="ml-1" />
+            {/* bottom-left creator info — overlays the video, stays fixed white */}
+            {!isCommentsOpen && (
+              <div
+                onClick={stop}
+                onTouchStart={stop}
+                onTouchEnd={stop}
+                className="absolute left-3 right-16 bottom-3 md:bottom-4 z-10 text-white cursor-default"
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <NavLink to={`/user/get-profile/${currentReel?.author?._id}`}>
+                    <img
+                      src={currentReel.author?.profilePic || "/images/default-profile-pic.jpg"}
+                      alt={currentReel.author?.username}
+                      className="w-8 h-8 rounded-full border border-yellow-400 object-cover"
+                    />
+                  </NavLink>
+                  <NavLink to={`/user/get-profile/${currentReel?.author?._id}`}>
+                    <span className={`font-semibold text-sm flex items-center gap-1 ${overlayShadow}`}>
+                      {currentReel.author?.username}
+                      {currentReel.author?.role === "admin" && (
+                        <BadgeCheck size={13} className="text-sky-400" />
+                      )}
+                    </span>
+                  </NavLink>
+
+                  {!user?.following?.some(
+                    (id) =>
+                      id.toString() === currentReel?.author?._id?.toString()
+                  ) &&
+                    user?._id?.toString() !== currentReel?.author?._id?.toString() && (
+                      <>
+                        <span className="text-sm text-neutral-300">·</span>
+                        <button className={`text-sky-400 text-sm font-semibold ${overlayShadow}`}>
+                          Follow
+                        </button>
+                      </>
+                    )}
+                </div>
+
+                {currentReel.location && (
+                  <div className={`flex items-center gap-1 text-xs text-neutral-200 mt-1 ml-10 ${overlayShadow}`}>
+                    <MapPin size={12} />
+                    {currentReel.location}
                   </div>
-                </div>
-              )}
+                )}
 
-              {showLikeBurst && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <img
-                    src="/images/gradient-like-icon.png"
-                    alt="like"
-                    className="w-32 sm:w-40 md:w-48 h-auto like-burst-anim"
+                {currentReel.caption && (
+                  <p className={`text-sm mt-2 line-clamp-3 ${overlayShadow}`}>{currentReel.caption}</p>
+                )}
+              </div>
+            )}
+
+            {/* right action rail — bottom-right corner, vertical, on top of the video */}
+            {!isCommentsOpen && (
+              <div
+                onClick={stop}
+                onTouchStart={stop}
+                onTouchEnd={stop}
+                className="absolute right-2 bottom-[76px] md:bottom-4 z-10 flex flex-col items-center gap-5 text-white cursor-default"
+              >
+                <button className="flex flex-col items-center gap-1 cursor-pointer" onClick={triggerLike}>
+                  <Heart
+                    size={26}
+                    className={`${currentReel.isLiked ? 'text-red-500' : 'text-white'} ${overlayShadow}`}
+                    fill={currentReel.isLiked ? 'currentColor' : 'none'}
                   />
-                </div>
-              )}
+                  <span className={`text-xs ${overlayShadow}`}>{formatCount(currentReel.likesCount)}</span>
+                </button>
 
-              {isCommentsOpen && (
+                <button
+                  onClick={() => setIsCommentsOpen(true)}
+                  className="flex flex-col items-center gap-1 cursor-pointer"
+                >
+                  <MessageCircle size={26} className={overlayShadow} />
+                  <span className={`text-xs ${overlayShadow}`}>{formatCount(currentReel.commentsCount)}</span>
+                </button>
+
+                <button
+                  onClick={() => setIsShareOpen(true)}
+                  className="flex flex-col items-center gap-1 cursor-pointer"
+                >
+                  <Send size={26} className={overlayShadow} />
+                  <span className={`text-xs ${overlayShadow}`}>{formatCount(currentReel.sharesCount)}</span>
+                </button>
+
+                <button className="cursor-pointer" onClick={triggerSave}>
+                  <Bookmark
+                    size={24}
+                    className={overlayShadow}
+                    fill={currentReel.isSaved ? 'currentColor' : 'none'}
+                  />
+                </button>
+
+                {canDeleteReel && (
+                  <div ref={menuRef} className="relative">
+                    <button
+                      className="cursor-pointer"
+                      onClick={() => setIsMenuOpen((prev) => !prev)}
+                      aria-label="Reel options"
+                    >
+                      <MoreHorizontal size={24} className={overlayShadow} />
+                    </button>
+
+                    {isMenuOpen && (
+                      <div className="absolute right-0 bottom-[130%] w-[160px] bg-[var(--bg-surface)] border border-[var(--border-soft)] rounded-xl shadow-2xl overflow-hidden z-20">
+                        <button
+                          onClick={() => {
+                            setIsMenuOpen(false)
+                            setIsDeleteConfirmOpen(true)
+                          }}
+                          className="w-full text-left px-4 py-3 text-sm font-semibold text-[var(--color-danger)] hover:bg-[var(--bg-row-hover)] cursor-pointer transition"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* comments overlay — wrapped so taps/swipes inside it never
+                toggle play, like, or change the reel */}
+            {isCommentsOpen && (
+              <div onClick={stop} onTouchStart={stop} onTouchEnd={stop}>
                 <ReelCommentsOverlay
                   reelId={currentReel._id}
                   isOpen={isCommentsOpen}
@@ -447,127 +642,8 @@ const ReelsPage = () => {
                   onClose={() => setIsCommentsOpen(false)}
                   onCommentCountChange={handleCommentCountChange}
                 />
-              )}
-
-              <button
-                className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center z-10"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setIsMuted((m) => !m)
-                }}
-              >
-                {isMuted ? <VolumeX size={16} className="text-white" /> : <Volume2 size={16} className="text-white" />}
-              </button>
-
-              {/* bottom-left creator info — overlays the video itself, stays fixed white */}
-              <div className="absolute bottom-3 left-3 right-14 sm:right-16 z-10 text-white">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <NavLink to={`/user/get-profile/${currentReel?.author?._id}`}>
-                  <img
-                    src={currentReel.author?.profilePic || "/images/default-profile-pic.jpg"}
-                    alt={currentReel.author?.username}
-                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-yellow-400 object-cover"
-                  />
-                  </NavLink>
-                  <NavLink to={`/user/get-profile/${currentReel?.author?._id}`}>
-                  <span className="font-semibold text-xs sm:text-sm flex items-center gap-1">
-                    {currentReel.author?.username}
-                    {currentReel.author?.role === "admin" && (
-                      <BadgeCheck size={13} className="text-sky-400" />
-                    )}
-                  </span>
-                  </NavLink>
-                  <span className="text-xs sm:text-sm text-neutral-300">·</span>
-                  
-                {!user?.following?.some(
-                  (id) =>
-                    id.toString() === currentReel?.author?._id?.toString()
-                ) &&
-                  user?._id?.toString() !== currentReel?.author?._id?.toString() && (
-                    <button className="text-sky-400 text-xs sm:text-sm font-semibold">
-                      Follow
-                    </button>
-                  )}
-                </div>
-
-                {currentReel.location && (
-                  <div className="flex items-center gap-1 text-[11px] sm:text-xs text-neutral-300 mt-0.5 ml-9 sm:ml-10">
-                    <MapPin size={12} />
-                    {currentReel.location}
-                  </div>
-                )}
-
-                {currentReel.caption && (
-                  <p className="text-xs sm:text-sm mt-2">{currentReel.caption}</p>
-                )}
               </div>
-            </div>
-
-            {/* right action rail — sits on page background on desktop, so it themes */}
-            <div
-              className="
-                flex flex-col items-center gap-4 sm:gap-5 pb-4 sm:pb-6
-                sm:static absolute bottom-16 right-2 sm:right-auto
-                bg-transparent text-[var(--text-primary)]
-              "
-            >
-              <button className="flex flex-col items-center gap-1 cursor-pointer" onClick={triggerLike}>
-                <Heart
-                  size={24}
-                  className={currentReel.isLiked ? 'text-red-500' : ''}
-                  fill={currentReel.isLiked ? 'currentColor' : 'none'}
-                />
-                <span className="text-[11px] sm:text-xs">{formatCount(currentReel.likesCount)}</span>
-              </button>
-
-              <button
-              onClick={()=>setIsCommentsOpen(!isCommentsOpen)}
-              className="flex flex-col items-center gap-1 cursor-pointer">
-                <MessageCircle size={24} />
-                <span className="text-[11px] sm:text-xs">{formatCount(currentReel.commentsCount)}</span>
-              </button>
-
-              <button
-                onClick={() => setIsShareOpen(true)}
-                className="flex flex-col items-center gap-1 cursor-pointer"
-              >
-                <Send size={24} />
-                <span className="text-[11px] sm:text-xs">{formatCount(currentReel.sharesCount)}</span>
-              </button>
-
-              <button className="cursor-pointer" onClick={triggerSave}>
-                <Bookmark
-                  size={20}
-                  fill={currentReel.isSaved ? 'currentColor' : 'none'}
-                />
-              </button>
-
-              {canDeleteReel && (
-                    <div ref={menuRef} className="relative">
-                      <button
-                        className="cursor-pointer"
-                        onClick={() => setIsMenuOpen((prev) => !prev)}
-                        aria-label="Reel options"
-                      >
-                        <MoreHorizontal size={22} />
-                      </button>
-
-                      {isMenuOpen && (
-                        <div className="absolute right-0 bottom-[110%] sm:bottom-auto sm:top-[110%] w-[160px] bg-[var(--bg-surface)] border border-[var(--border-soft)] rounded-xl shadow-2xl overflow-hidden z-20">
-                          <button
-                            onClick={() => {
-                              setIsMenuOpen(false)
-                              setIsDeleteConfirmOpen(true)
-                            }}
-                            className="w-full text-left px-4 py-3 text-sm font-semibold text-[var(--color-danger)] hover:bg-[var(--bg-row-hover)] cursor-pointer transition"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-            </div>
+            )}
           </div>
         )}
       </div>

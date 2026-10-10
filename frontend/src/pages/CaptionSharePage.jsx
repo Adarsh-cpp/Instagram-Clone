@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import EmojiPicker from "emoji-picker-react";
-import { Play, ChevronLeft, ChevronRight, MapPin, UserPlus, X, ArrowLeft, Smile, BadgeCheck } from "lucide-react";
+import { Play, ChevronLeft, ChevronRight, MapPin, UserPlus, X, ArrowLeft, Smile, BadgeCheck, Wifi } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import LocationPicker from "../components/LocationPicker";
 import TagPeoplePicker from "../components/TagPeoplePicker";
@@ -18,12 +18,18 @@ const ASPECT_RATIO_MAP = {
 
 const getVideoAspectRatio = (aspectRatio) => ASPECT_RATIO_MAP[aspectRatio] || 9 / 16;
 
+// Small look-ahead so the loop cuts back to trimStart just before the
+// window's real end rather than after it — timeupdate only fires every
+// ~250ms, so without this margin playback can visibly spill a frame or
+// two into the untrimmed footage before jumping back, which reads as a
+// stutter.
+const LOOP_MARGIN = 0.08;
+
 const CaptionSharePage = ({
   images,
   video,
   mediaType,
   trimData,
-  isPreTrimmed,
   aspectRatio,
   back,
   handlePost,
@@ -36,6 +42,7 @@ const CaptionSharePage = ({
   const [mediaUrls, setMediaUrls] = useState([]);
   const [activeSlide, setActiveSlide] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showUploadNotice, setShowUploadNotice] = useState(true);
 
   // location + tagging state
   const [location, setLocation] = useState(null); // { name, lat, lng } | null
@@ -101,18 +108,22 @@ const CaptionSharePage = ({
     touchStartX.current = null;
   };
 
+  // The uploaded file is always the untouched original now (server does the
+  // trimming), so the preview always needs to seek to trimStart and loop
+  // within the trim window — there's no "already trimmed" file to special-case.
   const handleLoadedMetadata = () => {
-    if (mediaType === "video" && !isPreTrimmed && videoRef.current && trimData?.trimStart != null) {
-      videoRef.current.currentTime = trimData.trimStart;
+    const v = videoRef.current;
+    if (v && trimData?.trimStart != null) {
+      v.currentTime = trimData.trimStart;
     }
   };
 
   const handleTimeUpdate = () => {
-    if (mediaType !== "video" || isPreTrimmed || !trimData?.trimDuration) return;
+    if (mediaType !== "video" || !trimData?.trimDuration) return;
     const v = videoRef.current;
     if (!v) return;
     const windowEnd = trimData.trimStart + trimData.trimDuration;
-    if (v.currentTime >= windowEnd) {
+    if (v.currentTime >= windowEnd - LOOP_MARGIN) {
       v.currentTime = trimData.trimStart;
     }
   };
@@ -153,6 +164,13 @@ const CaptionSharePage = ({
     captionRef.current?.focus();
   };
 
+  // Ignore extra taps on Share while a post is already in flight, so a
+  // double-tap can't start the same upload twice.
+  const onShare = () => {
+    if (isLoading) return;
+    handlePost(caption, location, taggedUsers);
+  };
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (pickerRef.current && !pickerRef.current.contains(e.target)) {
@@ -181,7 +199,7 @@ const CaptionSharePage = ({
             </div>
 
             <div
-              onClick={() => handlePost(caption, location, taggedUsers)}
+              onClick={onShare}
               className="next text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] hover:underline cursor-pointer text-sm sm:text-base"
             >
               Share
@@ -212,40 +230,29 @@ const CaptionSharePage = ({
                       maxHeight: "100%",
                     }}
                   >
-                    {isPreTrimmed ? (
+                    <div
+                      className="relative w-full h-full flex items-center justify-center cursor-pointer"
+                      onClick={togglePlay}
+                    >
                       <video
                         ref={videoRef}
                         src={mediaUrls[0]}
                         className="w-full h-full object-cover"
-                        controls
                         muted
                         loop
                         playsInline
+                        preload="auto"
+                        onLoadedMetadata={handleLoadedMetadata}
+                        onTimeUpdate={handleTimeUpdate}
                       />
-                    ) : (
-                      <div
-                        className="relative w-full h-full flex items-center justify-center cursor-pointer"
-                        onClick={togglePlay}
-                      >
-                        <video
-                          ref={videoRef}
-                          src={mediaUrls[0]}
-                          className="w-full h-full object-cover"
-                          muted
-                          loop
-                          playsInline
-                          onLoadedMetadata={handleLoadedMetadata}
-                          onTimeUpdate={handleTimeUpdate}
-                        />
-                        {!isPlaying && (
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="w-14 h-14 rounded-full bg-black/50 flex items-center justify-center">
-                              <Play size={22} fill="white" className="ml-0" />
-                            </div>
+                      {!isPlaying && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <div className="w-14 h-14 rounded-full bg-black/50 flex items-center justify-center">
+                            <Play size={22} fill="white" className="ml-0" />
                           </div>
-                        )}
-                      </div>
-                    )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )
               ) : (
@@ -303,6 +310,23 @@ const CaptionSharePage = ({
                   )}
                 </div>
               </div>
+
+              {/* Reel-only heads-up: uploads can be slow on weak connections */}
+              {mediaType === "video" && showUploadNotice && (
+                <div className="uploadNotice mx-4 mb-2 flex-shrink-0 flex items-start gap-2.5 rounded-lg border border-[rgba(250,204,21,0.35)] bg-[rgba(250,204,21,0.12)] px-3 py-2">
+                  <Wifi size={16} className="mt-0.5 shrink-0 text-amber-500" />
+                  <p className="flex-1 text-xs leading-snug text-[var(--text-primary)]">
+                    <span className="font-semibold">Use a fast, stable internet connection.</span>{" "}
+                    Uploading a reel can take a few minutes. Keep the app open until it's posted.
+                  </p>
+                  <X
+                    size={14}
+                    className="mt-0.5 shrink-0 cursor-pointer text-[#8e8e8e] hover:text-[var(--text-primary)]"
+                    onClick={() => setShowUploadNotice(false)}
+                    aria-label="Dismiss"
+                  />
+                </div>
+              )}
 
               <div className="caption w-full flex-1 min-h-[60px]">
                 <div className="captionSpace w-full h-full">
@@ -425,8 +449,8 @@ const CaptionSharePage = ({
                 />
               )}
 
-                          {isLoading && (
-                <div className="loadingSection absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[2px]">
+              {isLoading && (
+                <div className="loadingSection absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/50 backdrop-blur-[2px] px-6 text-center">
                   <div
                     className="w-12 h-12 sm:w-14 sm:h-14 rounded-full animate-spin"
                     style={{
@@ -438,6 +462,11 @@ const CaptionSharePage = ({
                         "radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px))",
                     }}
                   />
+                  {mediaType === "video" && (
+                    <p className="text-white text-sm font-medium max-w-[240px]">
+                      Uploading your reel… this can take a few minutes. Please keep the app open.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
