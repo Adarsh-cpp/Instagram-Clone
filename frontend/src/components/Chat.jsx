@@ -272,9 +272,27 @@ const Chat = ({ onConversationActivity }) => {
   const isLoadingOlderRef = useRef(false);
   const isNearBottomRef = useRef(true);
 
+  // always-current copy of `messages` for socket callbacks
+  const messagesRef = useRef([]);
+  messagesRef.current = messages;
+
   // tells the scroll-restoration effect below what just happened to
   // `messages`, so it knows whether to jump, smooth-scroll, or anchor
   const pendingActionRef = useRef(null); // "initial" | "append" | { type: "prepend", prevScrollHeight, prevScrollTop } | null
+
+  // The one place messages get appended. Ignores a message whose _id is
+  // already in the list, so socket + POST response + initial fetch can never
+  // produce a double.
+  const appendMessageUnique = useCallback((incoming) => {
+    if (!incoming?._id) return;
+    const id = String(incoming._id);
+    if (messagesRef.current.some((m) => String(m._id) === id)) return;
+
+    pendingActionRef.current = "append";
+    setMessages((prev) =>
+      prev.some((m) => String(m._id) === id) ? prev : [...prev, incoming]
+    );
+  }, []);
 
   const { user } = useAuth();
   const { conversationId } = useParams();
@@ -440,8 +458,12 @@ const Chat = ({ onConversationActivity }) => {
   };
 
   // fetch conversation (for friend details)
+  // `cancelled` stops a slow response from a PREVIOUS conversation from
+  // overwriting the one that's open now.
   useEffect(() => {
     if (!conversationId) return;
+
+    let cancelled = false;
 
     const getConversation = async () => {
       try {
@@ -452,22 +474,32 @@ const Chat = ({ onConversationActivity }) => {
           headers: { Authorization: `Bearer ${token}` },
         });
 
+        if (cancelled) return;
+
         if (response.status === 200) {
           setConversation(response.data.conversation);
         } else {
           toast.error("Error fetching conversation");
         }
       } catch (error) {
-        toast.error("Some error occurred");
+        if (!cancelled) toast.error("Some error occurred");
       }
     };
 
     getConversation();
+
+    return () => {
+      cancelled = true;
+    };
   }, [conversationId]);
 
-  // initial page — most recent MESSAGE_PAGE_SIZE messages for this conversation
+  // initial page — most recent MESSAGE_PAGE_SIZE messages for this conversation.
+  // Cancellable, and merges (instead of replaces) so a message that arrived
+  // over the socket while this request was in flight isn't lost or doubled.
   useEffect(() => {
     if (!conversationId) return;
+
+    let cancelled = false;
 
     oldestCursorRef.current = null;
     hasMoreOlderRef.current = true;
@@ -486,6 +518,8 @@ const Chat = ({ onConversationActivity }) => {
           }
         );
 
+        if (cancelled) return;
+
         if (response.status === 200) {
           const { messages: initialMessages, nextCursor, hasMore } = response.data;
 
@@ -494,19 +528,26 @@ const Chat = ({ onConversationActivity }) => {
           setHasMoreOlder(hasMore);
 
           pendingActionRef.current = "initial";
-          setMessages(initialMessages);
+          setMessages((prev) => {
+            const ids = new Set(initialMessages.map((m) => String(m._id)));
+            return [...initialMessages, ...prev.filter((m) => !ids.has(String(m._id)))];
+          });
 
           // fire-and-forget, deliberately NOT awaited
           markConversationSeen();
         }
       } catch (error) {
-        toast.error("Something went wrong");
+        if (!cancelled) toast.error("Something went wrong");
       } finally {
-        setInitialLoading(false);
+        if (!cancelled) setInitialLoading(false);
       }
     };
 
     getInitialMessages();
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
@@ -540,7 +581,12 @@ const Chat = ({ onConversationActivity }) => {
 
       if (olderMessages.length > 0) {
         pendingActionRef.current = { type: "prepend", prevScrollHeight, prevScrollTop };
-        setMessages((prev) => [...olderMessages, ...prev]);
+        setMessages((prev) => {
+          // never prepend something that's already in the list
+          const ids = new Set(prev.map((m) => String(m._id)));
+          const fresh = olderMessages.filter((m) => !ids.has(String(m._id)));
+          return [...fresh, ...prev];
+        });
       }
     } catch (error) {
       toast.error("Failed to load earlier messages");
@@ -642,10 +688,12 @@ const Chat = ({ onConversationActivity }) => {
   // handle the seen feature when new messages arrive
   useEffect(() => {
     const handleNewMessage = (incomingMessage) => {
-      if (incomingMessage.conversationId !== conversationId) return;
+      if (String(incomingMessage.conversationId) !== String(conversationId)) return;
 
-      pendingActionRef.current = "append";
-      setMessages((prev) => [...prev, incomingMessage]);
+      // de-duplicated: the same message can't be appended twice, even if
+      // the socket delivers it more than once or it's already in the
+      // initial fetch
+      appendMessageUnique(incomingMessage);
 
       const incomingSenderId =
         typeof incomingMessage.senderId === "object"
@@ -662,12 +710,13 @@ const Chat = ({ onConversationActivity }) => {
 
     socket.on("newMessage", handleNewMessage);
     return () => socket.off("newMessage", handleNewMessage);
-  }, [conversationId, user?._id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, user?._id, appendMessageUnique]);
 
   // handle a message being unsent — by us (other tab/device) or by the friend
   useEffect(() => {
     const handleMessageDeleted = ({ messageId, conversationId: convId }) => {
-      if (convId !== conversationId) return;
+      if (String(convId) !== String(conversationId)) return;
       setMessages((prev) => prev.filter((msg) => msg._id !== messageId));
     };
 
@@ -700,12 +749,13 @@ const Chat = ({ onConversationActivity }) => {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
   // listen for messagesSeen from the receiver
   useEffect(() => {
     const handleMessagesSeen = ({ conversationId: convId, seenAt }) => {
-      if (convId !== conversationId) return;
+      if (String(convId) !== String(conversationId)) return;
 
       setMessages((prev) =>
         prev.map((msg) => {
@@ -730,7 +780,7 @@ const Chat = ({ onConversationActivity }) => {
   // so this only needs to handle the OTHER participant's reactions arriving
   useEffect(() => {
     const handleMessageReacted = ({ messageId, conversationId: convId, reactions }) => {
-      if (convId !== conversationId) return;
+      if (String(convId) !== String(conversationId)) return;
 
       setMessages((prev) =>
         prev.map((msg) => (msg._id === messageId ? { ...msg, reactions } : msg))
@@ -745,7 +795,7 @@ const Chat = ({ onConversationActivity }) => {
   // changing the chat theme/font, so both sides stay in sync
   useEffect(() => {
     const handleThemeChanged = ({ conversationId: convId, chatTheme, chatFont }) => {
-      if (convId !== conversationId) return;
+      if (String(convId) !== String(conversationId)) return;
 
       setConversation((prev) =>
         prev
@@ -776,13 +826,13 @@ const Chat = ({ onConversationActivity }) => {
   // typing indicator: listen
   useEffect(() => {
     const handleTypingEvent = ({ senderId, conversationId: convId }) => {
-      if (convId === conversationId && senderId === friend?._id) {
+      if (String(convId) === String(conversationId) && senderId === friend?._id) {
         setIsFriendTyping(true);
       }
     };
 
     const handleStopTypingEvent = ({ senderId, conversationId: convId }) => {
-      if (convId === conversationId && senderId === friend?._id) {
+      if (String(convId) === String(conversationId) && senderId === friend?._id) {
         setIsFriendTyping(false);
       }
     };
@@ -994,8 +1044,7 @@ const Chat = ({ onConversationActivity }) => {
       }
 
       if (response.status === 201) {
-        pendingActionRef.current = "append";
-        setMessages((prev) => [...prev, response.data.data]);
+        appendMessageUnique(response.data.data);
         notifyMessageSent(response.data.data); // update the list on the left
         setMessage("");
         setReplyingTo(null);
@@ -1030,8 +1079,7 @@ const Chat = ({ onConversationActivity }) => {
       );
 
       if (response.status === 201) {
-        pendingActionRef.current = "append";
-        setMessages((prev) => [...prev, response.data.data]);
+        appendMessageUnique(response.data.data);
         notifyMessageSent(response.data.data); // update the list on the left
         setReplyingTo(null);
         messageInputRef.current?.focus();

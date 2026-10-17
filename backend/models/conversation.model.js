@@ -14,6 +14,14 @@ const conversationSchema = new mongoose.Schema(
       },
     ],
 
+    // Sorted "idA_idB" for two-person chats. Combined with the unique index
+    // below, this makes it impossible for the database to hold two
+    // conversations between the same pair of users, no matter how many
+    // requests race each other.
+    participantsKey: {
+      type: String,
+    },
+
     lastMessage: {
       type: String,
       default: "",
@@ -65,8 +73,30 @@ const conversationSchema = new mongoose.Schema(
   }
 );
 
+// Keeps participantsKey correct automatically whenever a conversation is
+// created or saved, so it can never drift from `participants`.
+conversationSchema.pre("validate", function (next) {
+  if (Array.isArray(this.participants) && this.participants.length === 2) {
+    this.participantsKey = this.participants
+      .map((p) => p.toString())
+      .sort()
+      .join("_");
+  }
+  next();
+});
+
 // Faster participant lookup
 conversationSchema.index({ participants: 1 });
+
+// One conversation per pair of users. Partial, so old documents that don't
+// have a key yet (before the cleanup script runs) don't violate uniqueness.
+conversationSchema.index(
+  { participantsKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { participantsKey: { $type: "string" } },
+  }
+);
 
 const Conversation = mongoose.model("Conversation", conversationSchema);
 

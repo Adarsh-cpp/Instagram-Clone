@@ -29,6 +29,31 @@ const DEFAULT_AVATAR = "/images/default-profile-pic.jpg";
 // had already finished.
 const FALLBACK_CLIP_SECONDS = 15;
 
+// How often the "x ago" label re-computes while a story is open.
+const TIME_AGO_REFRESH_MS = 30 * 1000;
+
+// ---- "time ago" label: "just now", "1 min ago", "55 mins ago", "12h ago", "2d ago" ----
+// `now` is passed in (from a ticking state) so the label stays fresh while
+// the viewer is open. Returns "" if the timestamp is missing/invalid so the
+// header simply shows nothing instead of "NaN ago".
+const formatTimeAgo = (dateInput, now = Date.now()) => {
+  if (!dateInput) return "";
+  const then = new Date(dateInput).getTime();
+  if (Number.isNaN(then)) return "";
+
+  const diffSec = Math.max(0, Math.floor((now - then) / 1000));
+  if (diffSec < 60) return "just now";
+
+  const mins = Math.floor(diffSec / 60);
+  if (mins < 60) return `${mins} min${mins === 1 ? "" : "s"} ago`;
+
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
+
 // ---- carousel geometry ----
 const CARD_WIDTH = 300;   // px, base width before scale is applied
 const CARD_HEIGHT = "80vh";
@@ -124,6 +149,8 @@ const StoryViewerPage = () => {
   const [highlightSheetOpen, setHighlightSheetOpen] = useState(false);
   const [burst, setBurst] = useState(null); // { x, y, key }
   const [likeBurstKey, setLikeBurstKey] = useState(0); // Devs Mode: heart-button burst
+  // Ticking "now" used by the "x ago" label so it refreshes while open.
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   const videoRef = useRef(null);
   const audioRef = useRef(null);
@@ -232,6 +259,13 @@ const StoryViewerPage = () => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // Keep the "x ago" label fresh (e.g. "just now" -> "1 min ago") while the
+  // viewer stays open.
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), TIME_AGO_REFRESH_MS);
+    return () => clearInterval(id);
   }, []);
 
   // ---- within-account story navigation ----
@@ -694,6 +728,8 @@ const StoryViewerPage = () => {
   const likesCount = likesCountMap[currentStory._id] || 0;
   const viewsCount = currentStory.viewers?.length || 0;
   const hasReplyDraft = reply.trim().length > 0;
+  // "just now" / "55 mins ago" / "12h ago" — when this story was posted
+  const postedAgo = formatTimeAgo(currentStory.createdAt, nowTick);
 
   // ---- build the carousel slot list ----
   const slots = [];
@@ -873,10 +909,15 @@ const StoryViewerPage = () => {
                     alt=""
                     className="w-8 h-8 rounded-full object-cover ring-1 ring-white/30 devs:ring-2 devs:ring-[var(--devs-cyan)]"
                   />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex items-baseline gap-2">
                     <p className="text-white text-sm font-semibold truncate devs:font-mono">
                       {currentAccount.author.username}
                     </p>
+                    {postedAgo && (
+                      <span className="text-white/70 text-xs font-normal whitespace-nowrap shrink-0 devs:font-mono">
+                        {postedAgo}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-white/90">

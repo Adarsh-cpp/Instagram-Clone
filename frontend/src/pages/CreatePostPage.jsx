@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import SelectImagePage from "./SelectImagePage";
 import CropImagePage from "./CropImagePage";
+import FilterImagePage from "./FilterImagePage";
 import TrimVideoPage from "./TrimVideoPage";
 import CaptionSharePage from "./CaptionSharePage";
 import { useNavigate } from "react-router-dom";
@@ -10,6 +11,22 @@ import { useUpload } from "../context/UploadContext";
 import { useTheme } from "../context/ThemeContext";
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
+
+/*
+  Flow
+   - Image post : select -> crop -> filter -> share
+   - Video/reel : select -> trim -> share
+  `stage` is a name instead of a number so the two flows can differ in length.
+*/
+const IMAGE_STAGES = ["select", "crop", "filter", "share"];
+const VIDEO_STAGES = ["select", "trim", "share"];
+const STAGE_LABELS = {
+  select: "Select",
+  crop: "Crop",
+  trim: "Trim",
+  filter: "Filter",
+  share: "Share",
+};
 
 /*
   Wrapper for each step.
@@ -38,14 +55,23 @@ const StepWrap = ({ children }) => {
 function CreatePostPage() {
   const { isDevs } = useTheme();
 
-  const [step, setStep] = useState(1);
+  const [stage, setStage] = useState("select");
+  // SelectImagePage calls setMediaType() and next() back-to-back, so the
+  // mediaType *state* isn't updated yet inside next(). This ref remembers
+  // what was just picked so next() can route to Crop or Trim correctly.
+  const pickedTypeRef = useRef(null);
 
   const [mediaType, setMediaType] = useState(null);
   const [originalMedia, setOriginalMedia] = useState(null);
   const { user } = useAuth();
   const { startUpload } = useUpload();
 
+  // cropped Files straight out of CropImagePage
   const [editedImages, setEditedImages] = useState([]);
+  // final Files out of FilterImagePage (these are what get uploaded)
+  const [filteredImages, setFilteredImages] = useState([]);
+  // per-slide { filter, adjust } kept here so Back -> Next doesn't lose them
+  const [filterEdits, setFilterEdits] = useState(null);
   const [aspectRatio, setAspectRatio] = useState("1:1");
 
   // Trimming happens server-side (Cloudinary transformation, applied via
@@ -83,7 +109,7 @@ function CreatePostPage() {
 
     const buildFormData = () => {
       const formData = new FormData();
-      editedImages.forEach((file, i) => {
+      filteredImages.forEach((file, i) => {
         formData.append("images", file, file.name || `slide-${i}.jpg`);
       });
       formData.append("caption", caption);
@@ -112,20 +138,21 @@ function CreatePostPage() {
     setTimeout(() => navigate("/home"), 400);
   };
 
-  const stepLabels = ["Select", mediaType === "video" ? "Trim" : "Crop", "Share"];
+  const stages = mediaType === "video" ? VIDEO_STAGES : IMAGE_STAGES;
+  const stageIndex = stages.indexOf(stage);
 
   return (
     <>
       {/* Devs Mode: floating step tracker */}
       {isDevs && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-40 hidden md:flex items-center gap-1 devs-glass rounded-full px-2 py-1.5 font-mono text-[10px] uppercase tracking-widest">
-          {stepLabels.map((label, i) => {
+          {stages.map((key, i) => {
             const n = i + 1;
-            const active = step === n;
-            const done = step > n;
+            const active = stageIndex === i;
+            const done = stageIndex > i;
 
             return (
-              <React.Fragment key={label}>
+              <React.Fragment key={key}>
                 <span
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-all duration-300 ${
                     active
@@ -136,58 +163,84 @@ function CreatePostPage() {
                   }`}
                 >
                   <span>{String(n).padStart(2, "0")}</span>
-                  <span>{label}</span>
+                  <span>{STAGE_LABELS[key]}</span>
                 </span>
-                {n < 3 && <span className="w-4 h-px bg-[var(--border-popup)]" />}
+                {n < stages.length && <span className="w-4 h-px bg-[var(--border-popup)]" />}
               </React.Fragment>
             );
           })}
         </div>
       )}
 
-      {step === 1 && (
+      {stage === "select" && (
         <StepWrap>
           <SelectImagePage
             setOriginalMedia={setOriginalMedia}
-            setMediaType={setMediaType}
-            next={() => setStep(2)}
+            setMediaType={(t) => {
+              pickedTypeRef.current = t;
+              setMediaType(t);
+            }}
+            next={() => {
+              // fresh media -> drop anything left over from a previous pick
+              setEditedImages([]);
+              setFilteredImages([]);
+              setFilterEdits(null);
+              setStage(pickedTypeRef.current === "video" ? "trim" : "crop");
+            }}
           />
         </StepWrap>
       )}
 
-      {step === 2 && mediaType === "image" && (
+      {stage === "crop" && mediaType === "image" && (
         <StepWrap>
           <CropImagePage
             images={originalMedia}
             setEditedImages={setEditedImages}
             setAspectRatio={setAspectRatio}
-            next={() => setStep(3)}
-            back={() => setStep(1)}
+            next={() => {
+              // the cropped images may have changed, so old filter edits no longer apply
+              setFilterEdits(null);
+              setStage("filter");
+            }}
+            back={() => setStage("select")}
           />
         </StepWrap>
       )}
 
-      {step === 2 && mediaType === "video" && (
+      {stage === "filter" && mediaType === "image" && (
+        <StepWrap>
+          <FilterImagePage
+            images={editedImages}
+            initialEdits={filterEdits}
+            onEditsChange={setFilterEdits}
+            setFilteredImages={setFilteredImages}
+            next={() => setStage("share")}
+            back={() => setStage("crop")}
+          />
+        </StepWrap>
+      )}
+
+      {stage === "trim" && mediaType === "video" && (
         <StepWrap>
           <TrimVideoPage
             video={originalMedia}
             setTrimData={setTrimData}
             setAspectRatio={setAspectRatio}
-            next={() => setStep(3)}
-            back={() => setStep(1)}
+            next={() => setStage("share")}
+            back={() => setStage("select")}
           />
         </StepWrap>
       )}
 
-      {step === 3 && (
+      {stage === "share" && (
         <StepWrap>
           <CaptionSharePage
             mediaType={mediaType}
-            images={editedImages}
+            images={filteredImages}
             video={mediaType === "video" ? originalMedia : null}
             trimData={trimData}
             aspectRatio={aspectRatio}
-            back={() => setStep(2)}
+            back={() => setStage(mediaType === "video" ? "trim" : "filter")}
             handlePost={handlePost}
             user={user}
             isLoading={false}

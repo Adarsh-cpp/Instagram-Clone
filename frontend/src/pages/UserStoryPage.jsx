@@ -1,5 +1,6 @@
 // UserStoryPage.jsx
 import React, { useEffect, useRef, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fabric } from "fabric";
 import { Rnd } from "react-rnd";
@@ -26,6 +27,11 @@ const MAX_CLIP_SECONDS = 15;
 // Story duration when no song is attached and it's an image (videos use
 // their own real playback length instead, capped at MAX_CLIP_SECONDS).
 const DEFAULT_IMAGE_SECONDS = 6;
+
+// Pinch-zoom limits
+const PINCH_MIN_RATIO = 0.1;
+const PINCH_MAX_RATIO = 10;
+const MIN_VIDEO_BOX_SIDE = 80;
 
 // ---------------------------------------------------------------------------
 // FIX — "half of the image turns black when a filter is applied"
@@ -108,6 +114,39 @@ const BG_SWATCHES = ["#000000", "#1a1a2e", "#4a5df9", "#ff6b0d", "#eb0089", "#0f
 const PEN_SWATCHES = ["#ffffff", "#000000", "#ffc600", "#ff6b0d", "#eb0089", "#4a5df9", "#0f9d58"];
 const TEXT_SWATCHES = ["#ffffff", "#000000", "#ffc600", "#ff6b0d", "#eb0089", "#4a5df9", "#0f9d58"];
 
+// Gradient backgrounds. `angle` follows CSS rules: 0deg = bottom -> top,
+// 90deg = left -> right, 180deg = top -> bottom.
+const BG_GRADIENTS = [
+  { id: "sunset", colors: ["#ff9a3c", "#ff3d77"], angle: 160 },
+  { id: "ocean", colors: ["#00c6ff", "#0072ff"], angle: 160 },
+  { id: "purple-haze", colors: ["#8e2de2", "#4a00e0"], angle: 160 },
+  { id: "peach", colors: ["#ffecd2", "#fcb69f"], angle: 160 },
+  { id: "mint", colors: ["#11998e", "#38ef7d"], angle: 160 },
+  { id: "insta", colors: ["#f09433", "#dc2743", "#bc1888"], angle: 45 },
+  { id: "midnight", colors: ["#0f2027", "#203a43", "#2c5364"], angle: 180 },
+  { id: "candy", colors: ["#ff6fd8", "#3813c2"], angle: 135 },
+  { id: "fire", colors: ["#f12711", "#f5af19"], angle: 0 },
+  { id: "aurora", colors: ["#00f260", "#0575e6", "#8e2de2"], angle: 135 },
+];
+
+const gradientCss = (g) => `linear-gradient(${g.angle}deg, ${g.colors.join(", ")})`;
+
+// Builds a fabric.js gradient that spans the whole canvas at the given angle.
+const buildFabricGradient = (g, w, h) => {
+  const rad = (g.angle * Math.PI) / 180;
+  const dx = Math.sin(rad);
+  const dy = -Math.cos(rad);
+  const half = (Math.abs(w * dx) + Math.abs(h * dy)) / 2;
+  const cx = w / 2;
+  const cy = h / 2;
+  return new fabric.Gradient({
+    type: "linear",
+    gradientUnits: "pixels",
+    coords: { x1: cx - dx * half, y1: cy - dy * half, x2: cx + dx * half, y2: cy + dy * half },
+    colorStops: g.colors.map((c, i) => ({ offset: i / (g.colors.length - 1), color: c })),
+  });
+};
+
 const FONT_OPTIONS = [
   "Poppins", "Roboto", "Montserrat", "Playfair Display",
   "Oswald", "Pacifico", "Dancing Script", "Bebas Neue", "Caveat", "Anton",
@@ -186,6 +225,8 @@ const STORY_PAGE_STYLES = `
 @keyframes storyPop { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
 `;
 
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
 const ColorPickerRow = ({ colors, value, onChange, activeClass }) => {
   const nativeRef = useRef(null);
   return (
@@ -215,7 +256,7 @@ const ColorPickerRow = ({ colors, value, onChange, activeClass }) => {
       <input
         ref={nativeRef}
         type="color"
-        value={value}
+        value={value || "#000000"}
         onChange={(e) => onChange(e.target.value)}
         className="w-0 h-0 opacity-0 absolute pointer-events-none"
         tabIndex={-1}
@@ -235,6 +276,9 @@ const UserStoryPage = () => {
   const videoElRef = useRef(null);
   const bgImageRef = useRef(null);
   const audioRef = useRef(null);
+  // The story frame (container of video + fabric canvas). Pinch gestures
+  // are listened for here.
+  const frameRef = useRef(null);
 
   const [dims, setDims] = useState({ width: 0, height: 0 });
   const [mode, setMode] = useState("select");
@@ -242,6 +286,8 @@ const UserStoryPage = () => {
   const [textColor, setTextColor] = useState("#ffffff");
   const [textFont, setTextFont] = useState("Poppins");
   const [bgColor, setBgColor] = useState("#000000");
+  // When set (one of BG_GRADIENTS), it replaces the solid bgColor.
+  const [bgGradient, setBgGradient] = useState(null);
   const [activeFilter, setActiveFilter] = useState("none");
   const [panel, setPanel] = useState(null);
   const [songs, setSongs] = useState([]);
@@ -256,6 +302,12 @@ const UserStoryPage = () => {
   const [isTextSelected, setIsTextSelected] = useState(false);
 
   const [videoBox, setVideoBox] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  // Always-current copy of videoBox for the native pinch handlers below
+  // (they're registered once and would otherwise see stale state).
+  const videoBoxRef = useRef(videoBox);
+  useEffect(() => {
+    videoBoxRef.current = videoBox;
+  }, [videoBox]);
 
   // Single stable object URL for `file`, created once per file change and
   // reused everywhere (main <video> element AND the filter-thumbnail
@@ -352,6 +404,10 @@ const UserStoryPage = () => {
     });
     fabricRef.current = canvas;
 
+    // Make sure the browser never hijacks touches on the canvas for
+    // scrolling / page-zoom — we handle pinch ourselves.
+    if (canvas.upperCanvasEl) canvas.upperCanvasEl.style.touchAction = "none";
+
     const updateSelection = () => {
       const obj = canvas.getActiveObject();
       setIsTextSelected(!!obj && obj.type === "textbox");
@@ -378,14 +434,27 @@ const UserStoryPage = () => {
           objectUrl = url;
           fabric.Image.fromURL(url, (img) => {
             if (cancelled || !img) return;
-            const scaleToCover = Math.max(dims.width / img.width, dims.height / img.height);
+
+            // AUTO-FIT:
+            //   - Portrait photo  -> "cover": fills the whole portrait story
+            //     container (full width AND full height).
+            //   - Landscape / square photo -> "fit width": takes the full
+            //     width of the container but NOT the full height, so the
+            //     entire picture is visible (bars show the background
+            //     colour above/below). The user can then pinch / drag /
+            //     resize it as they like.
+            const isLandscapeOrSquare = img.width >= img.height;
+            const fitScale = isLandscapeOrSquare
+              ? dims.width / img.width
+              : Math.max(dims.width / img.width, dims.height / img.height);
+
             img.set({
               left: dims.width / 2,
               top: dims.height / 2,
               originX: "center",
               originY: "center",
-              scaleX: scaleToCover,
-              scaleY: scaleToCover,
+              scaleX: fitScale,
+              scaleY: fitScale,
               selectable: true,
             });
             bgImageRef.current = img;
@@ -420,6 +489,140 @@ const UserStoryPage = () => {
   useEffect(() => {
     activeFilterRef.current = activeFilter;
   }, [activeFilter]);
+
+  // -------------------------------------------------------------------------
+  // PINCH IN / PINCH OUT (two fingers) to resize.
+  //   - Image story  -> scales the selected object (the photo by default, or
+  //                     the selected text box), and two-finger drag pans it.
+  //   - Video story  -> scales / pans the video frame.
+  // Registered in the CAPTURE phase on the frame so that fabric.js never sees
+  // the two-finger touches (otherwise it would try to drag / draw with them).
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el || !dims.width || !dims.height) return;
+
+    let pinch = null;
+    // true from the moment a pinch starts until ALL fingers are lifted, so
+    // the leftover finger doesn't suddenly start dragging something.
+    let suppress = false;
+
+    const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const mid = (t) => ({
+      x: (t[0].clientX + t[1].clientX) / 2,
+      y: (t[0].clientY + t[1].clientY) / 2,
+    });
+
+    const startPinch = (touches) => {
+      const d0 = dist(touches);
+      if (d0 < 1) return null;
+      const m0 = mid(touches);
+
+      if (mediaType === "video") {
+        return { kind: "video", d0, m0, box: { ...videoBoxRef.current } };
+      }
+
+      const canvas = fabricRef.current;
+      if (!canvas) return null;
+
+      // Abort whatever the first finger had started in fabric.
+      canvas._currentTransform = null;
+      if (canvas.isDrawingMode) {
+        canvas._isCurrentlyDrawing = false;
+        try {
+          canvas.clearContext(canvas.contextTop);
+        } catch (e) {
+          /* ignore */
+        }
+      }
+
+      let target = canvas.getActiveObject();
+      if (!target || target.type === "activeSelection") target = bgImageRef.current;
+      if (!target) return null;
+
+      return {
+        kind: "obj",
+        target,
+        d0,
+        m0,
+        sx: target.scaleX,
+        sy: target.scaleY,
+        left: target.left,
+        top: target.top,
+      };
+    };
+
+    const onTouchStart = (e) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        e.stopPropagation();
+        suppress = true;
+        pinch = startPinch(e.touches);
+      } else if (suppress) {
+        e.stopPropagation();
+      }
+    };
+
+    const onTouchMove = (e) => {
+      if (!suppress) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!pinch || e.touches.length !== 2) return;
+
+      const ratioRaw = dist(e.touches) / pinch.d0;
+      const m = mid(e.touches);
+      const dx = m.x - pinch.m0.x;
+      const dy = m.y - pinch.m0.y;
+
+      if (pinch.kind === "obj") {
+        const canvas = fabricRef.current;
+        if (!canvas) return;
+        const ratio = clamp(ratioRaw, PINCH_MIN_RATIO, PINCH_MAX_RATIO);
+        pinch.target.set({
+          scaleX: pinch.sx * ratio,
+          scaleY: pinch.sy * ratio,
+          left: pinch.left + dx,
+          top: pinch.top + dy,
+        });
+        pinch.target.setCoords();
+        canvas.requestRenderAll();
+      } else {
+        const { box } = pinch;
+        const maxRatio = Math.min(dims.width / box.width, dims.height / box.height);
+        const minRatio = MIN_VIDEO_BOX_SIDE / Math.min(box.width, box.height);
+        const ratio = clamp(ratioRaw, Math.min(minRatio, maxRatio), maxRatio);
+        const w = box.width * ratio;
+        const h = box.height * ratio;
+        const cx = box.x + box.width / 2 + dx;
+        const cy = box.y + box.height / 2 + dy;
+        setVideoBox({
+          width: w,
+          height: h,
+          x: clamp(cx - w / 2, 0, dims.width - w),
+          y: clamp(cy - h / 2, 0, dims.height - h),
+        });
+      }
+    };
+
+    const onTouchEnd = (e) => {
+      if (!suppress) return;
+      e.stopPropagation();
+      if (e.touches.length < 2) pinch = null;
+      if (e.touches.length === 0) suppress = false;
+    };
+
+    const opts = { capture: true, passive: false };
+    el.addEventListener("touchstart", onTouchStart, opts);
+    el.addEventListener("touchmove", onTouchMove, opts);
+    el.addEventListener("touchend", onTouchEnd, opts);
+    el.addEventListener("touchcancel", onTouchEnd, opts);
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart, opts);
+      el.removeEventListener("touchmove", onTouchMove, opts);
+      el.removeEventListener("touchend", onTouchEnd, opts);
+      el.removeEventListener("touchcancel", onTouchEnd, opts);
+    };
+  }, [mediaType, dims.width, dims.height]);
 
   useEffect(() => {
     const fetchSongs = async () => {
@@ -506,8 +709,11 @@ const UserStoryPage = () => {
   useEffect(() => {
     const canvas = fabricRef.current;
     if (!canvas || mediaType !== "image") return;
-    canvas.setBackgroundColor(bgColor, canvas.renderAll.bind(canvas));
-  }, [bgColor, mediaType]);
+    const fill = bgGradient
+      ? buildFabricGradient(bgGradient, dims.width, dims.height)
+      : bgColor;
+    canvas.setBackgroundColor(fill, canvas.renderAll.bind(canvas));
+  }, [bgColor, bgGradient, mediaType, dims.width, dims.height]);
 
   const addText = () => {
     const canvas = fabricRef.current;
@@ -692,7 +898,11 @@ const UserStoryPage = () => {
       // uploaded file's real mimetype, which is more trustworthy than
       // anything the client claims.
       formData.append("filterUsed", activeFilter);
-      formData.append("bgColor", bgColor);
+      // For a gradient, bgColor falls back to its first colour so any
+      // backend code that expects a single colour keeps working; the full
+      // gradient is sent separately.
+      formData.append("bgColor", bgGradient ? bgGradient.colors[0] : bgColor);
+      if (bgGradient) formData.append("bgGradient", JSON.stringify(bgGradient));
       formData.append("duration", computeStoryDuration());
       if (selectedSong) {
         formData.append("songId", selectedSong._id);
@@ -797,7 +1007,10 @@ const UserStoryPage = () => {
         songGradient: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)",
       };
 
-  return (
+  // Rendered through a portal on <body> so that no animated / transformed
+  // ancestor in the app layout (route transitions etc.) can move this
+  // `fixed` page around — it always sits exactly on the screen.
+  return createPortal(
     <div
       className={`userStoryPage fixed inset-0 ${T.page} z-50 flex items-center justify-center`}
       style={{ animation: "storyFadeIn 0.18s ease-out" }}
@@ -825,8 +1038,9 @@ const UserStoryPage = () => {
       {dims.width > 0 && (
         <div className="relative flex items-center gap-3 md:gap-3">
           <div
+            ref={frameRef}
             className={T.frame}
-            style={{ width: dims.width, height: dims.height }}
+            style={{ width: dims.width, height: dims.height, touchAction: "none" }}
           >
             {/* Devs Mode: rotating neon border around the frame (desktop) */}
             {isDevs && (
@@ -887,6 +1101,14 @@ const UserStoryPage = () => {
                 <div className="text-white text-xs truncate flex-1 devs:font-mono">
                   {selectedSong.title} · {selectedSong.artist}
                 </div>
+                <button
+                  type="button"
+                  onClick={removeSong}
+                  className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white/80 hover:text-white bg-white/10 hover:bg-white/20 active:scale-90 transition-all"
+                  aria-label="Remove music"
+                >
+                  <X size={14} />
+                </button>
               </div>
             )}
 
@@ -1074,7 +1296,35 @@ const UserStoryPage = () => {
 
                   {panel === "bg-color" && (
                     <div className="w-full sm:w-[260px]">
-                      <ColorPickerRow colors={BG_SWATCHES} value={bgColor} onChange={setBgColor} activeClass={T.colorActive} />
+                      <ColorPickerRow
+                        colors={BG_SWATCHES}
+                        value={bgGradient ? "" : bgColor}
+                        onChange={(c) => {
+                          setBgGradient(null);
+                          setBgColor(c);
+                        }}
+                        activeClass={T.colorActive}
+                      />
+                      <div className="px-4 pb-1">
+                        <span className={`${T.panelTitle} opacity-70`}>Gradients</span>
+                      </div>
+                      <div className="grid grid-cols-5 gap-3 px-4 pb-4 pt-2">
+                        {BG_GRADIENTS.map((g) => {
+                          const isActive = bgGradient?.id === g.id;
+                          return (
+                            <button
+                              key={g.id}
+                              type="button"
+                              onClick={() => setBgGradient(g)}
+                              style={{ background: gradientCss(g) }}
+                              className={`w-9 h-9 rounded-full border-2 transition-all duration-150 hover:scale-110 active:scale-95 ${
+                                isActive ? T.colorActive : "border-white/30 hover:border-white/60"
+                              }`}
+                              aria-label={`Gradient ${g.id}`}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
@@ -1290,7 +1540,8 @@ const UserStoryPage = () => {
           )}
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 };
 

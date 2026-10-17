@@ -1,19 +1,31 @@
+// controllers/conversation.controller.js
+import mongoose from "mongoose";
 import conversationModel from "../models/conversation.model.js";
 import messageModel from "../models/message.model.js";
-import { getIO, onlineUsers } from "../config/socket.js";
-import { deleteMedia } from "../services/upload.service.js";
+import { deleteMediaByUrls } from "../services/upload.service.js";
+import { emitToUser } from "../utils/emitToUser.js";
 
 import {
   VALID_THEME_IDS,
   VALID_FONT_IDS,
 } from "../constants/chatAppearance.js";
 
+// Sorted "idA_idB" — identical no matter which user starts the chat, which
+// is what lets the unique index on `participantsKey` catch duplicates.
+const buildParticipantsKey = (a, b) =>
+  [a.toString(), b.toString()].sort().join("_");
+
 export const createOrGetConversation = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
     const otherUserId = req.params.userId;
 
-    console.log(loggedInUserId, otherUserId);
+    if (!mongoose.isValidObjectId(otherUserId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user id",
+      });
+    }
 
     if (loggedInUserId.toString() === otherUserId.toString()) {
       return res.status(400).json({
@@ -22,16 +34,44 @@ export const createOrGetConversation = async (req, res) => {
       });
     }
 
+    const key = buildParticipantsKey(loggedInUserId, otherUserId);
+
     let conversation = await conversationModel.findOne({
-      participants: {
-        $all: [loggedInUserId, otherUserId],
-      },
+      participantsKey: key,
     });
 
+    // legacy conversations created before the key existed
     if (!conversation) {
-      conversation = await conversationModel.create({
-        participants: [loggedInUserId, otherUserId],
-      });
+      conversation = await conversationModel
+        .findOne({ participants: { $all: [loggedInUserId, otherUserId] } })
+        .sort({ createdAt: 1 });
+
+      if (conversation && !conversation.participantsKey) {
+        conversation.participantsKey = key;
+        try {
+          await conversation.save();
+        } catch (e) {
+          // another request backfilled a different duplicate first; ignore
+        }
+      }
+    }
+
+    if (!conversation) {
+      try {
+        conversation = await conversationModel.create({
+          participants: [loggedInUserId, otherUserId],
+          participantsKey: key,
+        });
+      } catch (err) {
+        // lost the race: the other request created it first, so just use it
+        if (err.code === 11000) {
+          conversation = await conversationModel.findOne({
+            participantsKey: key,
+          });
+        } else {
+          throw err;
+        }
+      }
     }
 
     return res.status(200).json({
@@ -90,6 +130,13 @@ export const getConversationById = async (req, res) => {
   try {
     const conversationId = req.params.conversationId;
 
+    if (!mongoose.isValidObjectId(conversationId)) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
+      });
+    }
+
     const conversation = await conversationModel
       .findById(conversationId)
       .populate("participants", "username fullname profilePic lastSeen role");
@@ -98,6 +145,16 @@ export const getConversationById = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Conversation not found",
+      });
+    }
+
+    const isParticipant = conversation.participants.some(
+      (p) => (p._id || p).toString() === req.user._id.toString()
+    );
+    if (!isParticipant) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not part of this conversation",
       });
     }
 
@@ -158,7 +215,6 @@ export const getShareUsersList = async (req, res) => {
   }
 };
 
-
 export const updateChatTheme = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -183,6 +239,13 @@ export const updateChatTheme = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Unknown chat font",
+      });
+    }
+
+    if (!mongoose.isValidObjectId(conversationId)) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found",
       });
     }
 
@@ -223,22 +286,32 @@ export const updateChatTheme = async (req, res) => {
   }
 };
 
-
 export const deleteConversation = async (req, res) => {
   try {
     const userId = req.user._id;
     const { conversationId } = req.params;
 
+    if (!mongoose.isValidObjectId(conversationId)) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Conversation not found" });
+    }
+
     const conversation = await conversationModel.findById(conversationId);
     if (!conversation) {
-      return res.status(404).json({ success: false, message: "Conversation not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Conversation not found" });
     }
 
     const isParticipant = conversation.participants.some(
       (p) => p.toString() === userId.toString()
     );
     if (!isParticipant) {
-      return res.status(403).json({ success: false, message: "You are not part of this conversation" });
+      return res.status(403).json({
+        success: false,
+        message: "You are not part of this conversation",
+      });
     }
 
     const otherParticipantId = conversation.participants.find(
@@ -265,20 +338,10 @@ export const deleteConversation = async (req, res) => {
     await conversationModel.deleteOne({ _id: conversationId });
 
     if (otherParticipantId) {
-      const io = getIO();
-      const otherSocketEntry = onlineUsers.get(otherParticipantId.toString());
-      if (otherSocketEntry) {
-        const payload = {
-          conversationId: conversationId.toString(),
-          deletedBy: userId.toString(),
-        };
-
-        if (otherSocketEntry instanceof Set) {
-          otherSocketEntry.forEach((socketId) => io.to(socketId).emit("conversationDeleted", payload));
-        } else {
-          io.to(otherSocketEntry).emit("conversationDeleted", payload);
-        }
-      }
+      emitToUser(otherParticipantId, "conversationDeleted", {
+        conversationId: conversationId.toString(),
+        deletedBy: userId.toString(),
+      });
     }
 
     return res.status(200).json({

@@ -47,3 +47,41 @@ export const deleteMedia = async (publicId) => {
   if (!publicId) return;
   await cloudinary.uploader.destroy(publicId);
 };
+
+// 🔹 Turns a Cloudinary URL back into its public_id, e.g.
+// https://res.cloudinary.com/x/image/upload/v123/instagram-clone/conversations/abc/pic.jpg
+//   -> instagram-clone/conversations/abc/pic
+const getPublicIdFromUrl = (url) => {
+  try {
+    if (typeof url !== "string" || !url.includes("/upload/")) return null;
+
+    const afterUpload = url.split("/upload/")[1].split("?")[0];
+    const parts = afterUpload.split("/");
+
+    // skip any transformation segments and the v123456 version segment
+    const versionIndex = parts.findIndex((p) => /^v\d+$/.test(p));
+    const idParts = versionIndex !== -1 ? parts.slice(versionIndex + 1) : parts;
+
+    const publicId = decodeURIComponent(idParts.join("/")).replace(/\.[^/.]+$/, "");
+    return publicId || null;
+  } catch {
+    return null;
+  }
+};
+
+// 🔹 Best-effort bulk delete by URL (used when unsending a message or
+// deleting a conversation). Never throws, so a Cloudinary hiccup can't block
+// the delete the user asked for.
+export const deleteMediaByUrls = async (urls = []) => {
+  const publicIds = [...new Set(urls.map(getPublicIdFromUrl).filter(Boolean))];
+
+  await Promise.all(
+    publicIds.map(async (publicId) => {
+      try {
+        await deleteMedia(publicId);
+      } catch (err) {
+        console.log("Failed to delete media:", publicId, err?.message || err);
+      }
+    })
+  );
+};

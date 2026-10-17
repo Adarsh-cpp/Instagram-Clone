@@ -10,6 +10,41 @@ import { useTheme } from "../context/ThemeContext";
 
 const DEFAULT_IMAGE_SECONDS = 5;
 
+// How often the "x ago" label re-computes while a highlight is open.
+const TIME_AGO_REFRESH_MS = 30 * 1000;
+
+// ---- "time ago" label ----
+// Highlights never expire, so unlike regular stories the age can be weeks,
+// months or years:
+//   "just now", "1 min ago", "55 mins ago", "12h ago", "3d ago",
+//   "2w ago", "5mo ago", "1y ago"
+// `now` is passed in (from a ticking state) so the label stays fresh while
+// the viewer is open. Returns "" if the timestamp is missing/invalid so the
+// header simply shows nothing instead of "NaN ago".
+const formatTimeAgo = (dateInput, now = Date.now()) => {
+  if (!dateInput) return "";
+  const then = new Date(dateInput).getTime();
+  if (Number.isNaN(then)) return "";
+
+  const diffSec = Math.max(0, Math.floor((now - then) / 1000));
+  if (diffSec < 60) return "just now";
+
+  const mins = Math.floor(diffSec / 60);
+  if (mins < 60) return `${mins} min${mins === 1 ? "" : "s"} ago`;
+
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+
+  if (days < 365) return `${Math.max(1, Math.floor(days / 30))}mo ago`;
+
+  return `${Math.floor(days / 365)}y ago`;
+};
+
 // the owner field can come back either as a plain id string or as a
 // populated user object — normalise both to an id string
 const getId = (v) => (v && typeof v === "object" ? v._id : v);
@@ -48,6 +83,8 @@ const HighlightViewerPage = () => {
   const [storyIndex, setStoryIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const [playing, setPlaying] = useState(true);
+  // Ticking "now" used by the "x ago" label so it refreshes while open.
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   // three-dot menu + confirmation state
   const [menuOpen, setMenuOpen] = useState(false);
@@ -78,6 +115,13 @@ const HighlightViewerPage = () => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightId]);
+
+  // Keep the "x ago" label fresh (e.g. "just now" -> "1 min ago") while the
+  // viewer stays open.
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), TIME_AGO_REFRESH_MS);
+    return () => clearInterval(id);
+  }, []);
 
   const stories = highlight?.stories || [];
   const currentStory = stories[storyIndex];
@@ -235,8 +279,16 @@ const HighlightViewerPage = () => {
 
   if (loading || !currentStory) return null;
 
+  // when this story was originally posted — "3d ago", "2w ago", "5mo ago", "1y ago"
+  const postedAgo = formatTimeAgo(currentStory.createdAt, nowTick);
+
   return (
-    <div className="w-full h-screen bg-black devs:bg-[#04050e] relative overflow-hidden flex items-center justify-center">
+    <div
+      className="w-full h-screen bg-black devs:bg-[#04050e] relative overflow-hidden flex items-center justify-center"
+      // 100dvh = the *visible* viewport on mobile (excludes the browser
+      // address bar); h-screen above is the fallback for older browsers.
+      style={{ height: "100dvh" }}
+    >
       {/* Devs Mode: ambient blurred backdrop */}
       {isDevs && (
         <div aria-hidden="true" className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -253,6 +305,8 @@ const HighlightViewerPage = () => {
         </div>
       )}
 
+      {/* Mobile: the story card fills the entire screen edge-to-edge.
+          md and up: the original 380px-wide rounded card. */}
       <motion.div
         {...(isDevs
           ? {
@@ -261,12 +315,15 @@ const HighlightViewerPage = () => {
               transition: { duration: 0.45, ease: [0.2, 0.8, 0.2, 1] },
             }
           : {})}
-        className="relative rounded-2xl overflow-hidden bg-neutral-900 devs:ring-1 devs:ring-[rgba(34,240,255,0.35)] devs:shadow-[0_0_70px_rgba(34,240,255,0.2),0_0_120px_rgba(139,92,246,0.15)]"
-        style={{ width: 380, maxWidth: "95vw", height: "90vh" }}
+        className="relative overflow-hidden bg-neutral-900 w-full h-full rounded-none md:w-[380px] md:max-w-[95vw] md:h-[90vh] md:rounded-2xl devs:ring-1 devs:ring-[rgba(34,240,255,0.35)] devs:shadow-[0_0_70px_rgba(34,240,255,0.2),0_0_120px_rgba(139,92,246,0.15)]"
       >
         {isDevs && <HudCorners />}
 
-        <div className="absolute top-2 left-2 right-2 flex gap-1 z-20">
+        {/* top offsets respect the phone notch / status bar (env() is 0 on desktop) */}
+        <div
+          className="absolute left-2 right-2 flex gap-1 z-20"
+          style={{ top: "max(0.5rem, env(safe-area-inset-top))" }}
+        >
           {stories.map((s, i) => (
             <div key={s._id} className="h-1 flex-1 bg-white/30 devs:bg-white/15 rounded-full overflow-hidden">
               <div
@@ -277,10 +334,20 @@ const HighlightViewerPage = () => {
           ))}
         </div>
 
-        <div className="absolute top-5 left-0 right-0 flex items-center justify-between px-3 pt-2 z-30">
-          <p className="text-white text-sm font-semibold truncate devs:font-mono devs:uppercase devs:tracking-[0.15em] devs:text-xs">
-            {highlight.title}
-          </p>
+        <div
+          className="absolute left-0 right-0 flex items-center justify-between px-3 pt-2 z-30"
+          style={{ top: "calc(env(safe-area-inset-top, 0px) + 1.25rem)" }}
+        >
+          <div className="min-w-0 flex flex-col">
+            <p className="text-white text-sm font-semibold truncate devs:font-mono devs:uppercase devs:tracking-[0.15em] devs:text-xs">
+              {highlight.title}
+            </p>
+            {postedAgo && (
+              <span className="text-white/70 text-xs font-normal leading-tight devs:font-mono">
+                {postedAgo}
+              </span>
+            )}
+          </div>
 
           <div className="relative flex items-center gap-4">
             {/* three-dot menu is owner-only */}

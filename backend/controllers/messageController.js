@@ -1,8 +1,13 @@
+// controllers/message.controller.js
+import mongoose from "mongoose";
 import conversationModel from "../models/conversation.model.js";
 import messageModel from "../models/message.model.js";
 import storyModel from "../models/story.model.js";
-import { getIO, onlineUsers } from "../config/socket.js";
-import { uploadSingleMedia, deleteMedia, uploadMultipleMedia} from "../services/upload.service.js";
+import {
+  uploadSingleMedia,
+  deleteMediaByUrls,
+} from "../services/upload.service.js";
+import { emitToUser } from "../utils/emitToUser.js";
 
 const SHARED_MEDIA_POPULATE = [
   {
@@ -92,7 +97,8 @@ const resolveMessageType = ({
 // from a single message document. Shared by postMessage (new message) and
 // deleteMessage (recomputing the preview after an unsend) so the "what
 // should the chat list show" logic only lives in one place.
-const buildLastMessagePreview = (msg) => {
+// Exported so the one-time duplicate-conversation merge script can reuse it.
+export const buildLastMessagePreview = (msg) => {
   if (!msg) {
     // conversation has no messages left at all
     return {
@@ -161,10 +167,22 @@ export const getMessages = async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit, 10) || 30, 50);
     const cursor = req.query.cursor;
 
-    if (!conversationId) {
+    if (!conversationId || !mongoose.isValidObjectId(conversationId)) {
       return res.status(400).json({
         success: false,
         message: "Conversation ID is required",
+      });
+    }
+
+    // only the two people in the conversation may read it
+    const isParticipant = await conversationModel.exists({
+      _id: conversationId,
+      participants: userId,
+    });
+    if (!isParticipant) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not part of this conversation",
       });
     }
 
@@ -252,7 +270,7 @@ export const getSharedMedia = async (req, res) => {
     );
     const cursor = req.query.cursor;
 
-    if (!conversationId) {
+    if (!conversationId || !mongoose.isValidObjectId(conversationId)) {
       return res.status(400).json({
         success: false,
         message: "Conversation ID is required",
@@ -362,10 +380,19 @@ export const postMessage = async (req, res) => {
     const { message, sharedPost, sharedReel, sharedStoryId, sticker, replyTo } = req.body;
     const files = req.files || []; // now an array (upload.array), not req.file
 
+    if (!mongoose.isValidObjectId(conversationId)) {
+      return res.status(404).json({ success: false, message: "Conversation not found" });
+    }
+
     const conversation = await conversationModel.findById(conversationId);
 
     if (!conversation) {
       return res.status(404).json({ success: false, message: "Conversation not found" });
+    }
+
+    // only a participant may post into this conversation
+    if (!conversation.participants.some((id) => id.toString() === senderId.toString())) {
+      return res.status(403).json({ success: false, message: "You are not part of this conversation" });
     }
 
     const receiverId = conversation.participants.find(
@@ -408,9 +435,11 @@ export const postMessage = async (req, res) => {
 
     let sharedStorySnapshot;
     if (sharedStoryId) {
-      const storyDoc = await storyModel
-        .findById(sharedStoryId)
-        .populate("author", "username profilePic role");
+      const storyDoc = mongoose.isValidObjectId(sharedStoryId)
+        ? await storyModel
+            .findById(sharedStoryId)
+            .populate("author", "username profilePic role")
+        : null;
 
       if (!storyDoc) {
         // Only a hard failure if there's nothing else riding along in this message
@@ -446,7 +475,7 @@ export const postMessage = async (req, res) => {
     // is missing, malformed, or points at a message from another
     // conversation — a broken/foreign reply id shouldn't fail the send.
     let replyToSnapshot;
-    if (replyTo) {
+    if (replyTo && mongoose.isValidObjectId(replyTo)) {
       const originalMessage = await messageModel.findById(replyTo);
 
       if (
@@ -498,10 +527,9 @@ export const postMessage = async (req, res) => {
 
     await newMessage.populate(SHARED_MEDIA_POPULATE);
 
-    const receiverSocketId = onlineUsers.get(receiverId.toString());
-    if (receiverSocketId) {
-      getIO().to(receiverSocketId).emit("newMessage", newMessage);
-    }
+    // delivers to EVERY connected socket of the receiver (multiple tabs /
+    // devices), however onlineUsers happens to store them
+    emitToUser(receiverId, "newMessage", newMessage);
 
     return res.status(201).json({
       success: true,
@@ -520,6 +548,10 @@ export const deleteMessage = async (req, res) => {
   try {
     const userId = req.user._id;
     const { messageId } = req.params;
+
+    if (!mongoose.isValidObjectId(messageId)) {
+      return res.status(404).json({ success: false, message: "Message not found" });
+    }
 
     const message = await messageModel.findById(messageId);
     if (!message) {
@@ -569,17 +601,10 @@ export const deleteMessage = async (req, res) => {
       await conversation.save();
     }
 
-    const receiverSocketEntry = onlineUsers.get(receiverId.toString());
-    if (receiverSocketEntry) {
-      const io = getIO();
-      const payload = { messageId, conversationId: conversationId.toString() };
-
-      if (receiverSocketEntry instanceof Set) {
-        receiverSocketEntry.forEach((socketId) => io.to(socketId).emit("messageDeleted", payload));
-      } else {
-        io.to(receiverSocketEntry).emit("messageDeleted", payload);
-      }
-    }
+    emitToUser(receiverId, "messageDeleted", {
+      messageId,
+      conversationId: conversationId.toString(),
+    });
 
     return res.status(200).json({ success: true, message: "Message unsent" });
   } catch (error) {
@@ -594,6 +619,19 @@ export const markSeen = async (req, res) => {
     const userId = req.user._id;
     const { conversationId } = req.params;
 
+    if (!mongoose.isValidObjectId(conversationId)) {
+      return res.status(404).json({ success: false, message: "Conversation not found" });
+    }
+
+    const conversation = await conversationModel.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ success: false, message: "Conversation not found" });
+    }
+
+    if (!conversation.participants.some((id) => id.toString() === userId.toString())) {
+      return res.status(403).json({ success: false, message: "You are not part of this conversation" });
+    }
+
     await messageModel.updateMany(
       {
         conversationId,
@@ -604,14 +642,12 @@ export const markSeen = async (req, res) => {
     );
 
     // tell the sender their messages were seen in real time
-    const conversation = await conversationModel.findById(conversationId);
     const senderId = conversation.participants.find(
       (id) => id.toString() !== userId.toString()
     );
 
-    const senderSocketId = onlineUsers.get(senderId.toString());
-    if (senderSocketId) {
-      getIO().to(senderSocketId).emit("messagesSeen", {
+    if (senderId) {
+      emitToUser(senderId, "messagesSeen", {
         conversationId,
         seenAt: new Date(),
       });
@@ -640,6 +676,10 @@ export const reactToMessage = async (req, res) => {
 
     if (!emoji || typeof emoji !== "string") {
       return res.status(400).json({ success: false, message: "Emoji is required" });
+    }
+
+    if (!mongoose.isValidObjectId(messageId)) {
+      return res.status(404).json({ success: false, message: "Message not found" });
     }
 
     const message = await messageModel.findById(messageId);
@@ -676,21 +716,11 @@ export const reactToMessage = async (req, res) => {
         ? message.receiverId
         : message.senderId;
 
-    const otherSocketEntry = onlineUsers.get(otherParticipantId.toString());
-    if (otherSocketEntry) {
-      const io = getIO();
-      const payload = {
-        messageId: message._id.toString(),
-        conversationId: message.conversationId.toString(),
-        reactions: message.reactions,
-      };
-
-      if (otherSocketEntry instanceof Set) {
-        otherSocketEntry.forEach((socketId) => io.to(socketId).emit("messageReacted", payload));
-      } else {
-        io.to(otherSocketEntry).emit("messageReacted", payload);
-      }
-    }
+    emitToUser(otherParticipantId, "messageReacted", {
+      messageId: message._id.toString(),
+      conversationId: message.conversationId.toString(),
+      reactions: message.reactions,
+    });
 
     return res.status(200).json({
       success: true,

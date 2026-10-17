@@ -25,6 +25,24 @@ import { useTheme } from '../context/ThemeContext';
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
+// On mobile every highlight tile (the "New" tile included) takes exactly a
+// quarter of the row, so 4 fit across the screen with no sideways scrolling
+// until a 5th one exists. Row padding is 0.25rem x 2 and the gap is 0.75rem x 3:
+//   (100% - 0.5rem - 2.25rem) / 4
+// From the `sm` breakpoint upward the original fixed sizing is used again.
+const HIGHLIGHT_TILE_W = "w-[calc((100%-0.5rem-2.25rem)/4)] sm:w-auto"
+
+// NEW: a highlight is "empty" when we can see it has zero stories.
+// If the backend doesn't send any story info we assume it's NOT empty,
+// so we never block a highlight by mistake.
+const isHighlightEmpty = (h) => {
+  if (!h) return false
+  if (Array.isArray(h.stories)) return h.stories.length === 0
+  if (typeof h.storiesCount === "number") return h.storiesCount === 0
+  if (typeof h.storyCount === "number") return h.storyCount === 0
+  return false
+}
+
 /* ---------- Devs Mode: number that counts up when it changes ---------- */
 const CountUp = ({ value }) => {
   const mv = useMotionValue(0)
@@ -98,6 +116,14 @@ const UserProfilePage = () => {
   // Highlights
   const [highlights, setHighlights] = useState([])
   const [showNewHighlightModal, setShowNewHighlightModal] = useState(false)
+  // the highlight the "Delete highlight?" popup is currently open for
+  const [highlightToDelete, setHighlightToDelete] = useState(null)
+  const [deletingHighlight, setDeletingHighlight] = useState(false)
+
+  // long-press (touch) tracking for the highlight delete popup
+  const longPressTimer = useRef(null)
+  const touchStartPos = useRef(null)
+  const lastLongPress = useRef(0)
 
   const {userId} = useParams()
 
@@ -294,6 +320,88 @@ const UserProfilePage = () => {
     setShowNewHighlightModal(false)
   }
 
+  // NEW: open a highlight, unless it has no stories — then tell the user why
+  const handleHighlightClick = (h) => {
+    if (isHighlightEmpty(h)) {
+      toast.info(
+        isOwnProfile
+          ? "This highlight is empty. Add a story to the highlight to view it."
+          : "This highlight is empty."
+      )
+      return
+    }
+    navigate(`/highlight/view/${h._id}`)
+  }
+
+  /* ---------- delete a highlight: right-click (PC) / long-press (mobile) ---------- */
+  const LONG_PRESS_MS = 500
+
+  const cancelLongPress = () => {
+    clearTimeout(longPressTimer.current)
+  }
+
+  const startLongPress = (h, e) => {
+    if (!isOwnProfile) return
+    const t = e.touches?.[0]
+    touchStartPos.current = t ? { x: t.clientX, y: t.clientY } : null
+    cancelLongPress()
+    longPressTimer.current = setTimeout(() => {
+      lastLongPress.current = Date.now()
+      setHighlightToDelete(h)
+    }, LONG_PRESS_MS)
+  }
+
+  // moving the finger (scrolling the row) cancels the long press
+  const moveLongPress = (e) => {
+    const t = e.touches?.[0]
+    const s = touchStartPos.current
+    if (!t || !s) return
+    if (Math.hypot(t.clientX - s.x, t.clientY - s.y) > 10) cancelLongPress()
+  }
+
+  // right-click on PC (also fired by some mobile browsers on long press)
+  const openDeletePopup = (h, e) => {
+    if (!isOwnProfile) return
+    e.preventDefault()
+    cancelLongPress()
+    lastLongPress.current = Date.now()
+    setHighlightToDelete(h)
+  }
+
+  // lifting the finger after a long press would otherwise count as a tap
+  // and open the highlight viewer — swallow that click
+  const blockClickAfterLongPress = (e) => {
+    if (Date.now() - lastLongPress.current < 700) {
+      e.stopPropagation()
+      e.preventDefault()
+    }
+  }
+
+  const closeDeletePopup = () => {
+    if (deletingHighlight) return
+    setHighlightToDelete(null)
+  }
+
+  const handleDeleteHighlight = async () => {
+    if (!highlightToDelete) return
+    const id = highlightToDelete._id
+    setDeletingHighlight(true)
+    try {
+      await axiosInstance.delete(`/highlight/${id}`)
+      setHighlights((prev) => prev.filter((h) => h._id !== id))
+      toast.success("Highlight deleted")
+      setHighlightToDelete(null)
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Couldn't delete highlight")
+    } finally {
+      setDeletingHighlight(false)
+    }
+  }
+
+  useEffect(() => {
+    return () => clearTimeout(longPressTimer.current)
+  }, [])
+
   // keep the highlight circles in sync with changes made inside the story
   // viewer page. Removing a story there can change the highlight's cover
   // image; removing the last story (or explicitly deleting the highlight)
@@ -334,7 +442,10 @@ const UserProfilePage = () => {
   // close dp overlay on Escape key
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === "Escape") setIsDpOverlayOpen(false);
+      if (e.key === "Escape") {
+        setIsDpOverlayOpen(false);
+        setHighlightToDelete(null);
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -523,11 +634,11 @@ const UserProfilePage = () => {
                        onMouseLeave={handleMouseLeave}
                        onMouseUp={handleMouseUp}
                        onMouseMove={handleMouseMove}
-                       className="highlightSection w-full min-h-[110px] sm:min-h-[150px] py-2 px-1 sm:px-2 flex justify-start items-center sm:items-start gap-4 sm:gap-10 overflow-x-auto scrollbar-hide select-none cursor-grab ">
+                       className="highlightSection w-full min-h-[110px] sm:min-h-[150px] py-2 px-1 sm:px-2 flex justify-start items-center sm:items-start gap-3 sm:gap-10 overflow-x-auto scrollbar-hide select-none cursor-grab ">
                           {isOwnProfile && (
                             <div
                               onClick={() => setShowNewHighlightModal(true)}
-                              className="newHighlightsection group h-full w-[100px] flex flex-col justify-center sm:justify-start items-center cursor-pointer shrink-0"
+                              className={`newHighlightsection group h-full ${HIGHLIGHT_TILE_W} sm:w-[100px] flex flex-col justify-center sm:justify-start items-center cursor-pointer shrink-0`}
                             >
                                <div className="newHighLightCircle w-[70px] h-[70px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-full object-fit object-center border-[4px] border-[var(--border-container)] overflow-hidden flex justify-center items-center bg-[var(--bg-input)] devs:border-2 devs:border-dashed devs:border-[var(--devs-cyan)] devs:transition-all devs:duration-300 devs:group-hover:shadow-[0_0_24px_rgba(34,240,255,0.45)] devs:group-hover:rotate-90">
                                  <Plus size={32} className="text-[var(--text-primary)] devs:text-[var(--devs-cyan)] select-none sm:w-10 sm:h-10" />
@@ -536,13 +647,25 @@ const UserProfilePage = () => {
                              </div>
                           )}
                           {highlights.map((h, i) => (
-                            <HighlightCircle
+                            // quarter-width slot on mobile; the circle + title are centred inside it
+                            <div
                               key={h._id}
-                              title={h.title}
-                              coverImage={h.coverImage}
-                              index={i + 1}
-                              onClick={() => navigate(`/highlight/view/${h._id}`)}
-                            />
+                              className={`shrink-0 min-w-0 flex justify-center ${HIGHLIGHT_TILE_W}`}
+                              style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
+                              onContextMenu={(e) => openDeletePopup(h, e)}
+                              onTouchStart={(e) => startLongPress(h, e)}
+                              onTouchMove={moveLongPress}
+                              onTouchEnd={cancelLongPress}
+                              onTouchCancel={cancelLongPress}
+                              onClickCapture={blockClickAfterLongPress}
+                            >
+                              <HighlightCircle
+                                title={h.title}
+                                coverImage={h.coverImage}
+                                index={i + 1}
+                                onClick={() => handleHighlightClick(h)}
+                              />
+                            </div>
                           ))}
                   </div>
                 )}
@@ -656,6 +779,53 @@ const UserProfilePage = () => {
 
         </div>
       </div>
+
+      {/* Delete-highlight popup (right-click on PC / long-press on mobile) */}
+      {highlightToDelete && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/60 devs:backdrop-blur-sm flex items-center justify-center px-6"
+          onClick={() => {
+            // ignore the click that follows the finger lifting after a long press
+            if (Date.now() - lastLongPress.current < 700) return
+            closeDeletePopup()
+          }}
+        >
+          <motion.div
+            {...(isDevs
+              ? {
+                  initial: { scale: 0.9, y: 16, opacity: 0 },
+                  animate: { scale: 1, y: 0, opacity: 1 },
+                  transition: { type: "spring", stiffness: 380, damping: 28 },
+                }
+              : {})}
+            onClick={(e) => e.stopPropagation()}
+            className={`bg-neutral-900 rounded-2xl p-5 w-full max-w-xs text-center ${isDevs ? "devs-glass devs-neon-border !rounded-3xl" : ""}`}
+          >
+            <p className="text-white text-base font-medium mb-2 devs:font-bold truncate">
+              Delete “{highlightToDelete.title}”?
+            </p>
+            <p className="text-neutral-400 text-sm mb-5 devs:font-mono devs:text-[11px] devs:leading-relaxed">
+              This will permanently delete the whole highlight. The stories themselves won't be deleted.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={closeDeletePopup}
+                disabled={deletingHighlight}
+                className="flex-1 py-2 rounded-lg bg-neutral-700 text-white text-sm disabled:opacity-50 devs:bg-[var(--bg-secondary-btn)] devs:hover:bg-[var(--bg-secondary-btn-hover)] devs:font-mono"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteHighlight}
+                disabled={deletingHighlight}
+                className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm disabled:opacity-50 devs:bg-[var(--color-danger)] devs:font-mono devs:font-bold"
+              >
+                {deletingHighlight ? "..." : "Delete"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {showNewHighlightModal && (
         <NewHighlightModal
