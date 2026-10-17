@@ -1,5 +1,6 @@
 // MessageBox.jsx
 import React, { useState, useMemo, useRef, useEffect } from "react";
+import { motion } from "framer-motion";
 // lottie-react exports Lottie as a DEFAULT export — the named import was
 // resolving to undefined, which throws the moment an animated sticker renders.
 import {Lottie} from "lottie-react";
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { getTimeAgo } from "../utils/timeAgo";
 import { formatFullTimestamp } from "../utils/dateTime";
 import CommentsOverlay from "./CommentsOverlay";
@@ -58,6 +60,8 @@ const REPLY_TYPE_LABELS = {
   story_reply: "Story reply",
 };
 
+const isHexColor = (c) => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c);
+
 const trimCaption = (text) => {
   if (!text) return "";
 
@@ -78,6 +82,7 @@ const MessageBox = ({
   receiverTextColor,
 }) => {
   const { user } = useAuth();
+  const { isDevs } = useTheme();
 
   const [isImageOpen, setIsImageOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -130,6 +135,42 @@ const MessageBox = ({
 
   const bubbleText =
     (isSenderMessage ? senderTextColor : receiverTextColor) || "#FFFFFF";
+
+  // The bubble "surface". Classic = flat theme colours (unchanged). In Devs
+  // Mode the default chat theme becomes a neon gradient (mine) / glass
+  // (friend's), and any other chat theme keeps its colours plus a soft glow.
+  const bubbleSurface = useMemo(() => {
+    const base = { backgroundColor: bubbleBg, color: bubbleText };
+    if (!isDevs) return base;
+
+    const lower = String(bubbleBg).toLowerCase();
+
+    if (isSenderMessage && lower === "#3797f0") {
+      return {
+        background: "linear-gradient(135deg,#22f0ff,#8b5cf6)",
+        color: "#04050e",
+        boxShadow: "0 0 18px rgba(34,240,255,0.35)",
+      };
+    }
+
+    if (!isSenderMessage && lower === "#262626") {
+      return {
+        backgroundColor: "rgba(16,18,44,0.7)",
+        color: "#eef2ff",
+        border: "1px solid rgba(139,92,246,0.35)",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
+      };
+    }
+
+    if (isHexColor(bubbleBg)) {
+      return { ...base, boxShadow: `0 0 16px ${bubbleBg}44` };
+    }
+
+    return base;
+  }, [isDevs, isSenderMessage, bubbleBg, bubbleText]);
+
+  const bubbleTextColor = bubbleSurface.color;
 
   const imageList = message?.images?.length
     ? message.images
@@ -515,8 +556,20 @@ const MessageBox = ({
       } px-3 sm:px-4`}
     >
       {/* swipe-to-reply wrapper — only received messages get the reply icon
-          revealed behind them and the live drag transform */}
-      <div className="relative w-full max-w-full flex" style={{ justifyContent: isSenderMessage ? "flex-end" : "flex-start" }}>
+          revealed behind them and the live drag transform.
+          In Devs Mode this wrapper also carries the slide-in entrance
+          (kept off the bubble itself so it can't fight the swipe transform). */}
+      <motion.div
+        {...(isDevs
+          ? {
+              initial: { opacity: 0, y: 10, scale: 0.97 },
+              animate: { opacity: 1, y: 0, scale: 1 },
+              transition: { duration: 0.28, ease: [0.2, 0.8, 0.2, 1] },
+            }
+          : {})}
+        className="relative w-full max-w-full flex"
+        style={{ justifyContent: isSenderMessage ? "flex-end" : "flex-start" }}
+      >
 
         {canReply && (
           <div
@@ -534,9 +587,7 @@ const MessageBox = ({
           onTouchEnd={handleTouchEnd}
           onTouchMove={canReply ? handleTouchMove : cancelLongPress}
           style={{
-            ...(hasMedia
-              ? undefined
-              : { backgroundColor: bubbleBg, color: bubbleText }),
+            ...(hasMedia ? undefined : bubbleSurface),
             transform: dragX ? `translateX(${dragX}px)` : undefined,
             transition: dragX ? "none" : "transform 150ms ease-out",
           }}
@@ -553,7 +604,7 @@ const MessageBox = ({
             style={
               hasMedia
                 ? { backgroundColor: "rgba(0,0,0,0.35)", color: "#FFFFFF" }
-                : { backgroundColor: "rgba(0,0,0,0.18)", color: bubbleText }
+                : { backgroundColor: "rgba(0,0,0,0.18)", color: bubbleTextColor }
             }
             className="replyQuote flex items-center gap-2 mb-1.5 max-w-full rounded-xl px-2.5 py-1.5 border-l-2 border-[var(--accent-blue)]"
           >
@@ -602,7 +653,7 @@ const MessageBox = ({
             src={imageList[0]}
             alt="attachment"
             onClick={() => openOverlay(0)}
-            className="max-w-[200px] max-h-[200px] sm:max-w-[280px] sm:max-h-[280px] rounded-2xl object-cover cursor-pointer"
+            className="max-w-[200px] max-h-[200px] sm:max-w-[280px] sm:max-h-[280px] rounded-2xl object-cover cursor-pointer devs:border devs:border-[var(--border-popup)]"
           />
         )}
 
@@ -618,7 +669,7 @@ const MessageBox = ({
                   marginLeft: idx === 0 ? 0 : "-16px",
                   zIndex: idx,
                 }}
-                className="relative w-[70px] h-[118px] sm:w-[120px] sm:h-[200px] mx-1 sm:mx-2 shrink-0 rounded-lg overflow-hidden border-2 border-white/20 shadow-md cursor-pointer hover:z-20 hover:scale-110 transition-transform"
+                className="relative w-[70px] h-[118px] sm:w-[120px] sm:h-[200px] mx-1 sm:mx-2 shrink-0 rounded-lg overflow-hidden border-2 border-white/20 shadow-md cursor-pointer hover:z-20 hover:scale-110 transition-transform devs:border-[var(--border-popup)] devs:hover:shadow-[0_0_20px_rgba(34,240,255,0.4)]"
                 onClick={() => openOverlay(idx)}
               >
                 <img
@@ -636,7 +687,7 @@ const MessageBox = ({
             onClick={() => {
               if (shareKind !== "story" && sharedItem) setIsCommentsOpen(true);
             }}
-            className={`sharedPostCard rounded-xl overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-soft)] max-w-full ${
+            className={`sharedPostCard rounded-xl overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-soft)] max-w-full devs:backdrop-blur-md devs:rounded-2xl devs:border-[var(--border-popup)] ${
               shareKind === "post"
                 ? `w-[170px] sm:w-[220px] ${sharedItem ? "cursor-pointer" : ""}`
                 : "w-[135px] sm:w-[160px]"
@@ -769,7 +820,7 @@ const MessageBox = ({
                     className="w-[22px] h-[22px] rounded-full object-cover shrink-0"
                   />
 
-                  <span className="text-[var(--text-primary)] text-[12px] font-medium truncate">
+                  <span className="text-[var(--text-primary)] text-[12px] font-medium truncate devs:font-mono">
                     {sharedItem.author?.username}
                   </span>
                 </Link>
@@ -801,9 +852,9 @@ const MessageBox = ({
         )}
 
         {repliedStory && (
-          <div className="repliedStoryCard w-[110px] sm:w-[130px] max-w-full rounded-xl overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-soft)]">
+          <div className="repliedStoryCard w-[110px] sm:w-[130px] max-w-full rounded-xl overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-soft)] devs:backdrop-blur-md devs:rounded-2xl devs:border-[var(--border-popup)]">
             <div className="px-2.5 pt-2 pb-1.5">
-              <span className="text-[var(--text-muted)] text-[11px] leading-tight">
+              <span className="text-[var(--text-muted)] text-[11px] leading-tight devs:font-mono">
                 {isSenderMessage
                   ? "Replied to their story"
                   : "Replied to your story"}
@@ -852,11 +903,7 @@ const MessageBox = ({
           // carries its own themed pill — otherwise light themes would render
           // white text straight onto a light background.
           <span
-            style={
-              hasMedia
-                ? { backgroundColor: bubbleBg, color: bubbleText }
-                : undefined
-            }
+            style={hasMedia ? bubbleSurface : undefined}
             className={
               hasMedia
                 ? "block w-fit max-w-full mt-1.5 px-3 py-2 rounded-2xl"
@@ -879,7 +926,7 @@ const MessageBox = ({
             aria-label="View reactions"
             className={`absolute -bottom-3 ${
               isSenderMessage ? "right-1" : "left-1"
-            } flex items-center gap-0.5 bg-[var(--bg-elevated)] border border-[var(--border-soft)] rounded-full px-1.5 py-0.5 shadow-sm cursor-pointer z-20`}
+            } flex items-center gap-0.5 bg-[var(--bg-elevated)] border border-[var(--border-soft)] rounded-full px-1.5 py-0.5 shadow-sm cursor-pointer z-20 devs:backdrop-blur-md devs:border-[var(--border-popup)] devs:shadow-[0_0_12px_rgba(34,240,255,0.25)]`}
           >
             {groupedReactions.map((g) => (
               <span key={g.emoji} className="text-[13px] leading-none">
@@ -894,10 +941,10 @@ const MessageBox = ({
           </button>
         )}
         </div>
-      </div>
+      </motion.div>
 
       {showSeen && (
-        <div className="text-[var(--text-muted)] text-[11px] mr-1 mb-1">
+        <div className="text-[var(--text-muted)] text-[11px] mr-1 mb-1 devs:font-mono devs:uppercase devs:tracking-widest devs:text-[9px]">
           Seen {getTimeAgo(message?.updatedAt)}
         </div>
       )}
@@ -911,7 +958,7 @@ const MessageBox = ({
               top: menuPosition.y,
               left: menuPosition.x,
             }}
-            className="z-[110] bg-[var(--bg-panel)] border border-[var(--border-popup)] rounded-2xl shadow-lg overflow-visible min-w-[230px]"
+            className="z-[110] bg-[var(--bg-panel)] border border-[var(--border-popup)] rounded-2xl shadow-lg overflow-visible min-w-[230px] devs:backdrop-blur-xl devs:rounded-3xl devs:font-mono devs:shadow-[0_0_40px_rgba(34,240,255,0.2)]"
           >
             {/* quick reactions + "more" picker */}
             <div className="flex items-center justify-between px-2.5 py-2 border-b border-[var(--border-popup)]">
@@ -955,7 +1002,7 @@ const MessageBox = ({
             </div>
 
             {/* non-editable, non-clickable — just the delivered timestamp */}
-            <div className="w-full text-left px-4 py-2.5 text-[var(--text-muted)] text-[12px] select-none cursor-default border-b border-[var(--border-popup)]">
+            <div className="w-full text-left px-4 py-2.5 text-[var(--text-muted)] text-[12px] select-none cursor-default border-b border-[var(--border-popup)] devs:text-[11px]">
               Delivered {messageFullTimestamp}
             </div>
 
@@ -1014,11 +1061,11 @@ const MessageBox = ({
         createPortal(
           <div
             onClick={closeOverlay}
-            className="fixed inset-0 z-[100] flex justify-center items-center bg-black/90 p-4 sm:p-8"
+            className="fixed inset-0 z-[100] flex justify-center items-center bg-black/90 p-4 sm:p-8 devs:bg-[rgba(2,3,10,0.92)] devs:backdrop-blur-md"
           >
             <button
               onClick={closeOverlay}
-              className="absolute top-4 right-4 sm:top-6 sm:right-6 text-white hover:opacity-70 transition cursor-pointer z-[101]"
+              className="absolute top-4 right-4 sm:top-6 sm:right-6 text-white hover:opacity-70 transition cursor-pointer z-[101] devs:text-[var(--devs-cyan)]"
             >
               <X size={32} />
             </button>
@@ -1026,7 +1073,7 @@ const MessageBox = ({
             <button
               onClick={handleDownload}
               disabled={isDownloading}
-              className="absolute top-4 right-16 sm:top-6 sm:right-20 text-white hover:opacity-70 transition cursor-pointer z-[101] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="absolute top-4 right-16 sm:top-6 sm:right-20 text-white hover:opacity-70 transition cursor-pointer z-[101] disabled:opacity-40 disabled:cursor-not-allowed devs:text-[var(--devs-cyan)]"
             >
               {isDownloading ? (
                 <div className="w-[28px] h-[28px] border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -1051,7 +1098,7 @@ const MessageBox = ({
                   <ChevronRight size={36} />
                 </button>
 
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white text-sm bg-black/50 px-3 py-1 rounded-full z-[101]">
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white text-sm bg-black/50 px-3 py-1 rounded-full z-[101] devs:font-mono devs:tracking-widest devs:border devs:border-[var(--border-popup)]">
                   {activeIndex + 1} / {imageList.length}
                 </div>
               </>

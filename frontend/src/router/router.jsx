@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 
 import App from "../App.jsx";
+import PageTransition from "../components/devs/PageTransition.jsx";
 
 import LoginPage from "../pages/LoginPage.jsx";
 import SignupPage from "../pages/SignupPage.jsx";
@@ -41,46 +42,51 @@ const router = createBrowserRouter([
   {
     element: <App />,
     children: [
-      { path: "/", element: <LoginPage /> },
-      { path: "/user/signup", element: <SignupPage /> },
-      { path: "/user/dob", element: <DobPage /> },
-      { path: "/user/confirm-otp", element: <ConfirmationPage /> },
-      { path: "/user/forgot-password", element: <ForgotPasswordPage /> },
-      { path: "/user/reset-password", element: <ResetPasswordPage /> },
-      { path: "/auth/callback", element: <GoogleAuthCallback /> },
-      { path: "/user/complete-profile", element: <CompleteProfile /> },
-      { path: "/user/recommendations", element: <FollowingSetupPage /> },
+      {
+        // Pathless layout route: adds page transitions in Devs Mode only
+        element: <PageTransition />,
+        children: [
+          { path: "/", element: <LoginPage /> },
+          { path: "/user/signup", element: <SignupPage /> },
+          { path: "/user/dob", element: <DobPage /> },
+          { path: "/user/confirm-otp", element: <ConfirmationPage /> },
+          { path: "/user/forgot-password", element: <ForgotPasswordPage /> },
+          { path: "/user/reset-password", element: <ResetPasswordPage /> },
+          { path: "/auth/callback", element: <GoogleAuthCallback /> },
+          { path: "/user/complete-profile", element: <CompleteProfile /> },
+          { path: "/user/recommendations", element: <FollowingSetupPage /> },
 
 
-      { path: "/home", element: <HomePage /> },
-      { path: "/user/get-profile", element: <UserProfilePage /> },
-      { path: "/user/get-profile/:userId", element: <UserProfilePage /> },
-      { path: "/user/edit-profile", element: <EditProfilePage /> },
+          { path: "/home", element: <HomePage /> },
+          { path: "/user/get-profile", element: <UserProfilePage /> },
+          { path: "/user/get-profile/:userId", element: <UserProfilePage /> },
+          { path: "/user/edit-profile", element: <EditProfilePage /> },
 
-      // { path: "/create/select-image", element: <SelectImagePage /> },
-      // { path: "/create/crop-image", element: <CropImagePage /> },
-      // { path: "/create/caption-share", element: <CaptionSharePage/> },
+          // { path: "/create/select-image", element: <SelectImagePage /> },
+          // { path: "/create/crop-image", element: <CropImagePage /> },
+          // { path: "/create/caption-share", element: <CaptionSharePage/> },
 
-      { path: "/create/post", element: <CreatePostPage /> },
-      { path: "/comments", element: <CommentsOverlay /> },
+          { path: "/create/post", element: <CreatePostPage /> },
+          { path: "/comments", element: <CommentsOverlay /> },
 
-      { path: "/explore", element: <ExplorePage /> },
-      { path: "/user/messages", element: <MessagesPage /> },
-      { path: "/user/messages/:conversationId", element: <MessagesPage /> },
+          { path: "/explore", element: <ExplorePage /> },
+          { path: "/user/messages", element: <MessagesPage /> },
+          { path: "/user/messages/:conversationId", element: <MessagesPage /> },
 
-      { path: "/user/notifications", element: <NotificationsPage /> },
+          { path: "/user/notifications", element: <NotificationsPage /> },
 
-      { path: "/reels", element: <ReelsPage /> },
+          { path: "/reels", element: <ReelsPage /> },
 
-      {path: "/story/create", element: <UserStoryPage /> },
-      {path: "/story/view/:userId", element: <StoryViewerPage /> },
-      {path: "/highlight/view/:highlightId", element: <HighlightViewerPage/> },
+          {path: "/story/create", element: <UserStoryPage /> },
+          {path: "/story/view/:userId", element: <StoryViewerPage /> },
+          {path: "/highlight/view/:highlightId", element: <HighlightViewerPage/> },
 
-      {path: "/about", element: <AboutPage/> },
+          {path: "/about", element: <AboutPage/> },
 
-      { path: "/privacy-policy", element: <PrivacyPolicy />},
-      { path: "/terms", element: <Terms /> },
-
+          { path: "/privacy-policy", element: <PrivacyPolicy />},
+          { path: "/terms", element: <Terms /> },
+        ],
+      },
     ],
   },
 ]);

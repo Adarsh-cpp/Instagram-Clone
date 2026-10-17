@@ -1,21 +1,47 @@
-
 <!doctype html>
 
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
 
-    <link href="/styles.css" rel="stylesheet">
     <link rel="stylesheet" href="/stylesheets/customScrollbar.css">
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#04050e" />
+
+    <!-- Apply the saved theme BEFORE first paint so there is no white/black flash -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("theme");
+          if (t !== "light" && t !== "dark" && t !== "devs") {
+            t = window.matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+          }
+          var r = document.documentElement;
+          r.classList.add(t === "devs" ? "dark" : t);
+          if (t === "devs") r.classList.add("devs");
+          r.setAttribute("data-theme", t);
+        } catch (e) {}
+      })();
+    </script>
+    <style>
+      html[data-theme="light"] { background: #fafafa; }
+      html[data-theme="dark"] { background: #0c1014; }
+      html[data-theme="devs"] { background: #04050e; }
+    </style>
+
+    <!-- Fonts used by Devs Mode (loaded from index.css) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
     <!-- Instagram Clone Favicon -->
     <link
       rel="icon"
       type="image/png"
       sizes="512x512"
-      href="/images/instagram-fav-con.png"
+      href="/images/instagram-fav-icon.png"
     />
 
     <title>Instagram Clone</title>
@@ -27,4 +53,3 @@
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
-

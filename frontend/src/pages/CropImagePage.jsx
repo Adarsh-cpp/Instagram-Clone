@@ -2,12 +2,23 @@ import React, { useState, useEffect } from "react";
 import Cropper from "react-easy-crop";
 import { ChevronLeft, ChevronRight, ArrowLeft, Crop, ZoomIn } from "lucide-react";
 import getCroppedImg, { getDefaultCroppedArea } from "../utils/cropImage";
+import { useTheme } from "../context/ThemeContext";
 
 const ASPECT_OPTIONS = [
   { label: "1 : 1", value: 1, key: "1:1" },
   { label: "16 : 9", value: 16 / 9, key: "16:9" },
   { label: "4 : 5", value: 4 / 5, key: "4:5" },
 ];
+
+// Devs Mode: neon crop frame over a deep-navy overlay. Only `color` (the
+// overlay, drawn by the library as a huge box-shadow) and the border are set,
+// so the library's own overlay keeps working.
+const DEVS_CROP_STYLE = {
+  cropAreaStyle: {
+    color: "rgba(4,5,14,0.72)",
+    border: "2px solid #22f0ff",
+  },
+};
 
 const CropImagePage = ({
   images,
@@ -16,6 +27,8 @@ const CropImagePage = ({
   next,
   back,
 }) => {
+  const { isDevs } = useTheme();
+
   const [activeIndex, setActiveIndex] = useState(0);
   const [aspect, setAspect] = useState(1);
   const [imageUrls, setImageUrls] = useState([]);
@@ -76,32 +89,42 @@ const CropImagePage = ({
 
   const menuBottom = hasMultiple ? "bottom-[111px]" : "bottom-[55px]";
 
+  // toolbar round buttons: classic dark circle / glass neon circle
+  const toolBtn =
+    "w-[34px] h-[34px] rounded-full flex justify-center items-center bg-[rgba(0,0,0,0.6)] cursor-pointer flex-shrink-0 devs:backdrop-blur-md devs:border devs:border-[var(--border-popup)] devs:transition-all devs:hover:shadow-[0_0_16px_rgba(34,240,255,0.5)] devs:active:scale-90";
+
   return (
     <div className="w-[100vw] h-[100vh] flex justify-center items-center bg-[var(--bg-app)]">
       <div className="cropContainerOverlay w-full h-full flex justify-center items-center bg-[rgba(0,0,0,0)] px-2 sm:px-4">
-        <div className="cropContainer relative w-full max-w-[500px] md:w-[70%] lg:w-[50%] xl:w-[30%] h-[70%] rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-container)] shadow-xl overflow-hidden">
+        <div
+          className={`cropContainer relative w-full max-w-[500px] md:w-[70%] lg:w-[50%] xl:w-[30%] h-[70%] rounded-2xl overflow-hidden ${
+            isDevs
+              ? "devs-glass devs-neon-border !rounded-3xl"
+              : "bg-[var(--bg-surface)] border border-[var(--border-container)] shadow-xl"
+          }`}
+        >
           {/* Header */}
-          <div className="header w-full h-[40px] px-3 sm:px-4 flex justify-between items-center bg-[var(--bg-app)] border-b border-[var(--border-soft)]">
-            <div onClick={back} className="back cursor-pointer">
+          <div className="header w-full h-[40px] px-3 sm:px-4 flex justify-between items-center bg-[var(--bg-app)] border-b border-[var(--border-soft)] devs:bg-transparent">
+            <div onClick={back} className="back cursor-pointer devs:hover:drop-shadow-[0_0_8px_rgba(34,240,255,0.8)] devs:transition-all">
               <ArrowLeft size={24} color="var(--text-primary)" />
             </div>
 
-            <div className="heading text-[var(--text-primary)] text-[16px] sm:text-[18px] font-semibold">
+            <div className="heading text-[var(--text-primary)] text-[16px] sm:text-[18px] font-semibold devs:font-mono devs:uppercase devs:tracking-[0.2em] devs:text-[12px]">
               {hasMultiple ? `Crop  ${activeIndex + 1}/${images?.length}` : "Crop"}
             </div>
 
             <div
               onClick={isSaving ? undefined : handleNext}
-              className={`next text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] hover:underline cursor-pointer text-sm sm:text-base ${
+              className={`next text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] hover:underline cursor-pointer text-sm sm:text-base devs:no-underline devs:font-mono devs:uppercase devs:tracking-wider devs:text-[11px] devs:font-bold devs:px-3 devs:py-1 devs:rounded-full devs:bg-[linear-gradient(120deg,#22f0ff,#8b5cf6)] devs:text-[#04050e] devs:hover:text-[#04050e] devs:shadow-[0_0_14px_rgba(34,240,255,0.45)] ${
                 isSaving ? "opacity-50 pointer-events-none" : ""
               }`}
             >
-              Next
+              {isSaving ? "Saving..." : "Next"}
             </div>
           </div>
 
           {/* Crop Area */}
-          <div className="relative w-full h-[calc(100%-40px)] overflow-hidden bg-[var(--bg-elevated)]">
+          <div className="relative w-full h-[calc(100%-40px)] overflow-hidden bg-[var(--bg-elevated)] devs:bg-[#04050e]">
             {imageUrls[activeIndex] && (
               <Cropper
                 image={imageUrls[activeIndex]}
@@ -111,13 +134,14 @@ const CropImagePage = ({
                 onCropChange={onCropChange}
                 onZoomChange={onZoomChange}
                 onCropComplete={onCropComplete}
+                style={isDevs ? DEVS_CROP_STYLE : undefined}
               />
             )}
 
             {hasMultiple && activeIndex > 0 && (
               <div
                 onClick={() => setActiveIndex((i) => i - 1)}
-                className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10"
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10 devs:backdrop-blur-md devs:border devs:border-[var(--border-popup)]"
               >
                 <ChevronLeft size={18} color="white" />
               </div>
@@ -125,7 +149,7 @@ const CropImagePage = ({
             {hasMultiple && activeIndex < images?.length - 1 && (
               <div
                 onClick={() => setActiveIndex((i) => i + 1)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10"
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10 devs:backdrop-blur-md devs:border devs:border-[var(--border-popup)]"
               >
                 <ChevronRight size={18} color="white" />
               </div>
@@ -133,12 +157,16 @@ const CropImagePage = ({
 
             {/* Aspect Ratio Menu */}
             {showAspectMenu && (
-              <div className={`absolute ${menuBottom} left-3 bg-[var(--bg-menu)] rounded-lg overflow-hidden z-50 min-w-[100px]`}>
+              <div className={`absolute ${menuBottom} left-3 bg-[var(--bg-menu)] rounded-lg overflow-hidden z-50 min-w-[100px] devs:backdrop-blur-xl devs:rounded-2xl devs:border devs:border-[var(--border-popup)] devs:font-mono`}>
                 {ASPECT_OPTIONS.map((opt) => (
                   <div
                     key={opt.key}
                     onClick={() => selectAspect(opt)}
-                    className="px-4 py-2 text-[var(--text-primary)] hover:bg-[var(--bg-menu-hover)] cursor-pointer text-sm"
+                    className={`px-4 py-2 text-[var(--text-primary)] hover:bg-[var(--bg-menu-hover)] cursor-pointer text-sm ${
+                      isDevs && aspect === opt.value
+                        ? "!text-[var(--devs-cyan)] [text-shadow:0_0_10px_rgba(34,240,255,0.7)]"
+                        : ""
+                    }`}
                   >
                     {opt?.label}
                   </div>
@@ -149,7 +177,7 @@ const CropImagePage = ({
             {/* Zoom Slider */}
             {showZoomSlider && (
               <div
-                className={`instagram-slider absolute ${menuBottom} left-[60px] sm:left-[70px] bg-[var(--bg-menu)] rounded-lg p-3 z-50 max-w-[calc(100%-80px)]`}
+                className={`instagram-slider absolute ${menuBottom} left-[60px] sm:left-[70px] bg-[var(--bg-menu)] rounded-lg p-3 z-50 max-w-[calc(100%-80px)] devs:backdrop-blur-xl devs:rounded-2xl devs:border devs:border-[var(--border-popup)]`}
               >
                 <input
                   type="range"
@@ -158,6 +186,7 @@ const CropImagePage = ({
                   step={0.1}
                   value={activeSlide.zoom}
                   onChange={(e) => onZoomChange(Number(e.target.value))}
+                  className="devs:accent-[var(--devs-cyan)]"
                 />
               </div>
             )}
@@ -165,13 +194,15 @@ const CropImagePage = ({
 
           {/* Filmstrip */}
           {hasMultiple && (
-            <div className="absolute bottom-[40px] w-full h-[56px] bg-[var(--bg-app)] flex items-center gap-2 px-2 overflow-x-auto z-20">
+            <div className="absolute bottom-[40px] w-full h-[56px] bg-[var(--bg-app)] flex items-center gap-2 px-2 overflow-x-auto z-20 devs:bg-[rgba(4,5,14,0.8)] devs:backdrop-blur-md">
               {imageUrls.map((url, i) => (
                 <div
                   key={i}
                   onClick={() => setActiveIndex(i)}
-                  className={`flex-shrink-0 w-[40px] h-[40px] rounded-md overflow-hidden cursor-pointer border-2 ${
-                    i === activeIndex ? "border-[var(--accent-blue)]" : "border-transparent"
+                  className={`flex-shrink-0 w-[40px] h-[40px] rounded-md overflow-hidden cursor-pointer border-2 devs:rounded-lg devs:transition-all ${
+                    i === activeIndex
+                      ? "border-[var(--accent-blue)] devs:shadow-[0_0_14px_rgba(34,240,255,0.6)]"
+                      : "border-transparent"
                   }`}
                 >
                   <img src={url} className="w-full h-full object-cover" alt="" />
@@ -185,14 +216,14 @@ const CropImagePage = ({
             <div className="left w-[50%] h-full px-2 flex gap-2 items-center">
               <div
                 onClick={() => setShowAspectMenu(!showAspectMenu)}
-                className="crop w-[34px] h-[34px] rounded-full flex justify-center items-center bg-[rgba(0,0,0,0.6)] cursor-pointer flex-shrink-0"
+                className={`crop ${toolBtn}`}
               >
                 <Crop size={18} color="white" />
               </div>
 
               <div
                 onClick={() => setShowZoomSlider(!showZoomSlider)}
-                className="magnify w-[34px] h-[34px] rounded-full flex justify-center items-center bg-[rgba(0,0,0,0.6)] cursor-pointer flex-shrink-0"
+                className={`magnify ${toolBtn}`}
               >
                 <ZoomIn size={18} color="white" />
               </div>

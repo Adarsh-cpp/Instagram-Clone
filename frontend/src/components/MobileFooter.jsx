@@ -1,6 +1,7 @@
 // MobileFooter.jsx
 import React, { useState, useEffect } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
 import { useNotifications } from '../context/NotificationContext'
@@ -26,10 +27,62 @@ const svgProps = {
   strokeLinejoin: 'round',
 }
 
+/* Slider-style switch used by the theme rows */
+const Switch = ({ on, gradient = false, children }) => (
+  <div
+    className={`relative w-[42px] h-[22px] rounded-full shrink-0 transition-colors duration-200
+      ${
+        on
+          ? gradient
+            ? 'bg-[linear-gradient(120deg,#22f0ff,#8b5cf6,#ff2bd6)]'
+            : 'bg-[var(--brand-blue)]'
+          : 'bg-[var(--toggle-track-off)]'
+      }`}
+  >
+    <div
+      className={`absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-white
+        flex items-center justify-center transition-transform duration-200
+        ${on ? 'translate-x-[20px]' : 'translate-x-0'}`}
+    >
+      {children}
+    </div>
+  </div>
+)
+
+const knobSvgProps = {
+  width: 10,
+  height: 10,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'var(--icon-on-toggle)',
+  strokeWidth: 2.5,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+}
+
+const MoonGlyph = () => (
+  <svg {...knobSvgProps}>
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+  </svg>
+)
+
+const SunGlyph = () => (
+  <svg {...knobSvgProps}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+  </svg>
+)
+
+const BoltGlyph = () => (
+  <svg {...knobSvgProps}>
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+  </svg>
+)
+
 const MobileFooter = () => {
   const { user } = useAuth()
   const { unreadCount } = useNotifications()
-  const { theme, toggleTheme } = useTheme()
+  const { theme, toggleTheme, isDevs, toggleDevs } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -136,10 +189,32 @@ const MobileFooter = () => {
 
   const badgeText = unreadCount > 99 ? '99+' : unreadCount
 
+  // Light/Dark row: in Devs Mode it becomes "Classic mode" and returns
+  // the user to whichever classic theme they were on before.
+  const classicLabel = isDevs
+    ? 'Classic mode'
+    : theme === 'dark'
+    ? 'Dark mode'
+    : 'Light mode'
+  const classicOn = !isDevs && theme === 'dark'
+
+  const sheetMotion = isDevs
+    ? {
+        initial: { y: 70, opacity: 0 },
+        animate: { y: 0, opacity: 1 },
+        transition: { type: 'spring', stiffness: 380, damping: 30 },
+      }
+    : {}
+
   const tileClass = (isActive) =>
     `relative flex flex-col items-center justify-center gap-2 h-[84px] rounded-xl text-[13px] font-medium
      text-[var(--text-primary)] transition-all duration-200 active:scale-[0.97]
-     ${isActive ? 'bg-[var(--bg-row-hover)]' : 'hover:bg-[var(--bg-row-hover)]'}`
+     devs:border devs:border-[var(--border-soft)] devs:font-mono devs:text-[11px] devs:uppercase devs:tracking-wider
+     ${
+       isActive
+         ? 'bg-[var(--bg-row-hover)] devs:shadow-[0_0_18px_rgba(34,240,255,0.25)]'
+         : 'hover:bg-[var(--bg-row-hover)]'
+     }`
 
   const rowClass = `w-full h-[48px] px-3 flex items-center gap-3 rounded-lg text-[14px] font-medium
     text-[var(--text-primary)] transition-all duration-200 hover:bg-[var(--bg-popup-hover)] active:scale-[0.98]`
@@ -149,17 +224,24 @@ const MobileFooter = () => {
       {/* Backdrop */}
       {isSheetOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden animate-[fadeIn_0.15s_ease-out]"
+          className={`fixed inset-0 bg-black/50 z-40 md:hidden devs:backdrop-blur-sm ${
+            isDevs ? '' : 'animate-[fadeIn_0.15s_ease-out]'
+          }`}
           onClick={closeSheet}
         />
       )}
 
       {/* Bottom sheet */}
       {isSheetOpen && (
-        <div
-          className="fixed left-0 right-0 bottom-[50px] z-50 md:hidden bg-[var(--bg-panel)]
+        <motion.div
+          {...sheetMotion}
+          className={`fixed left-0 right-0 bottom-[50px] z-50 md:hidden bg-[var(--bg-panel)]
                      border-t border-[var(--border-popup)] rounded-t-2xl p-3
-                     shadow-[0_-8px_30px_rgba(0,0,0,0.35)] animate-[fadeIn_0.15s_ease-out]"
+                     shadow-[0_-8px_30px_rgba(0,0,0,0.35)]
+                     devs:bottom-[66px] devs:left-2 devs:right-2 devs:rounded-3xl devs:border
+                     devs:backdrop-blur-xl devs:font-mono
+                     devs:shadow-[0_-8px_40px_rgba(0,0,0,0.6),0_0_30px_rgba(34,240,255,0.15)]
+                     ${isDevs ? '' : 'animate-[fadeIn_0.15s_ease-out]'}`}
         >
           {/* Grab handle */}
           <div className="w-10 h-1 rounded-full bg-[var(--border-popup)] mx-auto mb-3" />
@@ -227,31 +309,27 @@ const MobileFooter = () => {
 
               <div className="h-[1px] bg-[var(--border-popup)] my-3 mx-1" />
 
-              {/* Theme toggle */}
+              {/* Light / Dark (or "Classic") theme toggle */}
               <div onClick={toggleTheme} className={`${rowClass} justify-between cursor-pointer`}>
-                <span>{theme === 'dark' ? 'Dark mode' : 'Light mode'}</span>
+                <span>{classicLabel}</span>
 
-                <div
-                  className={`relative w-[42px] h-[22px] rounded-full shrink-0 transition-colors duration-200
-                    ${theme === 'dark' ? 'bg-[var(--brand-blue)]' : 'bg-[var(--toggle-track-off)]'}`}
-                >
-                  <div
-                    className={`absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-white
-                      flex items-center justify-center transition-transform duration-200
-                      ${theme === 'dark' ? 'translate-x-[20px]' : 'translate-x-0'}`}
-                  >
-                    {theme === 'dark' ? (
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--icon-on-toggle)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                      </svg>
-                    ) : (
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--icon-on-toggle)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="4" />
-                        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-                      </svg>
-                    )}
-                  </div>
-                </div>
+                <Switch on={classicOn}>
+                  {classicOn ? <MoonGlyph /> : <SunGlyph />}
+                </Switch>
+              </div>
+
+              {/* Devs Mode toggle */}
+              <div onClick={toggleDevs} className={`${rowClass} justify-between cursor-pointer`}>
+                <span className="flex items-center gap-2">
+                  Devs Mode
+                  <span className="px-1.5 py-[1px] rounded text-[9px] font-bold tracking-wider bg-[linear-gradient(120deg,#22f0ff,#8b5cf6,#ff2bd6)] text-[#04050e]">
+                    NEW
+                  </span>
+                </span>
+
+                <Switch on={isDevs} gradient>
+                  <BoltGlyph />
+                </Switch>
               </div>
 
               {/* About */}
@@ -376,11 +454,16 @@ const MobileFooter = () => {
               </div>
             </div>
           )}
-        </div>
+        </motion.div>
       )}
 
-      {/* Footer bar */}
-      <div className="mobileFooter w-full h-[50px] fixed bottom-0 flex justify-center items-center md:hidden bg-[var(--bg-app)] border-t border-[var(--border-soft)] z-30">
+      {/* Footer bar (becomes a floating glass dock in Devs Mode) */}
+      <div
+        className="mobileFooter w-full h-[50px] fixed bottom-0 flex justify-center items-center md:hidden bg-[var(--bg-app)] border-t border-[var(--border-soft)] z-30
+                   devs:bottom-2 devs:left-3 devs:w-[calc(100%-1.5rem)] devs:rounded-2xl devs:border devs:border-[var(--border-popup)]
+                   devs:backdrop-blur-xl
+                   devs:shadow-[0_8px_32px_rgba(0,0,0,0.55),0_0_24px_rgba(34,240,255,0.12)]"
+      >
         <NavLink to="/home" className="w-1/5 h-full">
           {({ isActive }) => <MobileIcons Icon={HomeIcon} isActive={isActive} label="Home" />}
         </NavLink>
@@ -406,13 +489,19 @@ const MobileFooter = () => {
         >
           <div
             className={`relative flex items-center justify-center w-[36px] h-[36px] rounded-full transition-all duration-200
-              ${isMoreActive ? 'bg-[var(--bg-row-hover)]' : ''}`}
+              ${isMoreActive ? 'bg-[var(--bg-row-hover)] devs:shadow-[0_0_14px_rgba(139,92,246,0.55)] devs:text-[var(--devs-violet)]' : ''}`}
           >
-            <svg {...svgProps} strokeWidth={isMoreActive ? 2.5 : 2}>
-              <line x1="4" y1="7" x2="20" y2="7" />
-              <line x1="4" y1="12" x2="20" y2="12" />
-              <line x1="4" y1="17" x2="20" y2="17" />
-            </svg>
+            <motion.span
+              className="flex"
+              animate={isDevs ? { rotate: isSheetOpen ? 90 : 0 } : undefined}
+              transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+            >
+              <svg {...svgProps} strokeWidth={isMoreActive ? 2.5 : 2}>
+                <line x1="4" y1="7" x2="20" y2="7" />
+                <line x1="4" y1="12" x2="20" y2="12" />
+                <line x1="4" y1="17" x2="20" y2="17" />
+              </svg>
+            </motion.span>
 
             {/* Unread dot, so notifications aren't hidden inside the sheet */}
             {unreadCount > 0 && !isSheetOpen && (

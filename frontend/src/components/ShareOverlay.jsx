@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { X, Check, BadgeCheck } from 'lucide-react'
+import { motion } from 'framer-motion'
 import axios from 'axios'
 import { toast } from 'react-toastify'
+import { useTheme } from '../context/ThemeContext'
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
@@ -20,6 +22,8 @@ const SEARCH_DEBOUNCE_MS = 400;
 // onShared(optional) fires once after a successful send, useful for the caller
 // to bump a local sharesCount (e.g. ReelsPage's Repeat2 counter). Reel-only.
 const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
+  const { isDevs } = useTheme()
+
   const shareType = story ? 'story' : reel ? 'reel' : 'post';
   const item = story || reel || post;
   const shareLabel = shareType === 'story' ? 'Story' : shareType === 'reel' ? 'Reel' : 'Post';
@@ -191,19 +195,28 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
 
   return (
     <div
-      className="overlayBackdrop fixed inset-0 z-[99] bg-black/60 flex justify-center items-center"
+      className="overlayBackdrop fixed inset-0 z-[99] bg-black/60 flex justify-center items-center devs:bg-[rgba(2,3,10,0.75)] devs:backdrop-blur-md"
       onClick={onClose}
     >
-      <div
-        className="ShareOverlay relative z-[100] w-[500px] h-[500px] rounded-[12px] overflow-hidden bg-[var(--bg-surface)] flex flex-col"
+      <motion.div
+        {...(isDevs
+          ? {
+              initial: { opacity: 0, scale: 0.92, y: 20 },
+              animate: { opacity: 1, scale: 1, y: 0 },
+              transition: { type: 'spring', stiffness: 320, damping: 28 },
+            }
+          : {})}
+        className={`ShareOverlay relative z-[100] w-[500px] h-[500px] rounded-[12px] overflow-hidden bg-[var(--bg-surface)] flex flex-col devs:max-w-[94vw] devs:!rounded-3xl ${
+          isDevs ? 'devs-glass devs-neon-border' : ''
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Heading */}
-        <div className="heading w-full h-[10%] shrink-0 relative flex justify-center items-center text-[var(--text-primary)] font-semibold text-[16px] border-b border-[var(--border-container)]">
+        <div className="heading w-full h-[10%] shrink-0 relative flex justify-center items-center text-[var(--text-primary)] font-semibold text-[16px] border-b border-[var(--border-container)] devs:font-mono devs:uppercase devs:tracking-[0.25em] devs:text-[12px]">
           Share
           <button
             onClick={onClose}
-            className="absolute right-4 cursor-pointer text-[var(--text-primary)]"
+            className="absolute right-4 cursor-pointer text-[var(--text-primary)] devs:hover:text-[var(--devs-cyan)] devs:transition-colors"
           >
             <X size={22} />
           </button>
@@ -213,7 +226,7 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
         {previewThumbUrl && (
           <div className="postPreview w-full h-[60px] shrink-0 flex items-center gap-3 px-4 border-b border-[var(--border-container)]">
             <div
-              className="w-[42px] h-[42px] rounded-md overflow-hidden shrink-0"
+              className="w-[42px] h-[42px] rounded-md overflow-hidden shrink-0 devs:rounded-xl devs:ring-1 devs:ring-[var(--devs-cyan)] devs:shadow-[0_0_14px_rgba(34,240,255,0.35)]"
               style={shareType === 'story' ? { backgroundColor: item.bgColor || undefined } : undefined}
             >
               {previewIsVideo ? (
@@ -223,12 +236,12 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
               )}
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-[var(--text-primary)] text-[13px] font-medium inline-flex items-center gap-1">
+              <span className="text-[var(--text-primary)] text-[13px] font-medium inline-flex items-center gap-1 devs:font-bold">
                 {shareType === 'story' ? (
                   <>
                     {item.author?.username}
                     {item.author?.role === "admin" && (
-                      <BadgeCheck size={14} className="text-sky-400 shrink-0" />
+                      <BadgeCheck size={14} className="text-sky-400 devs:text-[var(--devs-cyan)] shrink-0" />
                     )}
                     's story
                   </>
@@ -236,13 +249,13 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
                   <>
                     {item.author?.username}
                     {item.author?.role === "admin" && (
-                      <BadgeCheck size={14} className="text-sky-400 shrink-0" />
+                      <BadgeCheck size={14} className="text-sky-400 devs:text-[var(--devs-cyan)] shrink-0" />
                     )}
                   </>
                 )}
               </span>
               {item.caption && (
-                <span className="text-[var(--text-muted)] text-[12px] truncate max-w-[380px]">
+                <span className="text-[var(--text-muted)] text-[12px] truncate max-w-[380px] devs:font-mono devs:text-[11px]">
                   {item.caption}
                 </span>
               )}
@@ -259,7 +272,7 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
             placeholder="Search"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-[95%] h-[70%] rounded-md focus:outline-none bg-[var(--bg-secondary-btn)] px-2 text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+            className="w-[95%] h-[70%] rounded-md focus:outline-none bg-[var(--bg-secondary-btn)] px-2 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] devs:rounded-xl devs:px-4 devs:font-mono devs:text-[13px] devs:bg-[var(--bg-input)] devs:border devs:border-[var(--border-input)] devs:focus:border-[var(--devs-cyan)] devs:focus:shadow-[0_0_18px_rgba(34,240,255,0.25)] devs:transition-all"
           />
         </div>
 
@@ -270,15 +283,16 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
           className="listDiv w-full flex-1 overflow-y-auto px-3 py-3"
         >
           {isInitialLoading ? (
-            <div className="w-full h-full flex justify-center items-center text-[var(--text-muted)] text-[14px]">
+            <div className="w-full h-full flex justify-center items-center text-[var(--text-muted)] text-[14px] devs:font-mono">
+              {isDevs && <span className="text-[var(--devs-cyan)] mr-2">&gt;</span>}
               Loading...
             </div>
           ) : error ? (
-            <div className="w-full h-full flex justify-center items-center text-[var(--text-muted)] text-[14px]">
+            <div className="w-full h-full flex justify-center items-center text-[var(--text-muted)] text-[14px] devs:font-mono">
               {error}
             </div>
           ) : users.length === 0 ? (
-            <div className="w-full h-full flex justify-center items-center text-[var(--text-muted)] text-[14px]">
+            <div className="w-full h-full flex justify-center items-center text-[var(--text-muted)] text-[14px] devs:font-mono">
               No results found
             </div>
           ) : (
@@ -287,8 +301,9 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
                 {users.map((user) => {
                   const isSelected = selectedUsers.has(user._id)
                   return (
-                    <div
+                    <motion.div
                       key={user._id}
+                      {...(isDevs ? { whileTap: { scale: 0.92 }, whileHover: { y: -2 } } : {})}
                       onClick={() => toggleUser(user._id)}
                       className="flex flex-col items-center justify-start gap-1 cursor-pointer"
                     >
@@ -296,28 +311,31 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
                         <img
                           src={user.profilePic || "/images/default-profile-pic.jpg"}
                           alt={user.username}
-                          className={`w-[60px] h-[60px] rounded-full object-cover border-2 ${
-                            isSelected ? 'border-[var(--brand-blue)]' : 'border-[var(--border-container)]'
+                          className={`w-[60px] h-[60px] rounded-full object-cover border-2 devs:transition-all devs:duration-200 ${
+                            isSelected
+                              ? 'border-[var(--brand-blue)] devs:shadow-[0_0_18px_rgba(34,240,255,0.65)]'
+                              : 'border-[var(--border-container)]'
                           }`}
                         />
                         {isSelected && (
-                          <div className="absolute bottom-0 right-0 bg-[var(--brand-blue)] rounded-full w-[18px] h-[18px] flex items-center justify-center border-2 border-[var(--bg-surface)]">
+                          <div className="absolute bottom-0 right-0 bg-[var(--brand-blue)] rounded-full w-[18px] h-[18px] flex items-center justify-center border-2 border-[var(--bg-surface)] devs:bg-[linear-gradient(135deg,#22f0ff,#8b5cf6)] devs:border-[#04050e]">
                             <Check size={11} className="text-[var(--text-on-brand)]" strokeWidth={3} />
                           </div>
                         )}
                       </div>
-                      <span className="text-[var(--text-primary)] text-[12px] max-w-[70px] flex items-center justify-center gap-1">
+                      <span className="text-[var(--text-primary)] text-[12px] max-w-[70px] flex items-center justify-center gap-1 devs:font-mono devs:text-[11px]">
                         <span className="truncate min-w-0">{user.username}</span>
                         {user.role === "admin" && (
-                          <BadgeCheck size={14} className="text-sky-400 shrink-0" />
+                          <BadgeCheck size={14} className="text-sky-400 devs:text-[var(--devs-cyan)] shrink-0" />
                         )}
                       </span>
-                    </div>
+                    </motion.div>
                   )
                 })}
               </div>
               {isLoading && (
-                <div className="w-full h-[50px] flex justify-center items-center text-[var(--text-muted)] text-[13px]">
+                <div className="w-full h-[50px] flex justify-center items-center text-[var(--text-muted)] text-[13px] devs:font-mono">
+                  {isDevs && <span className="text-[var(--devs-cyan)] mr-2">&gt;</span>}
                   Loading more...
                 </div>
               )}
@@ -331,11 +349,11 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
             <button
               onClick={handleSend}
               disabled={isSending}
-              className="w-[95%] py-2 rounded-md bg-[var(--brand-blue)] text-[var(--text-on-brand)] text-[14px] font-semibold cursor-pointer hover:bg-[var(--brand-blue-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+              className="w-[95%] py-2 rounded-md bg-[var(--brand-blue)] text-[var(--text-on-brand)] text-[14px] font-semibold cursor-pointer hover:bg-[var(--brand-blue-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 devs:rounded-full devs:bg-[linear-gradient(120deg,#22f0ff,#8b5cf6,#ff2bd6)] devs:hover:bg-[linear-gradient(120deg,#22f0ff,#8b5cf6,#ff2bd6)] devs:font-mono devs:uppercase devs:tracking-wider devs:text-[12px] devs:font-bold devs:shadow-[0_0_22px_rgba(34,240,255,0.4)] devs:active:scale-95"
             >
               {isSending ? (
                 <>
-                  <div className="w-[14px] h-[14px] border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  <div className="w-[14px] h-[14px] border-2 border-white/40 border-t-white devs:border-[#04050e]/40 devs:border-t-[#04050e] rounded-full animate-spin" />
                   Sending...
                 </>
               ) : (
@@ -344,7 +362,7 @@ const ShareOverlay = ({ onClose, post, reel, story, onShared }) => {
             </button>
           </div>
         )}
-      </div>
+      </motion.div>
     </div>
   )
 }

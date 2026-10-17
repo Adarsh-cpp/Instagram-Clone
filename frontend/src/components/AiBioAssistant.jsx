@@ -4,13 +4,31 @@
 // the user still has to press Submit for anything to be persisted.
 
 import React, { useState, useRef, useEffect } from "react";
+import { motion } from "framer-motion";
 import { Sparkles, X, RotateCw } from "lucide-react";
 import { BIO_TONES, generateAiBio, getAiErrorMessage } from "../api/aiApi";
+import { useTheme } from "../context/ThemeContext";
 
 // tones that rewrite an existing bio rather than inventing a new one
 const NEEDS_EXISTING_BIO = ["improve", "shorter"];
 
+// Sparkle that gently pulses in Devs Mode (static in classic / on lite devices)
+const SparkIcon = ({ size }) => {
+  const { isDevs, lite } = useTheme();
+  if (!isDevs || lite) return <Sparkles size={size} />;
+  return (
+    <motion.span
+      className="flex"
+      animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.18, 1] }}
+      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+    >
+      <Sparkles size={size} />
+    </motion.span>
+  );
+};
+
 const AiBioAssistant = ({ currentBio, onBio }) => {
+  const { isDevs } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const [info, setInfo] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -99,10 +117,10 @@ const AiBioAssistant = ({ currentBio, onBio }) => {
           setError("");
           setIsOpen((prev) => !prev);
         }}
-        className={`flex items-center gap-1.5 h-[30px] px-3 rounded-full border border-[var(--border-input)] text-[13px] font-normal transition-colors ${
+        className={`flex items-center gap-1.5 h-[30px] px-3 rounded-full border border-[var(--border-input)] text-[13px] font-normal transition-colors devs:font-mono devs:uppercase devs:tracking-wider devs:text-[11px] devs:border-[var(--devs-cyan)] devs:shadow-[0_0_14px_rgba(34,240,255,0.25)] ${
           isGenerating
             ? "opacity-60 cursor-not-allowed text-[var(--text-muted)]"
-            : "cursor-pointer text-[var(--accent-blue)] hover:bg-[var(--bg-elevated)]"
+            : "cursor-pointer text-[var(--accent-blue)] hover:bg-[var(--bg-elevated)] devs:hover:bg-[rgba(34,240,255,0.1)]"
         }`}
       >
         {isGenerating ? (
@@ -114,19 +132,26 @@ const AiBioAssistant = ({ currentBio, onBio }) => {
           </>
         ) : (
           <>
-            <Sparkles size={14} />
+            <SparkIcon size={14} />
             <span>Generate Bio</span>
           </>
         )}
       </button>
 
       {isOpen && (
-        <div
+        <motion.div
+          {...(isDevs
+            ? {
+                initial: { opacity: 0, y: -8, scale: 0.96 },
+                animate: { opacity: 1, y: 0, scale: 1 },
+                transition: { duration: 0.18 },
+              }
+            : {})}
           ref={panelRef}
-          className="absolute right-0 top-[38px] z-30 w-[290px] sm:w-[320px] rounded-2xl bg-[var(--bg-menu)] border border-[var(--border-popup)] shadow-xl overflow-hidden"
+          className="absolute right-0 top-[38px] z-30 w-[290px] sm:w-[320px] rounded-2xl bg-[var(--bg-menu)] border border-[var(--border-popup)] shadow-xl overflow-hidden devs:backdrop-blur-xl devs:rounded-3xl devs:font-mono devs:shadow-[0_0_40px_rgba(34,240,255,0.18)]"
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-popup)]">
-            <span className="flex items-center gap-1.5 text-[14px] font-semibold text-[var(--text-primary)]">
+            <span className="flex items-center gap-1.5 text-[14px] font-semibold text-[var(--text-primary)] devs:text-[12px] devs:uppercase devs:tracking-[0.2em]">
               <Sparkles size={14} className="text-[var(--accent-blue)]" />
               AI Bio
             </span>
@@ -134,7 +159,7 @@ const AiBioAssistant = ({ currentBio, onBio }) => {
               type="button"
               onClick={() => setIsOpen(false)}
               aria-label="Close"
-              className="text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+              className="text-[var(--text-muted)] hover:text-[var(--text-primary)] devs:hover:text-[var(--devs-cyan)] cursor-pointer"
             >
               <X size={16} />
             </button>
@@ -147,7 +172,7 @@ const AiBioAssistant = ({ currentBio, onBio }) => {
               rows={3}
               maxLength={500}
               placeholder="A few things about you — work, interests, city, vibe..."
-              className="w-full resize-none rounded-xl bg-[var(--bg-input)] border border-[var(--border-input)] p-2.5 text-[13px] text-[var(--text-input)] placeholder-[var(--text-muted)] outline-none"
+              className="w-full resize-none rounded-xl bg-[var(--bg-input)] border border-[var(--border-input)] p-2.5 text-[13px] text-[var(--text-input)] placeholder-[var(--text-muted)] outline-none devs:transition-all devs:focus:border-[var(--devs-cyan)] devs:focus:shadow-[0_0_0_3px_rgba(34,240,255,0.15),0_0_18px_rgba(34,240,255,0.2)]"
             />
 
             {currentBio?.trim() ? (
@@ -165,7 +190,7 @@ const AiBioAssistant = ({ currentBio, onBio }) => {
                 type="button"
                 disabled={isGenerating}
                 onClick={() => handleGenerate(tone.id)}
-                className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] text-[var(--text-primary)] hover:bg-[var(--bg-row-hover)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full text-left px-3 py-2.5 rounded-lg text-[14px] text-[var(--text-primary)] hover:bg-[var(--bg-row-hover)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer devs:text-[13px] devs:hover:text-[var(--devs-cyan)]"
               >
                 {tone.label}
               </button>
@@ -175,7 +200,7 @@ const AiBioAssistant = ({ currentBio, onBio }) => {
           {error && (
             <div className="px-4 py-2.5 border-t border-[var(--border-popup)] flex items-start justify-between gap-2">
               <p className="text-[12px] text-[var(--color-error)] leading-snug">
-                {error}
+                {isDevs ? "! " : ""}{error}
               </p>
               <button
                 type="button"
@@ -187,7 +212,7 @@ const AiBioAssistant = ({ currentBio, onBio }) => {
               </button>
             </div>
           )}
-        </div>
+        </motion.div>
       )}
     </div>
   );

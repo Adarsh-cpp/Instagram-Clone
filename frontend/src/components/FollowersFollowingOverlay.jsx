@@ -1,8 +1,10 @@
 // FollowersFollowingOverlay.jsx
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { X } from "lucide-react"
+import { X, Search } from "lucide-react"
+import { motion } from "framer-motion"
 import axios from "axios"
 import FollowUserCard from './FollowUserCard'
+import { useTheme } from '../context/ThemeContext'
 
 const INITIAL_LIMIT = 10
 const LOAD_MORE_LIMIT = 5
@@ -15,6 +17,7 @@ const FollowersFollowingOverlay = ({
   mode = "followers", // "followers" | "following" — decides which single list to show
   userId, // the profile owner's user id whose followers/following we're fetching
 }) => {
+  const { isDevs } = useTheme()
   const [searchTerm, setSearchTerm] = useState("")
   const [items, setItems] = useState([])
   const [skip, setSkip] = useState(0)
@@ -114,24 +117,41 @@ const FollowersFollowingOverlay = ({
 
   return (
     <div
-      className="overlayBackdrop fixed inset-0 z-[99] bg-black/60 flex justify-center items-center"
+      className="overlayBackdrop fixed inset-0 z-[99] bg-black/60 devs:bg-[rgba(2,3,10,0.75)] devs:backdrop-blur-md flex justify-center items-center"
       onClick={onClose}
     >
-      <div
-        className="FollowersFollowingOverlay relative z-[100] w-[500px] h-[500px] rounded-[12px] overflow-hidden bg-[var(--bg-surface)] flex flex-col"
+      <motion.div
+        {...(isDevs
+          ? {
+              initial: { opacity: 0, scale: 0.92, y: 20 },
+              animate: { opacity: 1, scale: 1, y: 0 },
+              transition: { type: "spring", stiffness: 320, damping: 28 },
+            }
+          : {})}
+        className={`FollowersFollowingOverlay relative z-[100] w-[500px] h-[500px] rounded-[12px] overflow-hidden bg-[var(--bg-surface)] flex flex-col devs:max-w-[94vw] devs:rounded-3xl ${
+          isDevs ? "devs-glass devs-neon-border" : ""
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="heading w-full h-[10%] shrink-0 relative flex justify-center items-center text-[var(--text-primary)] font-semibold text-[16px] border-b border-[var(--border-container)]">
+        <div className="heading w-full h-[10%] shrink-0 relative flex justify-center items-center text-[var(--text-primary)] font-semibold text-[16px] border-b border-[var(--border-container)] devs:font-mono devs:uppercase devs:tracking-[0.25em] devs:text-[13px]">
           {heading}
+          {isDevs && (
+            <span className="ml-2 text-[var(--devs-cyan)] font-bold">
+              {items.length}
+            </span>
+          )}
           <button
             onClick={onClose}
-            className="absolute right-4 cursor-pointer text-[var(--text-primary)]"
+            className="absolute right-4 cursor-pointer text-[var(--text-primary)] devs:hover:text-[var(--devs-cyan)] devs:transition-colors"
           >
             <X size={22} />
           </button>
         </div>
 
-        <div className="searchDiv w-full h-[10%] shrink-0 flex justify-center items-center">
+        <div className="searchDiv relative w-full h-[10%] shrink-0 flex justify-center items-center">
+          {isDevs && (
+            <Search size={14} className="absolute left-6 text-[var(--text-muted)] pointer-events-none" />
+          )}
           <input
             type="text"
             name="search"
@@ -139,7 +159,7 @@ const FollowersFollowingOverlay = ({
             placeholder="Search"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-[95%] h-[70%] rounded-md focus:outline-none bg-[var(--bg-secondary-btn)] px-2 text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+            className="w-[95%] h-[70%] rounded-md focus:outline-none bg-[var(--bg-secondary-btn)] px-2 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] devs:pl-9 devs:rounded-xl devs:font-mono devs:text-[13px] devs:bg-[var(--bg-input)] devs:border devs:border-[var(--border-input)] devs:focus:border-[var(--devs-cyan)] devs:focus:shadow-[0_0_18px_rgba(34,240,255,0.2)] devs:transition-all"
           />
         </div>
 
@@ -149,11 +169,12 @@ const FollowersFollowingOverlay = ({
           className="listDiv w-full flex-1 overflow-y-auto"
         >
           {isInitialLoading ? (
-            <div className="w-full h-full flex justify-center items-center text-[var(--text-muted)] text-[14px]">
+            <div className="w-full h-full flex justify-center items-center text-[var(--text-muted)] text-[14px] devs:font-mono">
+              {isDevs && <span className="text-[var(--devs-cyan)] mr-2">&gt;</span>}
               Loading...
             </div>
           ) : filteredList.length === 0 ? (
-            <div className="w-full h-full flex justify-center items-center text-[var(--text-muted)] text-[14px]">
+            <div className="w-full h-full flex justify-center items-center text-[var(--text-muted)] text-[14px] devs:font-mono">
               No results found
             </div>
           ) : (
@@ -174,14 +195,15 @@ const FollowersFollowingOverlay = ({
                 />
               ))}
               {isLoading && (
-                <div className="w-full h-[50px] flex justify-center items-center text-[var(--text-muted)] text-[13px]">
+                <div className="w-full h-[50px] flex justify-center items-center text-[var(--text-muted)] text-[13px] devs:font-mono">
+                  {isDevs && <span className="text-[var(--devs-cyan)] mr-2">&gt;</span>}
                   Loading more...
                 </div>
               )}
             </>
           )}
         </div>
-      </div>
+      </motion.div>
     </div>
   )
 }

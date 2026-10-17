@@ -4,6 +4,19 @@ dns.setServers(["8.8.8.8", "8.8.4.4"]);
 console.log("DNS:", dns.getServers());
 
 import "dotenv/config";
+
+// import fs from "fs";
+// import path from "path";
+// import crypto from "crypto";
+
+// const envPath = path.resolve(process.cwd(), ".env");
+// console.log("cwd:", process.cwd());
+// console.log(".env exists:", fs.existsSync(envPath),
+//   "size:", fs.existsSync(envPath) ? fs.statSync(envPath).size : "n/a");
+// console.log("JWT_SECRET fingerprint:",
+//   crypto.createHash("sha256").update(String(process.env.JWT_SECRET)).digest("hex").slice(0, 8));
+
+
 // console.log("GEMINI_API_KEY loaded:", !!process.env.GEMINI_API_KEY);
 
 // console.log("Loaded ENV variables:", process.env);
@@ -92,4 +105,5 @@ app.get("/", (req, res) => {
 
 server.listen(port, "0.0.0.0", () => {
   console.log(`Server is running on port ${port}`);
+  console.log("JWT_SECRET loaded?", !!process.env.JWT_SECRET);
 });

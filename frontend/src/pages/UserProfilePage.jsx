@@ -1,5 +1,6 @@
 // UserProfilePage.jsx
 import React, { useEffect, useRef, useState } from 'react'
+import { animate, motion, useMotionValue, useTransform } from 'framer-motion'
 import HighlightCircle from '../components/HighlightCircle'
 import NewHighlightModal from '../components/NewHighlightModal'
 import PostType from '../components/PostType';
@@ -20,11 +21,59 @@ import axiosInstance from "../utils/axiosInstance"
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import FollowersFollowingOverlay from '../components/FollowersFollowingOverlay';
+import { useTheme } from '../context/ThemeContext';
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
+/* ---------- Devs Mode: number that counts up when it changes ---------- */
+const CountUp = ({ value }) => {
+  const mv = useMotionValue(0)
+  const rounded = useTransform(mv, (v) => Math.round(v))
+
+  useEffect(() => {
+    const controls = animate(mv, Number(value) || 0, { duration: 0.9, ease: 'easeOut' })
+    return () => controls.stop()
+  }, [value, mv])
+
+  return <motion.span>{rounded}</motion.span>
+}
+
+/* ---------- Empty state (classic markup identical to the original) ---------- */
+const EmptyState = ({ title, children }) => {
+  const { isDevs } = useTheme()
+
+  if (!isDevs) {
+    return (
+      <div className="w-full min-h-[44%] flex flex-col justify-center items-center gap-3">
+        <h2 className="text-[var(--text-primary)] text-2xl font-bold">{title}</h2>
+        <p className="text-[var(--text-muted)] text-sm">{children}</p>
+      </div>
+    )
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="w-full min-h-[44%] flex flex-col justify-center items-center gap-3 py-10"
+    >
+      <span className="devs-float devs-text-gradient font-mono text-[34px] font-bold">{'</>'}</span>
+      <h2
+        className="text-[var(--text-primary)] text-2xl font-bold"
+        style={{ fontFamily: 'var(--devs-font-display)' }}
+      >
+        {title}
+      </h2>
+      <p className="text-[var(--text-muted)] text-sm font-mono text-center px-6">{children}</p>
+    </motion.div>
+  )
+}
+
 
 const UserProfilePage = () => {
+
+  const { isDevs, lite } = useTheme()
 
   const [user, setUser] = useState([])
   const [posts, setPosts] = useState([])
@@ -296,6 +345,8 @@ const UserProfilePage = () => {
   // because of the "New" tile
   const showHighlightSection = isOwnProfile || highlights.length > 0
 
+  const tapProps = isDevs ? { whileTap: { scale: 0.95 }, whileHover: { y: -2 } } : {}
+
   return (
     <div className="UserProfilePage w-full h-[100dvh] flex justify-between items-center bg-[var(--bg-app)] overflow-x-hidden">
 
@@ -311,20 +362,28 @@ const UserProfilePage = () => {
 
         {/* Profile picture overlay */}
         {isDpOverlayOpen && (
-          <div
-            className="dpOverlay fixed inset-0 z-50 bg-black/80 flex justify-center items-center"
+          <motion.div
+            {...(isDevs ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.2 } } : {})}
+            className="dpOverlay fixed inset-0 z-50 bg-black/80 devs:bg-[rgba(2,3,10,0.85)] devs:backdrop-blur-md flex justify-center items-center"
             onClick={() => setIsDpOverlayOpen(false)}
           >
             <button
               onClick={() => setIsDpOverlayOpen(false)}
-              className="absolute top-6 right-6 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 flex justify-center items-center text-white cursor-pointer"
+              className="absolute top-6 right-6 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 flex justify-center items-center text-white cursor-pointer devs:border devs:border-[var(--border-popup)] devs:text-[var(--devs-cyan)] devs:hover:shadow-[0_0_16px_rgba(34,240,255,0.5)]"
               aria-label="Close"
             >
               <X size={22} />
             </button>
 
-            <div
-              className="dpOverlayContent w-[80vw] max-w-[500px] aspect-square rounded-full overflow-hidden"
+            <motion.div
+              {...(isDevs
+                ? {
+                    initial: { scale: 0.8, opacity: 0 },
+                    animate: { scale: 1, opacity: 1 },
+                    transition: { type: "spring", stiffness: 260, damping: 22 },
+                  }
+                : {})}
+              className="dpOverlayContent w-[80vw] max-w-[500px] aspect-square rounded-full overflow-hidden devs:ring-4 devs:ring-[rgba(34,240,255,0.6)] devs:shadow-[0_0_90px_rgba(139,92,246,0.55)]"
               onClick={(e) => e.stopPropagation()} // prevents click on image from closing overlay
             >
               <img
@@ -332,8 +391,8 @@ const UserProfilePage = () => {
                 alt=""
                 className="w-full h-full object-cover"
               />
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
 
         <div className="profileContainer w-full 2xl:w-[80%] h-full relative ">
@@ -341,29 +400,68 @@ const UserProfilePage = () => {
                 fixed % height, so a long/multi-line bio pushes the highlights row
                 down instead of overlapping it */}
             <div className="profileInfo w-full h-auto py-4 sm:py-6">
+
+                {/* Devs Mode: header strip */}
+                {isDevs && (
+                  <div className="px-1 sm:px-4 pb-1 flex items-center gap-2 font-mono text-[10px] tracking-[0.3em] uppercase text-[var(--text-muted)]">
+                    <span className="devs-pulse-glow w-2 h-2 rounded-full bg-[var(--devs-lime)]" />
+                    profile.sys
+                    {user.username && <span className="text-[var(--devs-cyan)] truncate">@{user.username}</span>}
+                  </div>
+                )}
+
                 <div className="personalInfoSection w-full flex flex-row items-center gap-3 sm:gap-6 py-4 sm:py-0">
                     <div className="profilePicSection shrink-0 w-auto sm:w-[30%] md:w-[25%] lg:w-[20%] h-auto flex justify-center items-center ">
-                        <div
-                          onClick={() => setIsDpOverlayOpen(true)}
-                          className="profilePic w-[90px] h-[90px] sm:w-[150px] sm:h-[150px] md:w-[150px] md:h-[150px] lg:w-[180px] lg:h-[180px] rounded-full overflow-hidden object-cover cursor-pointer shrink-0 "
-                        >
-                            <img
-                                src={
-                                  user?.profilePic
-                                    ? user.profilePic
-                                    : "/images/default-profile-pic.jpg"
-                                }
+                        {isDevs ? (
+                          <motion.div
+                            whileHover={{ scale: 1.04 }}
+                            whileTap={{ scale: 0.97 }}
+                            onClick={() => setIsDpOverlayOpen(true)}
+                            className="profilePic relative w-[90px] h-[90px] sm:w-[150px] sm:h-[150px] md:w-[150px] md:h-[150px] lg:w-[180px] lg:h-[180px] cursor-pointer shrink-0"
+                          >
+                            <span
+                              className="absolute -inset-[3px] rounded-full"
+                              style={{
+                                background:
+                                  "conic-gradient(from var(--devs-angle), #22f0ff, #8b5cf6, #ff2bd6, #22f0ff)",
+                                animation: lite ? "none" : "devs-spin 5s linear infinite",
+                                boxShadow: "0 0 34px rgba(139,92,246,0.5)",
+                              }}
+                            />
+                            <div className="relative w-full h-full rounded-full overflow-hidden border-[3px] border-[#04050e] bg-black">
+                              <img
+                                src={user?.profilePic ? user.profilePic : "/images/default-profile-pic.jpg"}
                                 alt=""
                                 className="w-full h-full object-cover"
                               />
-                        </div>
+                            </div>
+                          </motion.div>
+                        ) : (
+                          <div
+                            onClick={() => setIsDpOverlayOpen(true)}
+                            className="profilePic w-[90px] h-[90px] sm:w-[150px] sm:h-[150px] md:w-[150px] md:h-[150px] lg:w-[180px] lg:h-[180px] rounded-full overflow-hidden object-cover cursor-pointer shrink-0 "
+                          >
+                              <img
+                                  src={
+                                    user?.profilePic
+                                      ? user.profilePic
+                                      : "/images/default-profile-pic.jpg"
+                                  }
+                                  alt=""
+                                  className="w-full h-full object-cover"
+                                />
+                          </div>
+                        )}
                     </div>
                     <div className="profileDetails flex-1 min-w-0 h-auto flex flex-col justify-center gap-2 sm:gap-3 ">
                         <div className="nameSection w-full h-auto flex flex-col md:flex-row justify-start items-start md:items-center gap-2 md:gap-0 ">
                            <div className="name w-full md:w-[70%] h-auto md:h-full px-1 sm:px-6 flex items-center gap-1 text-[var(--text-primary)] text-[16px] sm:text-[20px] font-bold truncate ">
-                             {user.username}
+                             <span className={isDevs ? "devs-text-gradient truncate" : ""}>{user.username}</span>
                              {user?.role === "admin" && (
-                               <BadgeCheck size={20} className="text-sky-400 shrink-0" />
+                               <BadgeCheck
+                                 size={20}
+                                 className="text-sky-400 devs:text-[var(--devs-cyan)] devs:drop-shadow-[0_0_6px_rgba(34,240,255,0.9)] shrink-0"
+                               />
                              )}
                            </div>
 
@@ -375,7 +473,7 @@ const UserProfilePage = () => {
                                 }`}
                               >
                             <Link to="/user/edit-profile" className="w-full">
-                              <button className='w-full sm:max-w-[160px] mx-auto block h-[36px] sm:h-[40px] bg-[var(--bg-elevated)] hover:bg-[var(--bg-menu-hover)] cursor-pointer text-[var(--text-primary)] text-[13px] sm:text-[16px] font-bold rounded-xl truncate px-2'>Edit Profile</button>
+                              <motion.button {...tapProps} className='w-full sm:max-w-[160px] mx-auto block h-[36px] sm:h-[40px] bg-[var(--bg-elevated)] hover:bg-[var(--bg-menu-hover)] cursor-pointer text-[var(--text-primary)] text-[13px] sm:text-[16px] font-bold rounded-xl truncate px-2 devs:border devs:border-[var(--border-popup)] devs:font-mono devs:tracking-wider devs:hover:shadow-[0_0_18px_rgba(34,240,255,0.3)]'>Edit Profile</motion.button>
                             </Link>
                            </div>
 
@@ -384,23 +482,24 @@ const UserProfilePage = () => {
                               <>
                                 {/* Follow Button */}
                                 <div className="followbtn flex-1 min-w-0 flex justify-center items-center">
-                                   <button
+                                   <motion.button
+                                    {...tapProps}
                                     onClick={handleFollowToggle}
-                                    className={`w-full sm:max-w-[160px] h-[36px] sm:h-[40px] cursor-pointer text-[var(--text-on-brand)] text-[13px] sm:text-[16px] font-bold rounded-xl truncate px-2 ${
+                                    className={`w-full sm:max-w-[160px] h-[36px] sm:h-[40px] cursor-pointer text-[var(--text-on-brand)] text-[13px] sm:text-[16px] font-bold rounded-xl truncate px-2 devs:font-mono devs:tracking-wider ${
                                     isFollowing
-                                        ? "bg-[var(--bg-secondary-btn)] hover:bg-[var(--bg-secondary-btn-hover)]"
-                                        : "bg-[var(--accent-indigo)] hover:bg-[var(--accent-indigo-hover)]"
+                                        ? "bg-[var(--bg-secondary-btn)] hover:bg-[var(--bg-secondary-btn-hover)] devs:text-[var(--text-primary)] devs:border devs:border-[var(--border-popup)]"
+                                        : "bg-[var(--accent-indigo)] hover:bg-[var(--accent-indigo-hover)] devs:shadow-[0_0_20px_rgba(139,92,246,0.55)]"
                                     }`}
                                 >
                                     {isFollowing ? "Unfollow" : "Follow"}
-                                </button>
+                                </motion.button>
                                 </div>
 
                                 {/* Message Button */}
                                 <div className="msgbtn flex-1 min-w-0 flex justify-center items-center">
-                                  <button onClick={handleMessage} className="w-full sm:max-w-[160px] h-[36px] sm:h-[40px] bg-[var(--bg-elevated)] hover:bg-[var(--bg-menu-hover)] cursor-pointer text-[var(--text-primary)] text-[13px] sm:text-[16px] font-bold rounded-xl truncate px-2">
+                                  <motion.button {...tapProps} onClick={handleMessage} className="w-full sm:max-w-[160px] h-[36px] sm:h-[40px] bg-[var(--bg-elevated)] hover:bg-[var(--bg-menu-hover)] cursor-pointer text-[var(--text-primary)] text-[13px] sm:text-[16px] font-bold rounded-xl truncate px-2 devs:border devs:border-[var(--border-popup)] devs:font-mono devs:tracking-wider devs:hover:shadow-[0_0_18px_rgba(34,240,255,0.3)]">
                                     Message
-                                  </button>
+                                  </motion.button>
                                 </div>
                               </>
                             )}
@@ -409,10 +508,10 @@ const UserProfilePage = () => {
 
                            
                         </div>
-                        <div className="postCount w-full md:w-[80%] h-auto flex justify-start md:justify-center items-center gap-1 sm:gap-0 ">
-                            <div className="posts flex-1 h-auto px-1 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[13px] whitespace-nowrap "><span className='text-[var(--text-primary)]'>{user.postsCount}</span>&nbsp;posts</div>
-                            <div onClick={() => openFollowOverlay("followers")} className="fllwers flex-1 h-auto px-1 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[13px] whitespace-nowrap cursor-pointer "><span className='text-[var(--text-primary)]'>{followers}</span>&nbsp;followers</div>
-                            <div onClick={() => openFollowOverlay("following")} className="fllwing flex-1 h-auto px-1 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[13px] whitespace-nowrap cursor-pointer "><span className='text-[var(--text-primary)]'>{user.following?.length}</span>&nbsp;following</div>
+                        <div className="postCount w-full md:w-[80%] h-auto flex justify-start md:justify-center items-center gap-1 sm:gap-0 devs:font-mono">
+                            <div className="posts flex-1 h-auto px-1 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[13px] whitespace-nowrap "><span className='text-[var(--text-primary)] devs:font-bold'>{isDevs ? <CountUp value={user.postsCount} /> : user.postsCount}</span>&nbsp;posts</div>
+                            <div onClick={() => openFollowOverlay("followers")} className="fllwers flex-1 h-auto px-1 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[13px] whitespace-nowrap cursor-pointer devs:hover:text-[var(--devs-cyan)] transition-colors "><span className='text-[var(--text-primary)] devs:font-bold'>{isDevs ? <CountUp value={followers} /> : followers}</span>&nbsp;followers</div>
+                            <div onClick={() => openFollowOverlay("following")} className="fllwing flex-1 h-auto px-1 sm:px-6 flex justify-start items-center text-[var(--text-muted)] sm:text-[20px] text-[13px] whitespace-nowrap cursor-pointer devs:hover:text-[var(--devs-cyan)] transition-colors "><span className='text-[var(--text-primary)] devs:font-bold'>{isDevs ? <CountUp value={user.following?.length} /> : user.following?.length}</span>&nbsp;following</div>
                         </div>
                         <BioCard bioText={user.bio || ""} />
                     </div>
@@ -428,19 +527,20 @@ const UserProfilePage = () => {
                           {isOwnProfile && (
                             <div
                               onClick={() => setShowNewHighlightModal(true)}
-                              className="newHighlightsection h-full w-[100px] flex flex-col justify-center sm:justify-start items-center cursor-pointer shrink-0"
+                              className="newHighlightsection group h-full w-[100px] flex flex-col justify-center sm:justify-start items-center cursor-pointer shrink-0"
                             >
-                               <div className="newHighLightCircle w-[70px] h-[70px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-full object-fit object-center border-[4px] border-[var(--border-container)] overflow-hidden flex justify-center items-center bg-[var(--bg-input)]">
-                                 <Plus size={32} className="text-[var(--text-primary)] select-none sm:w-10 sm:h-10" />
+                               <div className="newHighLightCircle w-[70px] h-[70px] sm:w-[100px] sm:h-[100px] shrink-0 rounded-full object-fit object-center border-[4px] border-[var(--border-container)] overflow-hidden flex justify-center items-center bg-[var(--bg-input)] devs:border-2 devs:border-dashed devs:border-[var(--devs-cyan)] devs:transition-all devs:duration-300 devs:group-hover:shadow-[0_0_24px_rgba(34,240,255,0.45)] devs:group-hover:rotate-90">
+                                 <Plus size={32} className="text-[var(--text-primary)] devs:text-[var(--devs-cyan)] select-none sm:w-10 sm:h-10" />
                               </div>
-                              <div className="newtext text-[var(--text-primary)] text-[12px]">New</div>
+                              <div className="newtext text-[var(--text-primary)] text-[12px] devs:font-mono devs:mt-1.5">New</div>
                              </div>
                           )}
-                          {highlights.map((h) => (
+                          {highlights.map((h, i) => (
                             <HighlightCircle
                               key={h._id}
                               title={h.title}
                               coverImage={h.coverImage}
+                              index={i + 1}
                               onClick={() => navigate(`/highlight/view/${h._id}`)}
                             />
                           ))}
@@ -463,7 +563,7 @@ const UserProfilePage = () => {
           {activeTab === "Posts" && (
             <>
               {posts.length > 0 ? (
-                <div className="postSection w-full min-h-[44%] grid grid-cols-3">
+                <div className="postSection w-full min-h-[44%] grid grid-cols-3 devs:gap-1.5 devs:p-1.5">
                   {posts.map((post) => (
                     <PostCard
                       key={post._id}
@@ -477,13 +577,9 @@ const UserProfilePage = () => {
                   ))}
                 </div>
               ) : (
-                <div className="w-full min-h-[44%] flex flex-col justify-center items-center gap-3">
-                 
-                  <h2 className="text-[var(--text-primary)] text-2xl font-bold">No Posts Yet</h2>
-                  <p className="text-[var(--text-muted)] text-sm">
-                    When posts are shared, they'll appear here.
-                  </p>
-                </div>
+                <EmptyState title="No Posts Yet">
+                  When posts are shared, they'll appear here.
+                </EmptyState>
               )}
             </>
           )}
@@ -491,7 +587,7 @@ const UserProfilePage = () => {
         {activeTab === "Reels" && (
             <>
               {reels.length > 0 ? (
-                <div className="reelSection w-full min-h-[44%] grid grid-cols-4">
+                <div className="reelSection w-full min-h-[44%] grid grid-cols-4 devs:gap-1.5 devs:p-1.5">
                   {reels.map((reel) => (
                     <ReelCard
                       key={reel._id}
@@ -505,13 +601,9 @@ const UserProfilePage = () => {
                   ))}
                 </div>
               ) : (
-                <div className="w-full min-h-[44%] flex flex-col justify-center items-center gap-3">
-                 
-                  <h2 className="text-[var(--text-primary)] text-2xl font-bold">No Reels Yet</h2>
-                  <p className="text-[var(--text-muted)] text-sm">
-                    When reels are posted, they'll appear here.
-                  </p>
-                </div>
+                <EmptyState title="No Reels Yet">
+                  When reels are posted, they'll appear here.
+                </EmptyState>
               )}
             </>
           )}
@@ -519,18 +611,15 @@ const UserProfilePage = () => {
         {activeTab === "Tagged" && (
           <>
             {taggedItems.length > 0 ? (
-              <div className="tagSection w-full min-h-[44%] grid grid-cols-3">
+              <div className="tagSection w-full min-h-[44%] grid grid-cols-3 devs:gap-1.5 devs:p-1.5">
                 {taggedItems.map((item) => (
                   <TagCard key={`${item.type}-${item._id}`} item={item} />
                 ))}
               </div>
             ) : (
-              <div className="w-full min-h-[44%] flex flex-col justify-center items-center gap-3">
-                <h2 className="text-[var(--text-primary)] text-2xl font-bold">No Tagged Posts</h2>
-                <p className="text-[var(--text-muted)] text-sm">
-                  When people tag {isOwnProfile ? "you" : "them"} in photos and videos, they'll appear here.
-                </p>
-              </div>
+              <EmptyState title="No Tagged Posts">
+                When people tag {isOwnProfile ? "you" : "them"} in photos and videos, they'll appear here.
+              </EmptyState>
             )}
           </>
         )}
@@ -538,12 +627,12 @@ const UserProfilePage = () => {
         {activeTab === "Saved" && isOwnProfile && (
           <>
             <div className="savedSectionHeader w-full h-[50px] flex justify-between items-center p-4">
-              <div className="msg text-[12px] text-[var(--text-muted)]">Only you can see what you've saved</div>
+              <div className="msg text-[12px] text-[var(--text-muted)] devs:font-mono devs:tracking-wide">Only you can see what you've saved</div>
               {/* <button className="newCollection text-[14px] text-[var(--link-muted)] hover:text-[var(--link-muted-hover)] cursor-pointer ">+ New collection</button> */}
             </div>
 
             {savedItems.length > 0 ? (
-              <div className="SavedSection w-full min-h-[44%] grid grid-cols-5">
+              <div className="SavedSection w-full min-h-[44%] grid grid-cols-5 devs:gap-1.5 devs:p-1.5">
                 {savedItems.map((item) => (
                   <SavedCard
                     key={`${item.type}-${item._id}`}
@@ -555,12 +644,9 @@ const UserProfilePage = () => {
                 ))}
               </div>
             ) : (
-              <div className="w-full min-h-[44%] flex flex-col justify-center items-center gap-3">
-                <h2 className="text-[var(--text-primary)] text-2xl font-bold">No Saved Posts Yet</h2>
-                <p className="text-[var(--text-muted)] text-sm">
-                  When posts are saved, they'll appear here.
-                </p>
-              </div>
+              <EmptyState title="No Saved Posts Yet">
+                When posts are saved, they'll appear here.
+              </EmptyState>
             )}
           </>
         )}

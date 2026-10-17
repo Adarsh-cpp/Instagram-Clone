@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ArrowLeft, Play } from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
 
 const MAX_DURATION = 15; // hard cap on clip length, seconds — matches the app's reel limit
 const MIN_DURATION = 1; // shortest allowed clip, seconds
@@ -102,6 +103,8 @@ const useFilmstrip = (file, duration) => {
 };
 
 const TrimVideoPage = ({ video, setTrimData, setAspectRatio, next, back }) => {
+  const { isDevs } = useTheme();
+
   const videoRef = useRef(null);
   const trackRef = useRef(null);
   const dragOffsetRef = useRef(0);
@@ -263,25 +266,29 @@ const TrimVideoPage = ({ video, setTrimData, setAspectRatio, next, back }) => {
   return (
     <div className="w-[100vw] h-[100vh] flex justify-center items-center bg-[var(--bg-app)]">
       <div className="cropContainerOverlay w-full h-full flex justify-center items-center bg-[rgba(0,0,0,0)] px-2 sm:px-4">
-        <div className="cropContainer relative w-full max-w-[500px] md:w-[70%] lg:w-[50%] xl:w-[35%] h-[80%] rounded-2xl bg-[var(--bg-surface)] overflow-hidden flex flex-col">
-          <div className="header w-full h-[40px] px-3 sm:px-4 flex justify-between items-center bg-[var(--bg-app)] shrink-0">
-            <div onClick={back} className="back cursor-pointer">
+        <div
+          className={`cropContainer relative w-full max-w-[500px] md:w-[70%] lg:w-[50%] xl:w-[35%] h-[80%] rounded-2xl overflow-hidden flex flex-col ${
+            isDevs ? "devs-glass devs-neon-border !rounded-3xl" : "bg-[var(--bg-surface)]"
+          }`}
+        >
+          <div className="header w-full h-[40px] px-3 sm:px-4 flex justify-between items-center bg-[var(--bg-app)] shrink-0 devs:bg-transparent">
+            <div onClick={back} className="back cursor-pointer devs:hover:drop-shadow-[0_0_8px_rgba(34,240,255,0.8)] devs:transition-all">
               <ArrowLeft className="w-[26px] h-[26px] sm:w-[30px] sm:h-[30px] text-[var(--text-primary)]" />
             </div>
-            <div className="heading text-[var(--text-primary)] text-[16px] sm:text-[18px] font-semibold">
+            <div className="heading text-[var(--text-primary)] text-[16px] sm:text-[18px] font-semibold devs:font-mono devs:uppercase devs:tracking-[0.2em] devs:text-[12px] devs:sm:text-[12px]">
               Trim
             </div>
             <div
               onClick={handleNext}
-              className="next text-sm sm:text-base text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] hover:underline cursor-pointer"
+              className="next text-sm sm:text-base text-[var(--accent-blue)] hover:text-[var(--accent-blue-hover)] hover:underline cursor-pointer devs:no-underline devs:font-mono devs:uppercase devs:tracking-wider devs:text-[11px] devs:sm:text-[11px] devs:font-bold devs:px-3 devs:py-1 devs:rounded-full devs:bg-[linear-gradient(120deg,#22f0ff,#8b5cf6)] devs:text-[#04050e] devs:hover:text-[#04050e] devs:shadow-[0_0_14px_rgba(34,240,255,0.45)]"
             >
               Next
             </div>
           </div>
 
-          <hr />
+          <hr className="devs:border-[var(--border-soft)]" />
 
-          <div className="relative w-full flex-1 min-h-0 bg-[var(--bg-elevated)] flex items-center justify-center overflow-hidden">
+          <div className="relative w-full flex-1 min-h-0 bg-[var(--bg-elevated)] flex items-center justify-center overflow-hidden devs:bg-[#04050e]">
             {videoUrl && (
               <div className="relative w-full h-full flex items-center justify-center">
                 <video
@@ -296,7 +303,7 @@ const TrimVideoPage = ({ video, setTrimData, setAspectRatio, next, back }) => {
                 />
 
                 <div
-                  className="pointer-events-none absolute border-2 border-white/80"
+                  className="pointer-events-none absolute border-2 border-white/80 devs:border-[var(--devs-cyan)] devs:shadow-[0_0_20px_rgba(34,240,255,0.5)]"
                   style={{
                     aspectRatio: `${selectedAspect.ratio}`,
                     height: "90%",
@@ -309,7 +316,7 @@ const TrimVideoPage = ({ video, setTrimData, setAspectRatio, next, back }) => {
                     onClick={togglePreview}
                     className="absolute inset-0 flex items-center justify-center"
                   >
-                    <div className="w-14 h-14 rounded-full bg-black/50 flex items-center justify-center">
+                    <div className="w-14 h-14 rounded-full bg-black/50 flex items-center justify-center devs:backdrop-blur-md devs:border devs:border-[var(--devs-cyan)] devs:shadow-[0_0_24px_rgba(34,240,255,0.5)]">
                       <Play size={22} fill="white" className="ml-0" />
                     </div>
                   </button>
@@ -323,10 +330,10 @@ const TrimVideoPage = ({ video, setTrimData, setAspectRatio, next, back }) => {
               <button
                 key={opt.value}
                 onClick={() => setSelectedAspect(opt)}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium ${
+                className={`px-4 py-1.5 rounded-full text-sm font-medium devs:font-mono devs:uppercase devs:tracking-wider devs:text-[11px] devs:transition-all ${
                   selectedAspect.value === opt.value
-                    ? "bg-[var(--accent-indigo)] text-[var(--text-on-brand)]"
-                    : "bg-[var(--bg-menu)] text-[var(--text-secondary)]"
+                    ? "bg-[var(--accent-indigo)] text-[var(--text-on-brand)] devs:bg-[linear-gradient(120deg,#22f0ff,#8b5cf6)] devs:text-[#04050e] devs:font-bold devs:shadow-[0_0_16px_rgba(34,240,255,0.45)]"
+                    : "bg-[var(--bg-menu)] text-[var(--text-secondary)] devs:border devs:border-[var(--border-soft)]"
                 }`}
               >
                 {opt.label}
@@ -337,9 +344,9 @@ const TrimVideoPage = ({ video, setTrimData, setAspectRatio, next, back }) => {
           {/* --- Trim scrubber: drag the highlighted window to move it, use
               the slider below to change how long the clip is. --- */}
           <div className="w-full px-4 py-3 bg-[var(--bg-panel)] shrink-0">
-            <div className="flex justify-between text-xs text-[var(--text-secondary)] mb-2">
+            <div className="flex justify-between text-xs text-[var(--text-secondary)] mb-2 devs:font-mono devs:text-[11px]">
               <span>Start: {start.toFixed(1)}s</span>
-              <span className="text-[var(--text-primary)] font-medium">
+              <span className="text-[var(--text-primary)] font-medium devs:text-[var(--devs-cyan)]">
                 {clipSeconds.toFixed(1)}s clip
               </span>
               <span>End: {end.toFixed(1)}s</span>
@@ -348,7 +355,7 @@ const TrimVideoPage = ({ video, setTrimData, setAspectRatio, next, back }) => {
             <div
               ref={trackRef}
               onPointerDown={handleTrackPointerDown}
-              className="relative w-full h-16 rounded-xl overflow-hidden bg-[var(--bg-elevated)] ring-1 ring-white/10 select-none touch-none cursor-pointer"
+              className="relative w-full h-16 rounded-xl overflow-hidden bg-[var(--bg-elevated)] ring-1 ring-white/10 select-none touch-none cursor-pointer devs:ring-[var(--border-popup)]"
             >
               {/* Filmstrip background */}
               {thumbnails.length > 0 ? (
@@ -364,7 +371,7 @@ const TrimVideoPage = ({ video, setTrimData, setAspectRatio, next, back }) => {
                   ))}
                 </div>
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-[10px] text-[var(--text-muted)]">
+                <div className="absolute inset-0 flex items-center justify-center text-[10px] text-[var(--text-muted)] devs:font-mono">
                   {thumbsLoading ? "Loading preview…" : ""}
                 </div>
               )}
@@ -386,36 +393,44 @@ const TrimVideoPage = ({ video, setTrimData, setAspectRatio, next, back }) => {
                 onPointerMove={handleWindowPointerMove}
                 onPointerUp={handleWindowPointerUp}
                 onPointerCancel={handleWindowPointerUp}
-                className="absolute inset-y-0 rounded-lg ring-2 ring-[var(--accent-indigo)] cursor-grab active:cursor-grabbing touch-none"
+                className="absolute inset-y-0 rounded-lg ring-2 ring-[var(--accent-indigo)] cursor-grab active:cursor-grabbing touch-none devs:ring-[var(--devs-cyan)]"
                 style={{
                   left: `${windowLeftPct}%`,
                   width: `${windowWidthPct}%`,
-                  boxShadow: "0 0 0 9999px rgba(0,0,0,0)",
+                  boxShadow: isDevs
+                    ? "0 0 18px rgba(34,240,255,0.5)"
+                    : "0 0 0 9999px rgba(0,0,0,0)",
                 }}
               >
                 {/* grip bars, purely visual */}
-                <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-6 rounded-full bg-white/90" />
-                <div className="absolute right-1 top-1/2 -translate-y-1/2 w-1 h-6 rounded-full bg-white/90" />
+                <div
+                  className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-6 rounded-full bg-white/90"
+                  style={isDevs ? { background: "linear-gradient(180deg,#22f0ff,#8b5cf6)", boxShadow: "0 0 8px rgba(34,240,255,0.8)" } : undefined}
+                />
+                <div
+                  className="absolute right-1 top-1/2 -translate-y-1/2 w-1 h-6 rounded-full bg-white/90"
+                  style={isDevs ? { background: "linear-gradient(180deg,#ff2bd6,#8b5cf6)", boxShadow: "0 0 8px rgba(255,43,214,0.8)" } : undefined}
+                />
               </div>
 
               {/* Playhead */}
               {duration > 0 && (
                 <div
-                  className="absolute inset-y-0 w-[2px] bg-white pointer-events-none"
+                  className="absolute inset-y-0 w-[2px] bg-white pointer-events-none devs:shadow-[0_0_10px_rgba(255,255,255,0.9)]"
                   style={{ left: `${playheadPct}%` }}
                 />
               )}
             </div>
 
-            <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1">
+            <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1 devs:font-mono">
               <span>0:00</span>
               <span>{formatTime(duration)}</span>
             </div>
 
             <div className="mt-3">
-              <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] mb-1">
+              <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] mb-1 devs:font-mono devs:uppercase devs:tracking-widest devs:text-[10px]">
                 <span>Clip length</span>
-                <span className="text-[var(--text-primary)] font-medium">
+                <span className="text-[var(--text-primary)] font-medium devs:text-[var(--devs-cyan)]">
                   {clipSeconds.toFixed(1)}s
                 </span>
               </div>
@@ -426,12 +441,12 @@ const TrimVideoPage = ({ video, setTrimData, setAspectRatio, next, back }) => {
                 step={0.1}
                 value={clipSeconds}
                 onChange={(e) => handleClipSecondsChange(Number(e.target.value))}
-                className="w-full accent-[var(--accent-indigo)]"
+                className="w-full accent-[var(--accent-indigo)] devs:accent-[var(--devs-cyan)]"
                 aria-label="Clip length in seconds"
               />
             </div>
 
-            <div className="text-[10px] text-[var(--text-muted)] mt-2 text-center">
+            <div className="text-[10px] text-[var(--text-muted)] mt-2 text-center devs:font-mono">
               Drag the highlighted window to choose your {clipSeconds.toFixed(1)}s clip
             </div>
           </div>

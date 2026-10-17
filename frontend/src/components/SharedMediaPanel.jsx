@@ -1,8 +1,10 @@
 // components/SharedMediaPanel.jsx
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { motion } from "framer-motion";
 import axios from "axios";
 import { X, Download, ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
@@ -21,6 +23,8 @@ const toThumbUrl = (url) => {
 };
 
 export default function SharedMediaPanel({ conversationId }) {
+  const { isDevs } = useTheme();
+
   const [media, setMedia] = useState([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -182,6 +186,11 @@ export default function SharedMediaPanel({ conversationId }) {
 
   const activeImage = viewerIndex !== null ? media[viewerIndex] : null;
 
+  // Devs Mode: neon-glass round buttons for the full-screen viewer
+  const viewerBtn = isDevs
+    ? "devs-glass !rounded-full flex h-10 w-10 items-center justify-center text-[var(--devs-cyan)] hover:shadow-[0_0_18px_rgba(34,240,255,0.5)]"
+    : "";
+
   return (
     <>
       <div
@@ -195,15 +204,26 @@ export default function SharedMediaPanel({ conversationId }) {
             {Array.from({ length: 9 }).map((_, i) => (
               <div
                 key={i}
-                className="aspect-square animate-pulse rounded-lg"
-                style={{ background: "var(--bg-elevated)" }}
+                className={`aspect-square rounded-lg ${
+                  isDevs ? "devs-shimmer !rounded-xl" : "animate-pulse"
+                }`}
+                style={isDevs ? undefined : { background: "var(--bg-elevated)" }}
               />
             ))}
           </div>
         ) : media.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-            <ImageOff size={28} style={{ color: "var(--text-muted)" }} />
-            <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+            {isDevs ? (
+              <span className="devs-float devs-text-gradient font-mono text-[30px] font-bold">
+                {"</>"}
+              </span>
+            ) : (
+              <ImageOff size={28} style={{ color: "var(--text-muted)" }} />
+            )}
+            <span
+              className={`text-sm ${isDevs ? "font-mono" : ""}`}
+              style={{ color: "var(--text-muted)" }}
+            >
               {hasError ? "Couldn't load shared media" : "No photos shared yet"}
             </span>
           </div>
@@ -215,7 +235,11 @@ export default function SharedMediaPanel({ conversationId }) {
                   key={item.id}
                   type="button"
                   onClick={() => setViewerIndex(index)}
-                  className="group relative aspect-square overflow-hidden rounded-lg"
+                  className={`group relative aspect-square overflow-hidden rounded-lg ${
+                    isDevs
+                      ? "!rounded-xl border border-[var(--border-soft)] transition-all duration-300 hover:border-[var(--devs-cyan)] hover:shadow-[0_0_20px_rgba(34,240,255,0.3)]"
+                      : ""
+                  }`}
                   style={{ background: "var(--bg-elevated)" }}
                 >
                   <img
@@ -233,7 +257,11 @@ export default function SharedMediaPanel({ conversationId }) {
             <div ref={sentinelRef} className="h-px w-full" />
 
             {isLoadingMore && (
-              <div className="py-4 text-center text-xs" style={{ color: "var(--text-muted)" }}>
+              <div
+                className={`py-4 text-center text-xs ${isDevs ? "font-mono" : ""}`}
+                style={{ color: "var(--text-muted)" }}
+              >
+                {isDevs && <span className="mr-2 text-[var(--devs-cyan)]">&gt;</span>}
                 Loading more...
               </div>
             )}
@@ -247,7 +275,7 @@ export default function SharedMediaPanel({ conversationId }) {
                     setHasError(false);
                     loadMore();
                   }}
-                  className="text-xs underline"
+                  className={`text-xs underline ${isDevs ? "font-mono" : ""}`}
                   style={{ color: "var(--text-muted)" }}
                 >
                   Retry
@@ -262,26 +290,28 @@ export default function SharedMediaPanel({ conversationId }) {
         createPortal(
           <div
             onClick={closeViewer}
-            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-4 sm:p-8"
+            className={`fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-8 ${
+              isDevs ? "bg-[rgba(2,3,10,0.92)] backdrop-blur-md" : "bg-black/90"
+            }`}
           >
             <button
               onClick={closeViewer}
               aria-label="Close"
-              className="absolute right-4 top-4 z-[121] cursor-pointer text-white transition hover:opacity-70 sm:right-6 sm:top-6"
+              className={`absolute right-4 top-4 z-[121] cursor-pointer text-white transition hover:opacity-70 sm:right-6 sm:top-6 ${viewerBtn}`}
             >
-              <X size={32} />
+              <X size={isDevs ? 22 : 32} />
             </button>
 
             <button
               onClick={handleDownload}
               disabled={isDownloading}
               aria-label="Download image"
-              className="absolute right-16 top-4 z-[121] cursor-pointer text-white transition hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-40 sm:right-20 sm:top-6"
+              className={`absolute right-16 top-4 z-[121] cursor-pointer text-white transition hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-40 sm:right-20 sm:top-6 ${viewerBtn}`}
             >
               {isDownloading ? (
                 <div className="h-[28px] w-[28px] animate-spin rounded-full border-2 border-white/40 border-t-white" />
               ) : (
-                <Download size={28} />
+                <Download size={isDevs ? 20 : 28} />
               )}
             </button>
 
@@ -293,9 +323,9 @@ export default function SharedMediaPanel({ conversationId }) {
                     showPrev();
                   }}
                   aria-label="Previous image"
-                  className="absolute left-2 top-1/2 z-[121] -translate-y-1/2 cursor-pointer text-white transition hover:opacity-70 sm:left-6"
+                  className={`absolute left-2 top-1/2 z-[121] -translate-y-1/2 cursor-pointer text-white transition hover:opacity-70 sm:left-6 ${viewerBtn}`}
                 >
-                  <ChevronLeft size={36} />
+                  <ChevronLeft size={isDevs ? 22 : 36} />
                 </button>
 
                 <button
@@ -304,12 +334,18 @@ export default function SharedMediaPanel({ conversationId }) {
                     showNext();
                   }}
                   aria-label="Next image"
-                  className="absolute right-2 top-1/2 z-[121] -translate-y-1/2 cursor-pointer text-white transition hover:opacity-70 sm:right-6"
+                  className={`absolute right-2 top-1/2 z-[121] -translate-y-1/2 cursor-pointer text-white transition hover:opacity-70 sm:right-6 ${viewerBtn}`}
                 >
-                  <ChevronRight size={36} />
+                  <ChevronRight size={isDevs ? 22 : 36} />
                 </button>
 
-                <div className="absolute bottom-6 left-1/2 z-[121] -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-sm text-white">
+                <div
+                  className={`absolute bottom-6 left-1/2 z-[121] -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-sm text-white ${
+                    isDevs
+                      ? "devs-glass !bg-[var(--glass-panel-bg)] font-mono text-[11px] tracking-widest"
+                      : ""
+                  }`}
+                >
                   {viewerIndex + 1} / {media.length}
                   {hasMoreRef.current ? "+" : ""}
                 </div>
@@ -317,11 +353,21 @@ export default function SharedMediaPanel({ conversationId }) {
             )}
 
             {/* full-size original here, not the thumbnail transform */}
-            <img
+            <motion.img
+              key={activeImage.id}
+              {...(isDevs
+                ? {
+                    initial: { opacity: 0, scale: 0.94 },
+                    animate: { opacity: 1, scale: 1 },
+                    transition: { duration: 0.25, ease: [0.2, 0.8, 0.2, 1] },
+                  }
+                : {})}
               src={activeImage.url}
               alt="shared media full view"
               onClick={(e) => e.stopPropagation()}
-              className="h-auto max-h-full w-auto max-w-full rounded-md object-contain"
+              className={`h-auto max-h-full w-auto max-w-full rounded-md object-contain ${
+                isDevs ? "!rounded-2xl shadow-[0_0_60px_rgba(34,240,255,0.2)]" : ""
+              }`}
             />
           </div>,
           document.body

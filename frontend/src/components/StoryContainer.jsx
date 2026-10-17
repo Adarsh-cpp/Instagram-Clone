@@ -191,6 +191,12 @@ const StoryContainer = () => {
   const isOwnSeen =
     hasOwnStory && ownGroup.stories.every((s) => viewedOwnIds.includes(s._id));
 
+  // Row arrows: classic look + glass neon look in Devs Mode
+  const arrowClass =
+    "absolute z-10 w-8 h-8 rounded-full bg-black/60 hidden md:flex items-center justify-center text-white " +
+    "devs:bg-[rgba(10,12,32,0.7)] devs:backdrop-blur-md devs:border devs:border-[var(--border-popup)] " +
+    "devs:text-[var(--devs-cyan)] devs:hover:shadow-[0_0_16px_rgba(34,240,255,0.5)] devs:transition-shadow";
+
   return (
     <div className="storyContainer relative w-full h-[130px] px-2 md:px-10 flex items-center mt-4">
       <input
@@ -205,7 +211,7 @@ const StoryContainer = () => {
       {hasPrev && !showEmptyRowOnly && (
         <button
           onClick={() => swiperRef.current?.slidePrev()}
-          className="absolute left-0 z-10 w-8 h-8 rounded-full bg-black/60 hidden md:flex items-center justify-center text-white"
+          className={`${arrowClass} left-0`}
           aria-label="Previous stories"
         >
           <ChevronLeft size={18} />
@@ -238,15 +244,16 @@ const StoryContainer = () => {
             isSeen={isOwnSeen}
             onClick={handleOwnClick}
             onPlusClick={handlePlusClick}
+            index={0}
           />
           {processing && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-white border-t-transparent devs:border-t-[var(--devs-cyan)] rounded-full animate-spin" />
             </div>
           )}
         </SwiperSlide>
 
-        {feed.map((group) => (
+        {feed.map((group, i) => (
           <SwiperSlide key={group.author._id} className="md:!w-auto">
             <StoryCircle
               imgSrc={group.author.profilePic ? group.author.profilePic : "images/default-profile-pic.jpg" }
@@ -254,6 +261,7 @@ const StoryContainer = () => {
               hasStory={true}
               isSeen={isGroupSeen(group, user?._id)}
               onClick={() => openViewer(group)}
+              index={i + 1}
             />
           </SwiperSlide>
         ))}
@@ -262,7 +270,7 @@ const StoryContainer = () => {
       {hasNext && !showEmptyRowOnly && (
         <button
           onClick={() => swiperRef.current?.slideNext()}
-          className="absolute right-0 z-10 w-8 h-8 rounded-full bg-black/60 hidden md:flex items-center justify-center text-white"
+          className={`${arrowClass} right-0`}
           aria-label="Next stories"
         >
           <ChevronRight size={18} />

@@ -3,14 +3,42 @@ import React, { useState } from 'react'
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from "react-toastify";
+import { AtSign, Lock } from 'lucide-react';
 import { GoogleIcon, PasswordVisibleIcon, PasswordHiddenIcon } from '../components/Icons';
+import { useTheme } from '../context/ThemeContext';
+import {
+  DevsAuthShell,
+  DevsInput,
+  DevsButton,
+  DevsDivider,
+  DevsLink,
+} from '../components/devs/DevsAuthKit';
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
+const userRegex = /^(?:[a-zA-Z0-9_]{3,}|[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}|[6-9]\d{9})$/;
+
+const contactRules = {
+  required: "This field is required",
+  pattern: {
+    value: userRegex,
+    message: "Enter valid username or email",
+  },
+};
+
+const passwordRules = {
+  required: "Password is required",
+  minLength: {
+    value: 6,
+    message: "Password must be at least 6 characters",
+  },
+};
+
 const LoginPage = () => {
 
-   const { register, handleSubmit, formState: { errors },  } = useForm();
+   const { register, handleSubmit, formState: { errors, isSubmitting },  } = useForm();
    const navigate = useNavigate()
+   const { isDevs } = useTheme()
 
   const onSubmit = async (data) => {
 
@@ -21,6 +49,7 @@ const LoginPage = () => {
       });
 
     const token = response.data.token;
+    console.log(token)
     localStorage.setItem("authToken", token);
 
         navigate("/home", {
@@ -36,8 +65,6 @@ const LoginPage = () => {
 
   };
 
-   const userRegex = /^(?:[a-zA-Z0-9_]{3,}|[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}|[6-9]\d{9})$/;
-
    const [pwVisibility, setPwVisibility] = useState(false);
 
    const handlePwVisibility = () => {
@@ -48,8 +75,66 @@ const LoginPage = () => {
       window.location.href = `${BASE_URL}/auth/google`;
    }
 
+  /* ---------------- Devs Mode ---------------- */
+  if (isDevs) {
+    return (
+      <DevsAuthShell
+        title="Welcome back"
+        subtitle="authenticate to enter the grid"
+        headline={["Your feed.", "Rebuilt for tomorrow."]}
+        footer={
+          <div className="mt-6 flex flex-col items-center gap-3">
+            <DevsLink to="/user/forgot-password">Forgotten your password?</DevsLink>
+            <p className="font-mono text-[12px] text-[var(--text-muted)]">
+              Don't have an account?{" "}
+              <DevsLink to="/user/signup" accent>Sign up</DevsLink>
+            </p>
+          </div>
+        }
+      >
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <DevsInput
+            label="identity"
+            icon={AtSign}
+            placeholder="Username or email address"
+            error={errors.contact?.message}
+            {...register("contact", contactRules)}
+          />
 
+          <DevsInput
+            label="passkey"
+            icon={Lock}
+            type={pwVisibility ? "text" : "password"}
+            placeholder="Password"
+            error={errors.password?.message}
+            right={
+              <button type="button" onClick={handlePwVisibility} className="cursor-pointer">
+                {pwVisibility ? <PasswordHiddenIcon /> : <PasswordVisibleIcon />}
+              </button>
+            }
+            {...register("password", passwordRules)}
+          />
 
+          <DevsButton type="submit" loading={isSubmitting} className="mt-2">
+            Login
+          </DevsButton>
+        </form>
+
+        <DevsDivider />
+
+        <DevsButton
+          type="button"
+          variant="ghost"
+          onClick={handleGoogleLogin}
+          icon={<GoogleIcon size={18} />}
+        >
+          Continue with Google
+        </DevsButton>
+      </DevsAuthShell>
+    );
+  }
+
+  /* ---------------- Classic (light / dark) ---------------- */
   return (
    <div className="loginPage h-[100vh] w-[100vw] bg-[var(--bg-app)] flex justify-center">
         <div className="container h-full w-[900px] flex justify-center">
@@ -68,13 +153,7 @@ const LoginPage = () => {
         {/* Username/Email/Phone Field */}
         <div>
           <input
-            {...register("contact", {
-              required: "This field is required",
-              pattern: {
-                value: userRegex,
-                message: "Enter valid username or email",
-              },
-            })}
+            {...register("contact", contactRules)}
             className={`h-[36px] w-[270px] bg-[var(--bg-input)] text-[12px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px]  px-[10px] my-[3px] ${errors.contact ? " border border-[var(--color-error)]" : "border border-[var(--border-input)]" }`}
             placeholder="Username or email address"
           />
@@ -92,13 +171,7 @@ const LoginPage = () => {
             </button>
           <input
             type={pwVisibility ? "text" : "password"}
-            {...register("password", {
-              required: "Password is required",
-              minLength: {
-                value: 6,
-                message: "Password must be at least 6 characters",
-              },
-            })}
+            {...register("password", passwordRules)}
             className={`h-[36px] w-[270px] bg-[var(--bg-input)] text-[12px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px]  px-[10px] my-[3px] ${errors.password ? " border border-[var(--color-error)]" : "border border-[var(--border-input)]" }`}
             placeholder="Password"
           />

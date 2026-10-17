@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import axios from "axios"
+import { motion } from "framer-motion";
 import IconSidebar from "../components/IconSidebar";
 import EditProfilePic from "../components/EditProfilePic";
 import MobileFooter from "../components/MobileFooter";
 import AiBioAssistant from "../components/AiBioAssistant";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { toast } from "react-toastify";
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
@@ -20,6 +22,7 @@ const EditProfilePage = () => {
   } = useForm();
 
 const navigate = useNavigate()
+const { isDevs } = useTheme()
 
    const {user, setUser} = useAuth()
    const [bio, setBio] = useState("");
@@ -136,9 +139,28 @@ const navigate = useNavigate()
 
         <div className="relative editContainer w-full md:w-[95%] lg:w-[92%] h-full flex flex-col justify-start items-center">
 
-          <div className="heading w-[80%] h-[15%] flex justify-start items-center text-[20px] text-[var(--text-primary)] font-bold">
-            Edit Profile
-          </div>
+          <motion.div
+            {...(isDevs
+              ? { initial: { opacity: 0, y: -12 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.4 } }
+              : {})}
+            className="heading w-[80%] h-[15%] flex justify-start items-center text-[20px] text-[var(--text-primary)] font-bold"
+          >
+            {isDevs ? (
+              <div className="flex flex-col leading-none">
+                <span
+                  className="devs-text-gradient text-[28px] font-extrabold tracking-tight"
+                  style={{ fontFamily: "var(--devs-font-display)" }}
+                >
+                  Edit Profile
+                </span>
+                <span className="font-mono text-[10px] tracking-[0.3em] uppercase text-[var(--text-muted)] mt-2">
+                  {"// account.settings"}
+                </span>
+              </div>
+            ) : (
+              "Edit Profile"
+            )}
+          </motion.div>
 
           {/* Profile Pic stays outside the form */}
           <EditProfilePic user={user} />
@@ -151,7 +173,7 @@ const navigate = useNavigate()
             {/* --- Edit Bio --- */}
             <div className="editBio relative w-full h-[40%] mt-4 flex flex-col justify-start items-center rounded-[20px]">
               <div className="heading w-full flex items-center justify-between gap-2 mb-2">
-                <span className="text-[18px] text-[var(--text-primary)] font-bold">
+                <span className="text-[18px] text-[var(--text-primary)] font-bold devs:font-mono devs:text-[13px] devs:uppercase devs:tracking-[0.25em]">
                   Bio
                 </span>
 
@@ -171,7 +193,7 @@ const navigate = useNavigate()
                 value={bio}
                 onChange={(e) => handleBioChange(e.target.value)}
                 rows={3}
-                className={`w-full h-full  text-[16px] resize-none outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[20px] p-2 ${
+                className={`w-full h-full  text-[16px] resize-none outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[20px] p-2 devs:bg-[var(--bg-input)] devs:font-mono devs:text-[14px] devs:p-4 devs:transition-all devs:duration-200 devs:focus:border-[var(--devs-cyan)] devs:focus:shadow-[0_0_0_3px_rgba(34,240,255,0.15),0_0_22px_rgba(34,240,255,0.2)] ${
                   errors.bio
                     ? "border border-[var(--color-error)]"
                     : "border border-[var(--border-input)]"
@@ -180,7 +202,7 @@ const navigate = useNavigate()
               />
 
               {/* Character Counter */}
-              <div className="absolute bottom-[8px] right-[12px] z-10 flex justify-end text-[var(--text-primary)] text-[11px]">
+              <div className="absolute bottom-[8px] right-[12px] z-10 flex justify-end text-[var(--text-primary)] text-[11px] devs:font-mono">
                 <span
                   className={`${
                     bio.length > maxLength - 10
@@ -193,22 +215,22 @@ const navigate = useNavigate()
               </div>
 
               {errors.bio && (
-                <p className="text-[var(--color-error)] text-sm mt-1">
-                  {errors.bio.message}
+                <p className="text-[var(--color-error)] text-sm mt-1 devs:font-mono devs:text-[12px]">
+                  {isDevs ? "! " : ""}{errors.bio.message}
                 </p>
               )}
             </div>
 
             {/* --- Edit Gender --- */}
             <div className="editGender w-full h-[30%] mt-4 flex flex-col justify-start items-center rounded-[20px]">
-              <div className="heading w-full text-[18px] text-[var(--text-primary)] font-bold mb-2">
+              <div className="heading w-full text-[18px] text-[var(--text-primary)] font-bold mb-2 devs:font-mono devs:text-[13px] devs:uppercase devs:tracking-[0.25em]">
                 Gender
               </div>
 
               <input
                 {...register("gender")}
                 onClick={() => setIsModalOpen(true)}
-                className={`w-full h-full  text-[16px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[20px] px-[10px] my-[3px] cursor-pointer hover:bg-[var(--bg-row-hover)] ${
+                className={`w-full h-full  text-[16px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[20px] px-[10px] my-[3px] cursor-pointer hover:bg-[var(--bg-row-hover)] devs:bg-[var(--bg-input)] devs:font-mono devs:text-[14px] devs:px-4 devs:transition-all devs:duration-200 devs:hover:border-[var(--devs-cyan)] ${
                   errors.gender
                     ? "border border-[var(--color-error)]"
                     : "border border-[var(--border-input)]"
@@ -228,11 +250,18 @@ const navigate = useNavigate()
                   className="absolute top-0 left-0 h-[600px] inset-0 flex justify-center items-center bg-[var(--overlay-scrim)] backdrop-blur-[var(--overlay-blur)] z-10"
                   onClick={() => setIsModalOpen(false)}
                 >
-                  <div
-                    className="modal bg-[var(--bg-menu)] w-[90%] sm:w-[350px] rounded-2xl overflow-hidden text-center text-[var(--text-primary)] border border-[var(--border-container)] shadow-xl"
+                  <motion.div
+                    {...(isDevs
+                      ? {
+                          initial: { scale: 0.92, y: 16, opacity: 0 },
+                          animate: { scale: 1, y: 0, opacity: 1 },
+                          transition: { type: "spring", stiffness: 360, damping: 26 },
+                        }
+                      : {})}
+                    className="modal bg-[var(--bg-menu)] w-[90%] sm:w-[350px] rounded-2xl overflow-hidden text-center text-[var(--text-primary)] border border-[var(--border-container)] shadow-xl devs:font-mono devs:rounded-3xl devs:backdrop-blur-xl devs:shadow-[0_0_50px_rgba(34,240,255,0.2)]"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="py-4 border-b border-[var(--border-popup)] text-[18px] font-semibold">
+                    <div className="py-4 border-b border-[var(--border-popup)] text-[18px] font-semibold devs:text-[14px] devs:uppercase devs:tracking-[0.2em]">
                       Select Your Gender
                     </div>
 
@@ -246,7 +275,7 @@ const navigate = useNavigate()
     onClick={handleClick}
     checked={gender === "Male"}
     readOnly
-    className="w-[20px] h-[20px]"
+    className="w-[20px] h-[20px] devs:accent-[var(--devs-cyan)]"
   />
 </div>
 
@@ -260,7 +289,7 @@ const navigate = useNavigate()
     onClick={handleClick}
     checked={gender === "Female"}
     readOnly
-    className="w-[20px] h-[20px]"
+    className="w-[20px] h-[20px] devs:accent-[var(--devs-cyan)]"
   />
 </div>
 
@@ -274,7 +303,7 @@ const navigate = useNavigate()
     onClick={handleClick}
     checked={gender === "Prefer not to say"}
     readOnly
-    className="w-[20px] h-[20px]"
+    className="w-[20px] h-[20px] devs:accent-[var(--devs-cyan)]"
   />
 </div>
 
@@ -289,7 +318,7 @@ const navigate = useNavigate()
       value="custom"
       checked={gender === "custom"}
       onChange={(e) => setGender(e.target.value)}
-      className="w-[20px] h-[20px]"
+      className="w-[20px] h-[20px] devs:accent-[var(--devs-cyan)]"
     />
   </div>
 
@@ -301,7 +330,7 @@ const navigate = useNavigate()
       placeholder="Enter custom gender"
       value={customGender}
       onChange={(e) => setCustomGender(e.target.value)}
-      className="w-[80%] h-[60px] px-2 text-[16px] text-[var(--text-primary)] rounded-lg bg-[var(--bg-input)]"
+      className="w-[80%] h-[60px] px-2 text-[16px] text-[var(--text-primary)] rounded-lg bg-[var(--bg-input)] devs:border devs:border-[var(--border-input)] devs:outline-none devs:focus:border-[var(--devs-cyan)]"
     />
   )}
 </div>
@@ -313,19 +342,23 @@ const navigate = useNavigate()
                     >
                       Cancel
                     </button>
-                  </div>
+                  </motion.div>
                 </div>
               )}
             </div>
 
             {/* --- Submit Button --- */}
             <div className="submitSection w-full h-[10%] mt-8 flex justify-center items-center">
-              <button
+              <motion.button
+                {...(isDevs ? { whileTap: { scale: 0.95 }, whileHover: { y: -2 } } : {})}
                 type="submit"
-                className="w-[100px] sm:w-[150px] h-[40px] bg-[var(--accent-indigo)] hover:bg-[var(--accent-indigo-hover)] cursor-pointer text-white text-[14px] sm:text-[16px] font-bold rounded-xl"
+                className="relative overflow-hidden w-[100px] sm:w-[150px] h-[40px] bg-[var(--accent-indigo)] hover:bg-[var(--accent-indigo-hover)] cursor-pointer text-white text-[14px] sm:text-[16px] font-bold rounded-xl devs:bg-[linear-gradient(120deg,#22f0ff,#8b5cf6,#ff2bd6)] devs:hover:bg-[linear-gradient(120deg,#22f0ff,#8b5cf6,#ff2bd6)] devs:text-[#04050e] devs:font-mono devs:uppercase devs:tracking-widest devs:shadow-[0_0_24px_rgba(34,240,255,0.4)]"
               >
-                Submit
-              </button>
+                {isDevs && (
+                  <span className="devs-shimmer absolute inset-0 opacity-40 pointer-events-none" />
+                )}
+                <span className="relative">Submit</span>
+              </motion.button>
             </div>
           </form>
 

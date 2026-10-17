@@ -1,5 +1,6 @@
 // Icons.jsx
-import React from "react";
+import React, { useMemo } from "react";
+import { motion } from "framer-motion";
 import {
   Home,
   Search,
@@ -20,7 +21,11 @@ import {
   AtSign,
   MessageSquare,
 } from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
 
+/* ====================================================================
+   CLASSIC (light / dark) icon props - unchanged
+   ==================================================================== */
 const iconProps = (active) => ({
   size: 26,
   color: "var(--text-primary)",
@@ -28,32 +33,200 @@ const iconProps = (active) => ({
   strokeWidth: active ? 1.5 : 2,
 });
 
-// ---- Sidebar icons (active/inactive) ----
-export const HomeIcon = ({ active }) => <Home {...iconProps(active)} />;
-export const SearchIcon = ({ active }) => <Search {...iconProps(active)} strokeWidth={active ? 2.5 : 2} />;
-export const ExploreIcon = ({ active }) => <Compass {...iconProps(active)} />;
-export const ReelsIcon = ({ active }) => <Clapperboard {...iconProps(active)} />;
-export const MessagesIcon = ({ active }) => <MessageCircle {...iconProps(active)} />;
-export const NotificationsIcon = ({ active }) => <Heart {...iconProps(active)} />;
-export const CreateIcon = ({ active }) => <PlusSquare {...iconProps(active)} strokeWidth={active ? 2.5 : 2} />;
-export const MoreIcon = ({ active }) => <Menu {...iconProps(active)} strokeWidth={active ? 2.5 : 2} />;
-
-// ---- Settings icons (static, no active state) ----
 const settingsIconProps = { size: 26, color: "var(--text-primary)", strokeWidth: 2 };
 
-export const EditProfileIcon = () => <UserPen {...settingsIconProps} />;
-export const SettingsNotificationsIcon = () => <Bell {...settingsIconProps} />;
-export const AccountPrivacyIcon = () => <Lock {...settingsIconProps} />;
-export const CloseFriendsIcon = () => <Star {...settingsIconProps} />;
-export const BlockedIcon = () => <Ban {...settingsIconProps} />;
-export const RestrictedAccountsIcon = () => <EyeOff {...settingsIconProps} />;
-export const StoryLocationsIcon = () => <MapPin {...settingsIconProps} />;
-export const TagsMentionsIcon = () => <AtSign {...settingsIconProps} />;
-export const CommentsIcon = () => <MessageSquare {...settingsIconProps} />;
+/* ====================================================================
+   DEVS MODE - animated icon system
+   Every icon gets: its own neon accent, a hover animation, a glowing
+   "active" state and a tap squish. Endless loops are disabled on lite
+   devices (phones / touch / low-end / reduced motion).
+   ==================================================================== */
+const SPRING_BACK = { type: "spring", stiffness: 320, damping: 18 };
+const REST = { scale: 1, scaleY: 1, rotate: 0, x: 0, y: 0, transition: SPRING_BACK };
 
-// ---- Auth page icons ----
-export const PasswordVisibleIcon = () => <Eye size={20} color="var(--text-muted)" />;
-export const PasswordHiddenIcon = () => <EyeOff size={20} color="var(--text-muted)" />;
+const ANIMS = {
+  pop: {
+    hover: { scale: 1.18, rotate: [0, -8, 8, 0], transition: { duration: 0.4 } },
+  },
+  home: {
+    hover: { y: [0, -5, 0], scale: 1.15, transition: { duration: 0.45 } },
+  },
+  compass: {
+    hover: { rotate: [0, 70, -20, 45], scale: 1.15, transition: { duration: 0.7 } },
+    active: {
+      rotate: [0, 14, -14, 0],
+      transition: { duration: 5, repeat: Infinity, ease: "easeInOut" },
+    },
+  },
+  reels: {
+    hover: {
+      scaleY: [1, 0.78, 1.12, 1],
+      rotate: [0, -10, 0],
+      scale: 1.12,
+      transition: { duration: 0.5 },
+    },
+  },
+  chat: {
+    hover: { y: [0, -4, 0], rotate: [0, -7, 7, 0], scale: 1.12, transition: { duration: 0.5 } },
+  },
+  beat: {
+    hover: { scale: [1, 1.3, 1, 1.22, 1], transition: { duration: 0.7 } },
+    active: {
+      scale: [1, 1.18, 1, 1.12, 1],
+      transition: { duration: 1.5, repeat: Infinity },
+    },
+  },
+  spin: {
+    hover: { rotate: 90, scale: 1.18, transition: { type: "spring", stiffness: 260, damping: 14 } },
+  },
+  slide: {
+    hover: { x: [0, 4, -4, 0], scale: 1.1, transition: { duration: 0.45 } },
+  },
+  wiggle: {
+    hover: { rotate: [0, -14, 14, -8, 0], scale: 1.12, transition: { duration: 0.5 } },
+  },
+};
+
+const DevsIcon = ({
+  Icon,
+  active = false,
+  hovered = false,
+  anim = "pop",
+  accent = "var(--devs-cyan)",
+  size = 26,
+  bold = false,
+}) => {
+  const { lite } = useTheme();
+  const def = ANIMS[anim] || ANIMS.pop;
+
+  const variants = useMemo(
+    () => ({
+      rest: REST,
+      hover: def.hover,
+      active: !lite && def.active ? def.active : { ...REST, scale: 1.08 },
+      tap: { scale: 0.82 },
+    }),
+    [def, lite]
+  );
+
+  const state = hovered ? "hover" : active ? "active" : "rest";
+  const lit = active || hovered;
+
+  return (
+    <motion.span
+      variants={variants}
+      initial={false}
+      animate={state}
+      whileHover="hover"
+      whileTap="tap"
+      className="inline-flex"
+      style={{
+        color: lit ? accent : "var(--text-primary)",
+        filter: active ? `drop-shadow(0 0 7px ${accent})` : "none",
+        transition: "color 0.2s ease, filter 0.25s ease",
+      }}
+    >
+      <Icon
+        size={size}
+        color="currentColor"
+        fill="currentColor"
+        fillOpacity={active ? 0.22 : 0}
+        strokeWidth={active ? (bold ? 2.6 : 2.2) : 1.8}
+      />
+    </motion.span>
+  );
+};
+
+/* ---------- factories (classic output stays identical) ---------- */
+const makeNavIcon = (Icon, { anim, accent, bold = false }) => {
+  const Comp = ({ active, hovered }) => {
+    const { isDevs } = useTheme();
+
+    if (!isDevs) {
+      return bold ? (
+        <Icon {...iconProps(active)} strokeWidth={active ? 2.5 : 2} />
+      ) : (
+        <Icon {...iconProps(active)} />
+      );
+    }
+
+    return (
+      <DevsIcon
+        Icon={Icon}
+        active={active}
+        hovered={hovered}
+        anim={anim}
+        accent={accent}
+        bold={bold}
+      />
+    );
+  };
+  Comp.displayName = `NavIcon(${Icon.displayName || "icon"})`;
+  return Comp;
+};
+
+const makeSettingsIcon = (Icon, accent) => {
+  const Comp = ({ hovered }) => {
+    const { isDevs } = useTheme();
+    if (!isDevs) return <Icon {...settingsIconProps} />;
+    return <DevsIcon Icon={Icon} hovered={hovered} anim="wiggle" accent={accent} />;
+  };
+  Comp.displayName = `SettingsIcon(${Icon.displayName || "icon"})`;
+  return Comp;
+};
+
+const makeAuthIcon = (Icon) => {
+  const Comp = () => {
+    const { isDevs } = useTheme();
+    if (!isDevs) return <Icon size={20} color="var(--text-muted)" />;
+    return (
+      <motion.span
+        whileHover={{ scale: 1.2 }}
+        whileTap={{ scale: 0.9 }}
+        className="inline-flex"
+        style={{
+          color: "var(--devs-cyan)",
+          filter: "drop-shadow(0 0 5px rgba(34, 240, 255, 0.7))",
+        }}
+      >
+        <Icon size={20} color="currentColor" />
+      </motion.span>
+    );
+  };
+  Comp.displayName = `AuthIcon(${Icon.displayName || "icon"})`;
+  return Comp;
+};
+
+/* ====================================================================
+   Sidebar / footer icons (active / inactive)
+   ==================================================================== */
+export const HomeIcon = makeNavIcon(Home, { anim: "home", accent: "var(--devs-cyan)" });
+export const SearchIcon = makeNavIcon(Search, { anim: "slide", accent: "var(--devs-cyan)", bold: true });
+export const ExploreIcon = makeNavIcon(Compass, { anim: "compass", accent: "var(--devs-violet)" });
+export const ReelsIcon = makeNavIcon(Clapperboard, { anim: "reels", accent: "var(--devs-magenta)" });
+export const MessagesIcon = makeNavIcon(MessageCircle, { anim: "chat", accent: "var(--devs-cyan)" });
+export const NotificationsIcon = makeNavIcon(Heart, { anim: "beat", accent: "var(--devs-magenta)" });
+export const CreateIcon = makeNavIcon(PlusSquare, { anim: "spin", accent: "var(--devs-lime)", bold: true });
+export const MoreIcon = makeNavIcon(Menu, { anim: "slide", accent: "var(--devs-violet)", bold: true });
+
+/* ====================================================================
+   Settings icons (no active state; optional `hovered` from parent row)
+   ==================================================================== */
+export const EditProfileIcon = makeSettingsIcon(UserPen, "var(--devs-cyan)");
+export const SettingsNotificationsIcon = makeSettingsIcon(Bell, "var(--devs-magenta)");
+export const AccountPrivacyIcon = makeSettingsIcon(Lock, "var(--devs-violet)");
+export const CloseFriendsIcon = makeSettingsIcon(Star, "var(--devs-lime)");
+export const BlockedIcon = makeSettingsIcon(Ban, "var(--color-danger)");
+export const RestrictedAccountsIcon = makeSettingsIcon(EyeOff, "var(--devs-violet)");
+export const StoryLocationsIcon = makeSettingsIcon(MapPin, "var(--devs-cyan)");
+export const TagsMentionsIcon = makeSettingsIcon(AtSign, "var(--devs-magenta)");
+export const CommentsIcon = makeSettingsIcon(MessageSquare, "var(--devs-lime)");
+
+/* ====================================================================
+   Auth page icons
+   ==================================================================== */
+export const PasswordVisibleIcon = makeAuthIcon(Eye);
+export const PasswordHiddenIcon = makeAuthIcon(EyeOff);
 
 // Google's official multi-color "G" mark. Not in lucide-react on purpose —
 // lucide excludes trademarked brand logos, so every site hand-embeds this SVG.

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 import { Link } from 'react-router-dom'
 import { BadgeCheck } from 'lucide-react'
 import { useSocket } from '../context/SocketContext'
@@ -65,7 +66,7 @@ const ChatContextMenu = ({ position, options, onClose }) => {
   return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-50 bg-[var(--bg-elevated)] border border-[var(--border-soft)] rounded-xl shadow-lg overflow-hidden py-1"
+      className="fixed z-50 bg-[var(--bg-elevated)] border border-[var(--border-soft)] rounded-xl shadow-lg overflow-hidden py-1 devs:backdrop-blur-xl devs:rounded-2xl devs:border-[var(--border-popup)] devs:font-mono devs:shadow-[0_0_30px_rgba(34,240,255,0.2)]"
       style={{ top: Math.max(clampedY, MENU_MARGIN), left: Math.max(clampedX, MENU_MARGIN), width: MENU_WIDTH }}
       onContextMenu={(e) => e.preventDefault()}
     >
@@ -78,7 +79,7 @@ const ChatContextMenu = ({ position, options, onClose }) => {
             e.stopPropagation();
             opt.onClick();
           }}
-          className={`w-full text-left px-4 py-2.5 text-[14px] hover:bg-[var(--bg-row-hover)] ${
+          className={`w-full text-left px-4 py-2.5 text-[14px] hover:bg-[var(--bg-row-hover)] devs:text-[13px] ${
             opt.destructive ? "text-red-500" : "text-[var(--text-primary)]"
           }`}
         >
@@ -94,20 +95,24 @@ const ChatContextMenu = ({ position, options, onClose }) => {
 // deletes the whole conversation (all messages + their media) for both
 // participants.
 const ConfirmDeleteChatModal = ({ friendName, isDeleting, onCancel, onConfirm }) => {
+  const { isDevs } = useTheme();
+
   return createPortal(
     <div
-      className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center px-4"
+      className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center px-4 devs:backdrop-blur-sm"
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-[340px] bg-[var(--bg-elevated)] rounded-2xl overflow-hidden"
+        className={`w-full max-w-[340px] bg-[var(--bg-elevated)] rounded-2xl overflow-hidden ${
+          isDevs ? "devs-glass devs-neon-border !rounded-3xl" : ""
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-6 text-center">
-          <h3 className="text-[17px] font-semibold text-[var(--text-primary)] mb-2">
+          <h3 className="text-[17px] font-semibold text-[var(--text-primary)] mb-2 devs:font-bold">
             Delete chat{friendName ? ` with ${friendName}` : ""}?
           </h3>
-          <p className="text-[14px] text-[var(--text-muted)]">
+          <p className="text-[14px] text-[var(--text-muted)] devs:font-mono devs:text-[12px] devs:leading-relaxed">
             This will permanently delete the entire chat history, including
             all photos and videos. This can't be undone.
           </p>
@@ -118,7 +123,7 @@ const ConfirmDeleteChatModal = ({ friendName, isDeleting, onCancel, onConfirm })
             type="button"
             disabled={isDeleting}
             onClick={onConfirm}
-            className="w-full py-3 text-[15px] font-semibold text-red-500 border-b border-[var(--border-soft)] disabled:opacity-50"
+            className="w-full py-3 text-[15px] font-semibold text-red-500 border-b border-[var(--border-soft)] disabled:opacity-50 devs:font-mono devs:text-[var(--color-danger)] devs:hover:bg-[var(--bg-danger-hover)]"
           >
             {isDeleting ? "Deleting..." : "Delete"}
           </button>
@@ -126,7 +131,7 @@ const ConfirmDeleteChatModal = ({ friendName, isDeleting, onCancel, onConfirm })
             type="button"
             disabled={isDeleting}
             onClick={onCancel}
-            className="w-full py-3 text-[15px] text-[var(--text-primary)] disabled:opacity-50"
+            className="w-full py-3 text-[15px] text-[var(--text-primary)] disabled:opacity-50 devs:font-mono devs:hover:bg-[var(--bg-row-hover)]"
           >
             Cancel
           </button>
@@ -140,6 +145,7 @@ const ConfirmDeleteChatModal = ({ friendName, isDeleting, onCancel, onConfirm })
 const MessageCard = ({ conversation, onDeleteConversation }) => {
   const { user } = useAuth()
   const { onlineUsers } = useSocket()
+  const { isDevs } = useTheme()
   const isDesktop = useIsDesktop()
 
   const [menuPosition, setMenuPosition] = useState(null) // {x, y} or null
@@ -253,11 +259,11 @@ const MessageCard = ({ conversation, onDeleteConversation }) => {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        <div className="messageCard w-full h-[80px] sm:h-[85px] flex justify-center items-center rounded-xl hover:bg-[var(--bg-row-hover)] cursor-pointer px-2 select-none">
+        <div className="messageCard relative w-full h-[80px] sm:h-[85px] flex justify-center items-center rounded-xl hover:bg-[var(--bg-row-hover)] cursor-pointer px-2 select-none devs:rounded-2xl devs:transition-all devs:duration-200 devs:hover:shadow-[inset_3px_0_0_var(--devs-cyan)]">
 
           <div className="profilePicSection w-[20%] h-full flex justify-center items-center">
             <div className="profilePic relative w-[55px] h-[55px] sm:w-[70px] sm:h-[70px]">
-              <div className="w-full h-full rounded-full overflow-hidden">
+              <div className="w-full h-full rounded-full overflow-hidden devs:ring-2 devs:ring-[var(--devs-violet)] devs:ring-offset-2 devs:ring-offset-[#04050e]">
                 <img
                   src={friend?.profilePic ? friend.profilePic : "/images/default-profile-pic.jpg" }
                   alt=""
@@ -266,22 +272,29 @@ const MessageCard = ({ conversation, onDeleteConversation }) => {
               </div>
 
               {isOnline && (
-                <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-[var(--bg-app)]" />
+                <span
+                  className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-[var(--bg-app)] devs:bg-[var(--devs-lime)] devs:border-[#04050e] ${
+                    isDevs ? "devs-pulse-glow" : ""
+                  }`}
+                />
               )}
             </div>
           </div>
 
           <div className="messageDetails w-[80%] h-full">
-            <div className="fullname w-full h-[50%] flex justify-start items-end text-[var(--text-primary)] text-[18px] md:text-[15px] lg:text-[18px]">
+            <div className="fullname w-full h-[50%] flex justify-start items-end text-[var(--text-primary)] text-[18px] md:text-[15px] lg:text-[18px] devs:font-semibold">
               <span className="ml-2 flex items-center gap-1">
                 {friend?.fullname}
                 {friend?.role === "admin" && (
-                  <BadgeCheck size={14} className="text-sky-400 shrink-0" />
+                  <BadgeCheck
+                    size={14}
+                    className="text-sky-400 devs:text-[var(--devs-cyan)] devs:drop-shadow-[0_0_5px_rgba(34,240,255,0.9)] shrink-0"
+                  />
                 )}
               </span>
             </div>
 
-            <div className="lastMsg w-full h-[50%] flex justify-start items-start text-[14px] md:text-[12px] lg:text-[14px] mt-1">
+            <div className="lastMsg w-full h-[50%] flex justify-start items-start text-[14px] md:text-[12px] lg:text-[14px] mt-1 devs:font-mono devs:text-[12px]">
               {unreadCount > 1 ? (
                 <span className="ml-2 text-[var(--text-primary)] font-semibold">
                   {unreadCount > 9 ? "9+ new messages" : `${unreadCount} new messages`}
@@ -296,6 +309,13 @@ const MessageCard = ({ conversation, onDeleteConversation }) => {
               )}
             </div>
           </div>
+
+          {/* Devs Mode: neon unread badge on the right edge */}
+          {isDevs && unreadCount > 0 && (
+            <span className="devs-pulse-glow absolute right-3 top-1/2 -translate-y-1/2 min-w-[20px] h-[20px] px-1 rounded-full bg-[var(--devs-magenta)] text-[#04050e] font-mono text-[10px] font-bold flex items-center justify-center">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
 
         </div>
       </Link>

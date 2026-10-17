@@ -1,6 +1,9 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@300..700&family=Syne:wght@500;600;700;800&display=swap");
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+/* Use `devs:` in Tailwind classes, e.g. `devs:bg-black/40 devs:font-mono` */
+@custom-variant devs (&:where(.devs, .devs *));
 
 /* ============================
    Theme variables
@@ -98,13 +101,87 @@
   --link-muted: #3b5bdb;
   --link-muted-hover: #2f4bc4;
 
-  
   --overlay-scrim: rgba(255, 255, 255, 0.4);
   --overlay-blur: 14px;
   --glass-panel-bg: rgba(255, 255, 255, 0.65);
   --glass-panel-border: rgba(255, 255, 255, 0.6);
 }
 
+/* ============================
+   DEVS MODE - theme variables
+   Same variable names as dark/light, so every component that already uses
+   var(--bg-panel) etc. is re-skinned automatically. Backgrounds are
+   semi-transparent so the 3D scene shows through the glass.
+   ============================ */
+
+:root[data-theme="devs"] {
+  /* Devs-only tokens */
+  --devs-cyan: #22f0ff;
+  --devs-cyan-soft: #7df7ff;
+  --devs-violet: #8b5cf6;
+  --devs-magenta: #ff2bd6;
+  --devs-lime: #b6ff3b;
+  --devs-void: #04050e;
+  --devs-gradient: linear-gradient(120deg, #22f0ff 0%, #8b5cf6 50%, #ff2bd6 100%);
+  --devs-gradient-soft: linear-gradient(120deg, rgba(34, 240, 255, 0.18), rgba(139, 92, 246, 0.18), rgba(255, 43, 214, 0.18));
+  --devs-font-display: "Syne", "Space Grotesk", system-ui, sans-serif;
+  --devs-font-body: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --devs-font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --devs-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Functional / brand colors (re-pointed to neon) */
+  --brand-blue: #22f0ff;
+  --brand-blue-hover: #7df7ff;
+  --accent-blue: #22f0ff;
+  --accent-blue-hover: #7df7ff;
+  --accent-indigo: #8b5cf6;
+  --accent-indigo-hover: #a78bfa;
+  --color-error: #ff3b6b;
+  --color-danger: #ff3b6b;
+  --color-danger-hover: #ff6b8e;
+  --text-on-brand: #04050e;
+  --button-text-on-accent: #04050e;
+  --icon-on-toggle: #04050e;
+
+  /* Backgrounds */
+  --bg-app: rgba(5, 6, 18, 0.45);
+  --bg-panel: rgba(14, 16, 36, 0.62);
+  --bg-surface: rgba(16, 18, 40, 0.6);
+  --bg-elevated: rgba(24, 27, 58, 0.7);
+  --bg-menu: rgba(12, 14, 32, 0.88);
+  --bg-menu-hover: rgba(34, 240, 255, 0.1);
+  --bg-input: rgba(8, 10, 26, 0.7);
+  --bg-loading: #07081a;
+  --bg-row-hover: rgba(139, 92, 246, 0.14);
+  --bg-popup-hover: rgba(34, 240, 255, 0.1);
+  --bg-danger-hover: rgba(255, 59, 107, 0.14);
+  --bg-secondary-btn: rgba(139, 92, 246, 0.18);
+  --bg-secondary-btn-hover: rgba(139, 92, 246, 0.32);
+  --bg-unread: rgba(34, 240, 255, 0.08);
+
+  /* Borders */
+  --border-soft: rgba(139, 92, 246, 0.22);
+  --border-popup: rgba(34, 240, 255, 0.28);
+  --border-container: rgba(139, 92, 246, 0.3);
+  --border-select: rgba(139, 92, 246, 0.25);
+  --border-input: rgba(34, 240, 255, 0.35);
+
+  /* Text */
+  --text-primary: #eef2ff;
+  --text-secondary: #b8c0ff;
+  --text-muted: #8a93c9;
+  --text-input: #eef2ff;
+
+  /* Toggle / misc */
+  --toggle-track-off: #2a2f63;
+  --link-muted: #22f0ff;
+  --link-muted-hover: #7df7ff;
+
+  --overlay-scrim: rgba(3, 4, 12, 0.7);
+  --overlay-blur: 18px;
+  --glass-panel-bg: rgba(16, 18, 44, 0.55);
+  --glass-panel-border: rgba(34, 240, 255, 0.18);
+}
 
 /* ============================
    Utilities
@@ -162,4 +239,426 @@
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* ====================================================================
+   DEVS MODE - global styling
+   Everything below only activates when <html> has the `devs` class,
+   except the reusable `.devs-*` helper classes (use them in components).
+   ==================================================================== */
+
+/* ---------- base ---------- */
+html.devs {
+  color-scheme: dark;
+}
+
+html.devs body {
+  font-family: var(--devs-font-body);
+  color: var(--text-primary);
+  background:
+    radial-gradient(1200px 700px at 85% -10%, rgba(139, 92, 246, 0.22), transparent 60%),
+    radial-gradient(900px 600px at -10% 110%, rgba(34, 240, 255, 0.14), transparent 60%),
+    var(--devs-void);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* The classic app wrapper is hard black; make it transparent in Devs Mode */
+html.devs .app-container {
+  background: transparent !important;
+}
+
+html.devs h1,
+html.devs h2,
+html.devs h3 {
+  font-family: var(--devs-font-display);
+  letter-spacing: -0.02em;
+}
+
+html.devs code,
+html.devs kbd,
+html.devs pre,
+html.devs .font-mono,
+html.devs time {
+  font-family: var(--devs-font-mono);
+}
+
+html.devs ::selection {
+  background: rgba(34, 240, 255, 0.35);
+  color: #ffffff;
+}
+
+html.devs :focus-visible {
+  outline: 2px solid var(--devs-cyan);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(34, 240, 255, 0.18);
+}
+
+/* Smooth, springy micro-interactions on every button and link */
+html.devs button,
+html.devs a {
+  transition:
+    transform 0.25s var(--devs-ease),
+    box-shadow 0.25s var(--devs-ease),
+    color 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    filter 0.2s ease,
+    opacity 0.2s ease;
+}
+
+html.devs button:not(:disabled):hover {
+  filter: drop-shadow(0 0 8px rgba(34, 240, 255, 0.45));
+}
+
+html.devs button:not(:disabled):active {
+  transform: scale(0.94);
+}
+
+html.devs input,
+html.devs textarea {
+  caret-color: var(--devs-cyan);
+}
+
+html.devs input::placeholder,
+html.devs textarea::placeholder {
+  color: var(--text-muted);
+  font-family: var(--devs-font-mono);
+  font-size: 0.92em;
+}
+
+/* ---------- scrollbar ---------- */
+html.devs ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+html.devs ::-webkit-scrollbar-track {
+  background: transparent;
+}
+html.devs ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--devs-cyan), var(--devs-violet));
+  border-radius: 999px;
+}
+html.devs {
+  scrollbar-color: var(--devs-violet) transparent;
+}
+
+/* ---------- react-toastify ---------- */
+html.devs .Toastify__toast {
+  background: rgba(10, 12, 30, 0.85);
+  color: var(--text-primary);
+  border: 1px solid rgba(34, 240, 255, 0.3);
+  border-radius: 14px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  font-family: var(--devs-font-mono);
+  font-size: 0.85rem;
+  box-shadow: 0 0 28px rgba(34, 240, 255, 0.16);
+}
+html.devs .Toastify__progress-bar {
+  background: var(--devs-gradient) !important;
+}
+html.devs .Toastify__close-button {
+  color: var(--devs-cyan);
+}
+
+/* ---------- theme switch transitions ---------- */
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition:
+    background-color 0.45s ease,
+    color 0.45s ease,
+    border-color 0.45s ease,
+    fill 0.45s ease,
+    stroke 0.45s ease !important;
+}
+
+/* Neon "boot" sweep when entering Devs Mode */
+html.devs-entering::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgba(34, 240, 255, 0.35) 44%,
+    rgba(139, 92, 246, 0.5) 56%,
+    transparent 80%
+  );
+  transform: translateX(-100%);
+  animation: devs-sweep 0.9s cubic-bezier(0.7, 0, 0.2, 1) forwards;
+}
+
+/* ---------- background layers (used by DevsBackground.jsx) ---------- */
+.devs-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(70px);
+  opacity: 0.55;
+  will-change: transform;
+}
+.devs-blob-1 {
+  width: 46vmax;
+  height: 46vmax;
+  top: -14vmax;
+  right: -10vmax;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.75), transparent 65%);
+  animation: devs-drift 22s ease-in-out infinite alternate;
+}
+.devs-blob-2 {
+  width: 40vmax;
+  height: 40vmax;
+  bottom: -12vmax;
+  left: -10vmax;
+  background: radial-gradient(circle, rgba(34, 240, 255, 0.55), transparent 65%);
+  animation: devs-drift 26s ease-in-out infinite alternate-reverse;
+}
+.devs-blob-3 {
+  width: 28vmax;
+  height: 28vmax;
+  top: 40%;
+  left: 45%;
+  background: radial-gradient(circle, rgba(255, 43, 214, 0.4), transparent 65%);
+  animation: devs-drift 30s ease-in-out infinite alternate;
+}
+
+.devs-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(34, 240, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 240, 255, 0.06) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 78%);
+  mask-image: radial-gradient(ellipse at center, #000 30%, transparent 78%);
+}
+
+.devs-noise {
+  position: absolute;
+  inset: 0;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+.devs-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(2, 3, 10, 0.75) 100%);
+}
+
+.devs-cursor-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 520px;
+  height: 520px;
+  margin: -260px 0 0 -260px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(34, 240, 255, 0.14), rgba(139, 92, 246, 0.07) 45%, transparent 70%);
+  will-change: transform;
+  transform: translate3d(-9999px, -9999px, 0);
+}
+
+/* ---------- reusable helpers for Devs Mode components ---------- */
+.devs-glass {
+  background: var(--glass-panel-bg);
+  border: 1px solid var(--glass-panel-border);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.devs-text-gradient {
+  background: var(--devs-gradient);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: devs-gradient-shift 8s ease infinite;
+}
+
+.devs-glow {
+  box-shadow:
+    0 0 0 1px rgba(34, 240, 255, 0.25),
+    0 0 24px rgba(34, 240, 255, 0.25),
+    0 0 60px rgba(139, 92, 246, 0.18);
+}
+
+.devs-glow-text {
+  text-shadow: 0 0 12px rgba(34, 240, 255, 0.65);
+}
+
+.devs-lift {
+  transform-style: preserve-3d;
+  transition:
+    transform 0.35s var(--devs-ease),
+    box-shadow 0.35s var(--devs-ease);
+}
+.devs-lift:hover {
+  transform: perspective(900px) translateY(-4px) rotateX(2deg);
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.5),
+    0 0 30px rgba(34, 240, 255, 0.18);
+}
+
+/* Rotating neon gradient border. Put on any element that has a border-radius. */
+@property --devs-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.devs-neon-border {
+  position: relative;
+}
+.devs-neon-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--devs-angle),
+    transparent 0 50%,
+    var(--devs-cyan),
+    var(--devs-violet),
+    var(--devs-magenta),
+    transparent 92%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: devs-spin 6s linear infinite;
+  pointer-events: none;
+}
+
+.devs-shimmer {
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.04) 20%,
+    rgba(34, 240, 255, 0.16) 50%,
+    rgba(255, 255, 255, 0.04) 80%
+  );
+  background-size: 220% 100%;
+  animation: devs-shimmer 1.6s linear infinite;
+}
+
+.devs-float {
+  animation: devs-float 5s ease-in-out infinite;
+}
+.devs-pulse-glow {
+  animation: devs-pulse-glow 2.4s ease-in-out infinite;
+}
+.devs-flicker {
+  animation: devs-flicker 3.5s steps(1) infinite;
+}
+.devs-marquee {
+  display: flex;
+  width: max-content;
+  animation: devs-marquee 24s linear infinite;
+}
+
+/* Glitch on hover: <span class="devs-glitch" data-text="Hello">Hello</span> */
+.devs-glitch {
+  position: relative;
+  display: inline-block;
+}
+.devs-glitch:hover::before,
+.devs-glitch:hover::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.devs-glitch:hover::before {
+  color: var(--devs-cyan);
+  transform: translate(-2px, 0);
+  clip-path: inset(0 0 55% 0);
+  animation: devs-glitch 0.45s steps(2) infinite;
+}
+.devs-glitch:hover::after {
+  color: var(--devs-magenta);
+  transform: translate(2px, 0);
+  clip-path: inset(55% 0 0 0);
+  animation: devs-glitch 0.45s steps(2) infinite reverse;
+}
+
+/* ---------- keyframes ---------- */
+@keyframes devs-sweep {
+  to { transform: translateX(100%); }
+}
+@keyframes devs-drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(6vmax, 4vmax, 0) scale(1.15); }
+}
+@keyframes devs-spin {
+  to { --devs-angle: 360deg; }
+}
+@keyframes devs-gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+@keyframes devs-shimmer {
+  to { background-position: -220% 0; }
+}
+@keyframes devs-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+@keyframes devs-pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 240, 255, 0.45); }
+  50%      { box-shadow: 0 0 0 10px rgba(34, 240, 255, 0); }
+}
+@keyframes devs-flicker {
+  0%, 100% { opacity: 1; }
+  92%      { opacity: 1; }
+  93%      { opacity: 0.55; }
+  94%      { opacity: 1; }
+  96%      { opacity: 0.7; }
+}
+@keyframes devs-marquee {
+  to { transform: translateX(-50%); }
+}
+@keyframes devs-glitch {
+  0%   { transform: translate(-2px, 1px); }
+  50%  { transform: translate(2px, -1px); }
+  100% { transform: translate(-1px, 0); }
+}
+
+/* ---------- lite mode (phones, touch, low-end devices) ---------- */
+html[data-lite="true"] .devs-blob {
+  filter: none;
+  opacity: 0.4;
+  animation: none;
+}
+html[data-lite="true"] .devs-neon-border::before,
+html[data-lite="true"] .devs-marquee {
+  animation: none;
+}
+html[data-lite="true"] .devs-glass {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  html.devs *,
+  html.devs *::before,
+  html.devs *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

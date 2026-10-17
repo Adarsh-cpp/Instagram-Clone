@@ -4,14 +4,32 @@
 // it hands the text back through onCaption and never posts anything.
 
 import React, { useState, useRef, useEffect } from "react";
+import { motion } from "framer-motion";
 import { Sparkles, RotateCw } from "lucide-react";
 import {
   CAPTION_TONES,
   generateAiCaption,
   getAiErrorMessage,
 } from "../api/aiApi";
+import { useTheme } from "../context/ThemeContext";
+
+// Sparkle that gently pulses in Devs Mode (static in classic / on lite devices)
+const SparkIcon = ({ size }) => {
+  const { isDevs, lite } = useTheme();
+  if (!isDevs || lite) return <Sparkles size={size} />;
+  return (
+    <motion.span
+      className="flex"
+      animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.18, 1] }}
+      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+    >
+      <Sparkles size={size} />
+    </motion.span>
+  );
+};
 
 const AiCaptionAssistant = ({ imageFile, onCaption, disabled }) => {
+  const { isDevs } = useTheme();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTone, setActiveTone] = useState(null);
@@ -85,10 +103,10 @@ const AiCaptionAssistant = ({ imageFile, onCaption, disabled }) => {
           type="button"
           disabled={isDisabled || isGenerating}
           onClick={() => setIsMenuOpen((prev) => !prev)}
-          className={`flex items-center gap-1.5 h-[32px] px-3 rounded-full border border-[var(--border-input)] text-[13px] transition-colors ${
+          className={`flex items-center gap-1.5 h-[32px] px-3 rounded-full border border-[var(--border-input)] text-[13px] transition-colors devs:font-mono devs:uppercase devs:tracking-wider devs:text-[11px] devs:border-[var(--devs-cyan)] devs:shadow-[0_0_14px_rgba(34,240,255,0.25)] ${
             isDisabled || isGenerating
               ? "opacity-50 cursor-not-allowed text-[var(--text-muted)]"
-              : "cursor-pointer text-[var(--accent-blue)] hover:bg-[var(--bg-elevated)]"
+              : "cursor-pointer text-[var(--accent-blue)] hover:bg-[var(--bg-elevated)] devs:hover:bg-[rgba(34,240,255,0.1)]"
           }`}
         >
           {isGenerating ? (
@@ -100,7 +118,7 @@ const AiCaptionAssistant = ({ imageFile, onCaption, disabled }) => {
             </>
           ) : (
             <>
-              <Sparkles size={15} />
+              <SparkIcon size={15} />
               <span>Generate Caption</span>
             </>
           )}
@@ -119,27 +137,34 @@ const AiCaptionAssistant = ({ imageFile, onCaption, disabled }) => {
       </div>
 
       {error && (
-        <p className="mt-1.5 text-[12px] text-[var(--color-error)] leading-snug">
-          {error}
+        <p className="mt-1.5 text-[12px] text-[var(--color-error)] leading-snug devs:font-mono">
+          {isDevs ? "! " : ""}{error}
         </p>
       )}
 
       {isMenuOpen && (
-        <div
+        <motion.div
+          {...(isDevs
+            ? {
+                initial: { opacity: 0, y: 8, scale: 0.96 },
+                animate: { opacity: 1, y: 0, scale: 1 },
+                transition: { duration: 0.18 },
+              }
+            : {})}
           ref={menuRef}
-          className="absolute bottom-[40px] left-0 z-50 w-[220px] rounded-xl bg-[var(--bg-menu)] border border-[var(--border-popup)] shadow-lg py-1 overflow-hidden"
+          className="absolute bottom-[40px] left-0 z-50 w-[220px] rounded-xl bg-[var(--bg-menu)] border border-[var(--border-popup)] shadow-lg py-1 overflow-hidden devs:backdrop-blur-xl devs:rounded-2xl devs:font-mono devs:shadow-[0_0_40px_rgba(34,240,255,0.18)]"
         >
           {CAPTION_TONES.map((tone) => (
             <button
               key={tone.id}
               type="button"
               onClick={() => handleGenerate(tone.id)}
-              className="w-full text-left px-4 py-2.5 text-[14px] text-[var(--text-primary)] hover:bg-[var(--bg-row-hover)] cursor-pointer"
+              className="w-full text-left px-4 py-2.5 text-[14px] text-[var(--text-primary)] hover:bg-[var(--bg-row-hover)] cursor-pointer devs:text-[13px] devs:hover:text-[var(--devs-cyan)]"
             >
               {tone.label}
             </button>
           ))}
-        </div>
+        </motion.div>
       )}
     </div>
   );

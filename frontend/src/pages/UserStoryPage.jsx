@@ -5,12 +5,14 @@ import { fabric } from "fabric";
 import { Rnd } from "react-rnd";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { motion } from "framer-motion";
 import {
   X, Type, Pencil, Palette, Music, Check, Undo2, SlidersHorizontal,
   CaseSensitive, Baseline, ChevronLeft, Loader2,
 } from "lucide-react";
 import { getImageFilterPreset, VIDEO_FILTER_CSS, FILTER_NAMES } from "../utils/storyFilters";
 import SongTrimClipper from "../components/SongTrimClipper";
+import { useTheme } from "../context/ThemeContext";
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
@@ -144,11 +146,11 @@ fabric.Object.prototype.set({
 
 // Visible, easy-to-grab corner handle for the video frame (mirrors the
 // fabric.js text-corner styling above so the whole editor feels consistent)
-const cornerHandle = (offset, cursor) => ({
+const cornerHandle = (offset, cursor, accent) => ({
   width: 18,
   height: 18,
   background: "#ffffff",
-  border: "2px solid #4a5df9",
+  border: `2px solid ${accent}`,
   borderRadius: "9999px",
   boxShadow: "0 1px 4px rgba(0,0,0,0.45)",
   zIndex: 20,
@@ -165,16 +167,16 @@ const edgeHandle = (offset, cursor) => ({
   ...offset,
 });
 
-const RND_HANDLE_STYLES = {
+const buildRndHandleStyles = (accent) => ({
   top: edgeHandle({ height: 16, top: -8 }, "ns-resize"),
   bottom: edgeHandle({ height: 16, bottom: -8 }, "ns-resize"),
   left: edgeHandle({ width: 16, left: -8 }, "ew-resize"),
   right: edgeHandle({ width: 16, right: -8 }, "ew-resize"),
-  topLeft: cornerHandle({ top: -9, left: -9 }, "nwse-resize"),
-  topRight: cornerHandle({ top: -9, right: -9 }, "nesw-resize"),
-  bottomLeft: cornerHandle({ bottom: -9, left: -9 }, "nesw-resize"),
-  bottomRight: cornerHandle({ bottom: -9, right: -9 }, "nwse-resize"),
-};
+  topLeft: cornerHandle({ top: -9, left: -9 }, "nwse-resize", accent),
+  topRight: cornerHandle({ top: -9, right: -9 }, "nesw-resize", accent),
+  bottomLeft: cornerHandle({ bottom: -9, left: -9 }, "nesw-resize", accent),
+  bottomRight: cornerHandle({ bottom: -9, right: -9 }, "nwse-resize", accent),
+});
 
 // Injected once — small keyframes for panel/backdrop/page entrance so
 // nothing feels like it just "pops" into existence
@@ -184,7 +186,7 @@ const STORY_PAGE_STYLES = `
 @keyframes storyPop { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
 `;
 
-const ColorPickerRow = ({ colors, value, onChange }) => {
+const ColorPickerRow = ({ colors, value, onChange, activeClass }) => {
   const nativeRef = useRef(null);
   return (
     <div className="flex items-center gap-3 flex-wrap p-4 pt-2">
@@ -196,7 +198,7 @@ const ColorPickerRow = ({ colors, value, onChange }) => {
           style={{ backgroundColor: c }}
           className={`w-9 h-9 rounded-full border-2 shrink-0 transition-all duration-150 hover:scale-110 active:scale-95 ${
             value === c
-              ? "border-[#4a5df9] scale-110 shadow-[0_0_0_3px_rgba(74,93,249,0.35)]"
+              ? activeClass
               : "border-white/30 hover:border-white/60"
           }`}
           aria-label={`Choose ${c}`}
@@ -225,6 +227,7 @@ const ColorPickerRow = ({ colors, value, onChange }) => {
 const UserStoryPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { isDevs, lite } = useTheme();
   const { file, mediaType } = location.state || {};
 
   const canvasElRef = useRef(null);
@@ -269,6 +272,22 @@ const UserStoryPage = () => {
   // Kept as an alias so the filter-thumbnail grid code below (which already
   // referenced `previewUrl`) doesn't need any other changes.
   const previewUrl = mediaUrl;
+
+  // Devs Mode: recolour the fabric selection handles (editor chrome only,
+  // never part of the exported image/video).
+  useEffect(() => {
+    fabric.Object.prototype.set(
+      isDevs
+        ? { cornerColor: "#22f0ff", cornerStrokeColor: "#04050e", borderColor: "#22f0ff" }
+        : { cornerColor: "#4a5df9", cornerStrokeColor: "#ffffff", borderColor: "#4a5df9" }
+    );
+    fabricRef.current?.requestRenderAll();
+  }, [isDevs]);
+
+  const rndHandleStyles = useMemo(
+    () => buildRndHandleStyles(isDevs ? "#22f0ff" : "#4a5df9"),
+    [isDevs]
+  );
 
   useEffect(() => {
     if (!file) {
@@ -699,6 +718,9 @@ const UserStoryPage = () => {
 
   if (!file) return null;
 
+  /* ------------------------------------------------------------------
+     Theme tokens. Classic strings are the original ones, untouched.
+     ------------------------------------------------------------------ */
   const toolbarBtnBase =
     "w-10 h-10 rounded-full flex items-center justify-center text-white backdrop-blur-md " +
     "bg-black/40 ring-1 ring-white/10 shadow-lg shadow-black/30 transition-all duration-150 " +
@@ -706,12 +728,95 @@ const UserStoryPage = () => {
   const toolbarBtnActive =
     "bg-[#4a5df9] ring-[#4a5df9]/50 shadow-[0_0_14px_rgba(74,93,249,0.55)] hover:bg-[#4a5df9]";
 
+  const devsBtnBase =
+    "w-10 h-10 rounded-full flex items-center justify-center text-white backdrop-blur-md " +
+    "transition-all duration-150 hover:scale-110 active:scale-90";
+  const devsBtnIdle =
+    "bg-[rgba(8,10,28,0.7)] ring-1 ring-[rgba(34,240,255,0.25)] shadow-lg shadow-black/40 " +
+    "hover:ring-[#22f0ff] hover:shadow-[0_0_16px_rgba(34,240,255,0.5)]";
+  const devsBtnActive =
+    "bg-[linear-gradient(135deg,#8b5cf6,#ff2bd6)] ring-1 ring-[#ff2bd6] shadow-[0_0_20px_rgba(255,43,214,0.6)]";
+
+  // Toolbar button class: (isActive, classicExtra)
+  const tbtn = (active, extra = "") =>
+    isDevs
+      ? `${devsBtnBase} ${active ? devsBtnActive : devsBtnIdle} ${extra}`
+      : `${toolbarBtnBase} ${extra} ${active ? toolbarBtnActive : ""}`;
+
+  const T = isDevs
+    ? {
+        page: "bg-[#04050e]",
+        frame:
+          "relative overflow-hidden bg-black rounded-none shadow-none ring-0 md:rounded-2xl md:shadow-[0_0_60px_rgba(34,240,255,0.18),0_20px_80px_rgba(0,0,0,0.7)]",
+        rnd: "cursor-move ring-1 ring-white/20 hover:ring-[#22f0ff]/70 focus-within:ring-[#22f0ff] transition-all duration-150",
+        panel:
+          "fixed inset-x-0 bottom-0 z-50 bg-[rgba(8,10,28,0.94)] backdrop-blur-xl border-t border-[rgba(34,240,255,0.25)] rounded-t-3xl shadow-[0_0_50px_rgba(34,240,255,0.15)] max-h-[65vh] overflow-hidden flex flex-col md:absolute md:inset-x-auto md:bottom-auto md:right-[84px] md:top-1/2 md:-translate-y-1/2 md:rounded-2xl md:border md:border-[rgba(34,240,255,0.25)] md:max-h-[70vh] md:w-auto",
+        panelTitle: "text-white text-xs font-mono uppercase tracking-[0.2em]",
+        colorActive:
+          "border-[#22f0ff] scale-110 shadow-[0_0_0_3px_rgba(34,240,255,0.35),0_0_14px_rgba(34,240,255,0.6)]",
+        fontActive: "text-white bg-[rgba(34,240,255,0.12)]",
+        accentText: "text-[#22f0ff]",
+        filterActive:
+          "ring-[#22f0ff] scale-[1.04] shadow-[0_0_14px_rgba(34,240,255,0.6)]",
+        filterBadge: "bg-[#22f0ff] ring-2 ring-[#0a0c1c]",
+        filterBadgeIcon: "text-[#04050e]",
+        done: "text-[#22f0ff] hover:text-[#7df7ff] text-xs font-mono uppercase tracking-widest px-1.5 py-1 rounded-lg hover:bg-[rgba(34,240,255,0.1)] transition-colors",
+        range: "w-full accent-[#22f0ff]",
+        addBtn:
+          "bg-[linear-gradient(120deg,#22f0ff,#8b5cf6,#ff2bd6)] text-[#04050e] font-mono uppercase tracking-widest text-xs font-bold px-6 py-3 rounded-full shadow-[0_0_24px_rgba(34,240,255,0.5)] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 hover:scale-[1.04] active:scale-95 flex items-center gap-2",
+        discard:
+          "text-white/90 hover:text-[#22f0ff] font-mono uppercase tracking-widest text-xs px-2 py-1 rounded-lg hover:bg-[rgba(34,240,255,0.1)] transition-all",
+        topBtn:
+          "text-white/90 hover:text-[#22f0ff] p-1.5 rounded-full hover:bg-[rgba(34,240,255,0.1)] active:scale-90 transition-all",
+        songGradient: "linear-gradient(45deg,#22f0ff,#8b5cf6,#ff2bd6)",
+      }
+    : {
+        page: "bg-[#0c1014]",
+        frame:
+          "relative overflow-hidden bg-black rounded-none shadow-none ring-0 md:rounded-2xl md:shadow-2xl md:shadow-black/60 md:ring-1 md:ring-white/10",
+        rnd: "cursor-move ring-1 ring-white/20 hover:ring-[#4a5df9]/70 focus-within:ring-[#4a5df9] transition-all duration-150",
+        panel:
+          "fixed inset-x-0 bottom-0 z-50 bg-[#161616]/95 backdrop-blur-xl border-t border-white/10 rounded-t-3xl shadow-2xl max-h-[65vh] overflow-hidden flex flex-col md:absolute md:inset-x-auto md:bottom-auto md:right-[84px] md:top-1/2 md:-translate-y-1/2 md:rounded-2xl md:border md:border-white/10 md:border-t-white/10 md:max-h-[70vh] md:w-auto",
+        panelTitle: "text-white text-sm font-semibold",
+        colorActive:
+          "border-[#4a5df9] scale-110 shadow-[0_0_0_3px_rgba(74,93,249,0.35)]",
+        fontActive: "text-white bg-[#4a5df9]/15",
+        accentText: "text-[#4a5df9]",
+        filterActive:
+          "ring-[#4a5df9] scale-[1.04] shadow-[0_0_10px_rgba(74,93,249,0.5)]",
+        filterBadge: "bg-[#4a5df9] ring-2 ring-[#161616]",
+        filterBadgeIcon: "text-white",
+        done: "text-[#4a5df9] hover:text-[#6b7bff] text-xs font-semibold px-1.5 py-1 rounded-lg hover:bg-[#4a5df9]/10 transition-colors",
+        range: "w-full accent-[#4a5df9]",
+        addBtn:
+          "bg-[#4a5df9] hover:bg-[#4150f7] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold px-6 py-2.5 rounded-full shadow-lg shadow-[#4a5df9]/30 transition-all duration-150 hover:scale-[1.03] active:scale-95 flex items-center gap-2",
+        discard:
+          "text-white/90 hover:text-white text-sm font-medium px-2 py-1 rounded-lg hover:bg-white/10 transition-all",
+        topBtn:
+          "text-white/90 hover:text-white p-1.5 rounded-full hover:bg-white/10 active:scale-90 transition-all",
+        songGradient: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)",
+      };
+
   return (
     <div
-      className="userStoryPage fixed inset-0 bg-[#0c1014] z-50 flex items-center justify-center"
+      className={`userStoryPage fixed inset-0 ${T.page} z-50 flex items-center justify-center`}
       style={{ animation: "storyFadeIn 0.18s ease-out" }}
     >
       <style>{STORY_PAGE_STYLES}</style>
+
+      {/* Devs Mode: ambient grid + glow behind the editor */}
+      {isDevs && (
+        <div aria-hidden="true" className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="devs-grid" />
+          {!lite && (
+            <>
+              <div className="devs-blob devs-blob-1" />
+              <div className="devs-blob devs-blob-2" />
+            </>
+          )}
+          <div className="devs-vignette" />
+        </div>
+      )}
 
       {selectedSong && (
         <audio ref={audioRef} src={selectedSong.audioUrl} className="hidden" crossOrigin="anonymous" />
@@ -720,17 +825,24 @@ const UserStoryPage = () => {
       {dims.width > 0 && (
         <div className="relative flex items-center gap-3 md:gap-3">
           <div
-            className="relative overflow-hidden bg-black rounded-none shadow-none ring-0 md:rounded-2xl md:shadow-2xl md:shadow-black/60 md:ring-1 md:ring-white/10"
+            className={T.frame}
             style={{ width: dims.width, height: dims.height }}
           >
+            {/* Devs Mode: rotating neon border around the frame (desktop) */}
+            {isDevs && (
+              <div className="absolute inset-0 pointer-events-none z-[35] hidden md:block">
+                <div className="devs-neon-border w-full h-full rounded-2xl" />
+              </div>
+            )}
+
             {mediaType === "video" && mediaUrl && (
               <Rnd
                 size={{ width: videoBox.width, height: videoBox.height }}
                 position={{ x: videoBox.x, y: videoBox.y }}
                 bounds="parent"
                 style={{ zIndex: 10 }}
-                className="cursor-move ring-1 ring-white/20 hover:ring-[#4a5df9]/70 focus-within:ring-[#4a5df9] transition-all duration-150"
-                resizeHandleStyles={RND_HANDLE_STYLES}
+                className={T.rnd}
+                resizeHandleStyles={rndHandleStyles}
                 onDragStop={(e, d) => setVideoBox((b) => ({ ...b, x: d.x, y: d.y }))}
                 onResizeStop={(e, dir, ref, delta, position) => {
                   setVideoBox({
@@ -765,14 +877,14 @@ const UserStoryPage = () => {
 
             {selectedSong && (
               <div
-                className="absolute top-14 left-4 right-4 z-30 flex items-center gap-2 bg-black/45 rounded-full px-3 py-2 backdrop-blur-md ring-1 ring-white/10 shadow-lg shadow-black/30"
+                className="absolute top-14 left-4 right-4 z-30 flex items-center gap-2 bg-black/45 rounded-full px-3 py-2 backdrop-blur-md ring-1 ring-white/10 devs:ring-[rgba(34,240,255,0.35)] shadow-lg shadow-black/30"
                 style={{ animation: "storyPop 0.2s ease-out" }}
               >
                 <div
                   className="w-6 h-6 rounded-full shrink-0"
-                  style={{ background: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)" }}
+                  style={{ background: T.songGradient }}
                 />
-                <div className="text-white text-xs truncate flex-1">
+                <div className="text-white text-xs truncate flex-1 devs:font-mono">
                   {selectedSong.title} · {selectedSong.artist}
                 </div>
               </div>
@@ -784,14 +896,21 @@ const UserStoryPage = () => {
             >
               <button
                 onClick={handleDiscard}
-                className="text-white/90 hover:text-white p-1.5 -ml-1.5 rounded-full hover:bg-white/10 active:scale-90 transition-all"
+                className={`${T.topBtn} -ml-1.5`}
                 aria-label="Discard"
               >
                 <X size={24} />
               </button>
+
+              {isDevs && (
+                <span className="absolute left-1/2 -translate-x-1/2 font-mono text-[10px] uppercase tracking-[0.3em] text-white/70">
+                  story.editor
+                </span>
+              )}
+
               <button
                 onClick={undoLast}
-                className="text-white/90 hover:text-white p-1.5 -mr-1.5 rounded-full hover:bg-white/10 active:scale-90 transition-all"
+                className={`${T.topBtn} -mr-1.5`}
                 aria-label="Undo"
               >
                 <Undo2 size={20} />
@@ -804,14 +923,14 @@ const UserStoryPage = () => {
             >
               <button
                 onClick={handleDiscard}
-                className="text-white/90 hover:text-white text-sm font-medium px-2 py-1 rounded-lg hover:bg-white/10 transition-all"
+                className={T.discard}
               >
                 Discard
               </button>
               <button
                 onClick={handleAddToStory}
                 disabled={exporting}
-                className="bg-[#4a5df9] hover:bg-[#4150f7] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold px-6 py-2.5 rounded-full shadow-lg shadow-[#4a5df9]/30 transition-all duration-150 hover:scale-[1.03] active:scale-95 flex items-center gap-2"
+                className={T.addBtn}
               >
                 {exporting && <Loader2 size={16} className="animate-spin" />}
                 {exporting ? "Posting..." : "Add to Story"}
@@ -823,13 +942,20 @@ const UserStoryPage = () => {
               fixed to the viewport since the media already fills it), and
               reverts to a normal side column next to the media from md
               upward, same as before. */}
-          <div
+          <motion.div
+            {...(isDevs
+              ? {
+                  initial: { opacity: 0, x: 24 },
+                  animate: { opacity: 1, x: 0 },
+                  transition: { delay: 0.2, duration: 0.4, ease: [0.2, 0.8, 0.2, 1] },
+                }
+              : {})}
             className="fixed z-40 flex flex-col items-center gap-3 md:static md:gap-4"
             style={{ top: "calc(env(safe-area-inset-top, 0px) + 6rem)", right: "0.75rem" }}
           >
             <button
               onClick={addText}
-              className={toolbarBtnBase}
+              className={tbtn(false)}
               aria-label="Add text"
             >
               <Type size={20} />
@@ -839,7 +965,7 @@ const UserStoryPage = () => {
               <>
                 <button
                   onClick={() => togglePanel("text-color")}
-                  className={`${toolbarBtnBase} relative ${panel === "text-color" ? toolbarBtnActive : ""}`}
+                  className={`${tbtn(panel === "text-color")} relative`}
                   style={{ animation: "storyPop 0.15s ease-out" }}
                   aria-label="Text color"
                 >
@@ -851,7 +977,7 @@ const UserStoryPage = () => {
                 </button>
                 <button
                   onClick={() => togglePanel("font")}
-                  className={`${toolbarBtnBase} ${panel === "font" ? toolbarBtnActive : ""}`}
+                  className={tbtn(panel === "font")}
                   style={{ animation: "storyPop 0.15s ease-out" }}
                   aria-label="Font"
                 >
@@ -865,7 +991,7 @@ const UserStoryPage = () => {
                 setMode((m) => (m === "draw" ? "select" : "draw"));
                 setPanel(mode === "draw" ? null : "pen-color");
               }}
-              className={`${toolbarBtnBase} relative ${mode === "draw" ? toolbarBtnActive : ""}`}
+              className={`${tbtn(mode === "draw")} relative`}
               aria-label="Doodle"
             >
               <Pencil size={20} />
@@ -878,7 +1004,7 @@ const UserStoryPage = () => {
             {mediaType === "image" && (
               <button
                 onClick={() => togglePanel("bg-color")}
-                className={`${toolbarBtnBase} ${panel === "bg-color" ? toolbarBtnActive : ""}`}
+                className={tbtn(panel === "bg-color")}
                 aria-label="Background color"
               >
                 <Palette size={20} />
@@ -887,7 +1013,7 @@ const UserStoryPage = () => {
 
             <button
               onClick={() => togglePanel("filters")}
-              className={`${toolbarBtnBase} ${panel === "filters" ? toolbarBtnActive : ""}`}
+              className={tbtn(panel === "filters")}
               aria-label="Filters"
             >
               <SlidersHorizontal size={20} />
@@ -895,19 +1021,17 @@ const UserStoryPage = () => {
 
             <button
               onClick={() => togglePanel("songs")}
-              className={`${toolbarBtnBase} ${
-                selectedSong ? "ring-white/20" : ""
-              } ${panel === "songs" ? toolbarBtnActive : ""}`}
+              className={tbtn(panel === "songs", selectedSong ? "ring-white/20" : "")}
               style={
                 selectedSong && panel !== "songs"
-                  ? { background: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)" }
+                  ? { background: T.songGradient }
                   : undefined
               }
               aria-label="Add music"
             >
               <Music size={20} />
             </button>
-          </div>
+          </motion.div>
 
           {panel && (
             <>
@@ -922,7 +1046,7 @@ const UserStoryPage = () => {
               />
 
               <div
-                className="fixed inset-x-0 bottom-0 z-50 bg-[#161616]/95 backdrop-blur-xl border-t border-white/10 rounded-t-3xl shadow-2xl max-h-[65vh] overflow-hidden flex flex-col md:absolute md:inset-x-auto md:bottom-auto md:right-[84px] md:top-1/2 md:-translate-y-1/2 md:rounded-2xl md:border md:border-white/10 md:border-t-white/10 md:max-h-[70vh] md:w-auto"
+                className={T.panel}
                 style={{
                   animation: "storyPanelIn 0.2s ease-out",
                   paddingBottom: "env(safe-area-inset-bottom)",
@@ -930,7 +1054,7 @@ const UserStoryPage = () => {
               >
                 {panel !== "songs" && PANEL_TITLES[panel] && (
                   <div className="flex items-center justify-between px-4 pt-3 pb-1 shrink-0">
-                    <span className="text-white text-sm font-semibold">{PANEL_TITLES[panel]}</span>
+                    <span className={T.panelTitle}>{PANEL_TITLES[panel]}</span>
                     <button
                       onClick={closePanel}
                       className="text-white/50 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors"
@@ -944,19 +1068,19 @@ const UserStoryPage = () => {
                 <div className="overflow-y-auto no-scrollbar">
                   {panel === "pen-color" && (
                     <div className="w-full sm:w-[260px]">
-                      <ColorPickerRow colors={PEN_SWATCHES} value={penColor} onChange={setPenColor} />
+                      <ColorPickerRow colors={PEN_SWATCHES} value={penColor} onChange={setPenColor} activeClass={T.colorActive} />
                     </div>
                   )}
 
                   {panel === "bg-color" && (
                     <div className="w-full sm:w-[260px]">
-                      <ColorPickerRow colors={BG_SWATCHES} value={bgColor} onChange={setBgColor} />
+                      <ColorPickerRow colors={BG_SWATCHES} value={bgColor} onChange={setBgColor} activeClass={T.colorActive} />
                     </div>
                   )}
 
                   {panel === "text-color" && (
                     <div className="w-full sm:w-[260px]">
-                      <ColorPickerRow colors={TEXT_SWATCHES} value={textColor} onChange={applyTextColor} />
+                      <ColorPickerRow colors={TEXT_SWATCHES} value={textColor} onChange={applyTextColor} activeClass={T.colorActive} />
                     </div>
                   )}
 
@@ -968,11 +1092,11 @@ const UserStoryPage = () => {
                           onClick={() => applyFont(f)}
                           style={{ fontFamily: f }}
                           className={`w-full flex items-center justify-between px-4 py-2.5 text-base transition-colors ${
-                            textFont === f ? "text-white bg-[#4a5df9]/15" : "text-white/90 hover:bg-white/5"
+                            textFont === f ? T.fontActive : "text-white/90 hover:bg-white/5"
                           }`}
                         >
                           {f}
-                          {textFont === f && <Check size={14} className="text-[#4a5df9] shrink-0" />}
+                          {textFont === f && <Check size={14} className={`${T.accentText} shrink-0`} />}
                         </button>
                       ))}
                     </div>
@@ -997,7 +1121,7 @@ const UserStoryPage = () => {
                               <div
                                 className={`relative w-full aspect-square rounded-xl overflow-hidden bg-black/40 ring-2 transition-all duration-150 ${
                                   isActive
-                                    ? "ring-[#4a5df9] scale-[1.04] shadow-[0_0_10px_rgba(74,93,249,0.5)]"
+                                    ? T.filterActive
                                     : "ring-white/15 hover:ring-white/40"
                                 }`}
                               >
@@ -1021,13 +1145,13 @@ const UserStoryPage = () => {
                                   />
                                 )}
                                 {isActive && (
-                                  <span className="absolute top-1 right-1 bg-[#4a5df9] rounded-full p-0.5 ring-2 ring-[#161616]">
-                                    <Check size={9} className="text-white" />
+                                  <span className={`absolute top-1 right-1 rounded-full p-0.5 ${T.filterBadge}`}>
+                                    <Check size={9} className={T.filterBadgeIcon} />
                                   </span>
                                 )}
                               </div>
                               <span
-                                className={`text-[11px] w-full text-center truncate ${
+                                className={`text-[11px] w-full text-center truncate devs:font-mono ${
                                   isActive ? "text-white font-semibold" : "text-white/70"
                                 }`}
                               >
@@ -1045,7 +1169,7 @@ const UserStoryPage = () => {
                       {!selectedSong ? (
                         <>
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-white text-sm font-semibold">Choose a song</span>
+                            <span className={T.panelTitle}>Choose a song</span>
                             <button
                               onClick={closePanel}
                               className="text-white/50 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors"
@@ -1074,7 +1198,7 @@ const UserStoryPage = () => {
                                   setSongStartTime(0);
                                   setSongClipSeconds(maxClip);
                                 }}
-                                className="flex items-center gap-3 p-2 mx-1 rounded-xl cursor-pointer hover:bg-white/5 active:bg-white/10 transition-colors"
+                                className="flex items-center gap-3 p-2 mx-1 rounded-xl cursor-pointer hover:bg-white/5 devs:hover:bg-[rgba(34,240,255,0.08)] active:bg-white/10 transition-colors"
                               >
                                 <img
                                   src={song.thumbnail || "/images/song-placeholder.png"}
@@ -1105,7 +1229,7 @@ const UserStoryPage = () => {
                             </button>
                             <button
                               onClick={closePanel}
-                              className="text-[#4a5df9] hover:text-[#6b7bff] text-xs font-semibold px-1.5 py-1 rounded-lg hover:bg-[#4a5df9]/10 transition-colors"
+                              className={T.done}
                             >
                               Done
                             </button>
@@ -1146,7 +1270,7 @@ const UserStoryPage = () => {
                                   max={sliderMax}
                                   value={songClipSeconds}
                                   onChange={(e) => setSongClipSeconds(Number(e.target.value))}
-                                  className="w-full accent-[#4a5df9]"
+                                  className={T.range}
                                   aria-label="Song clip length in seconds"
                                 />
                               </div>

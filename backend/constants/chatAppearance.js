@@ -27,6 +27,14 @@ export const VALID_THEME_IDS = [
   "glacier",
   "peach",
   "matrix",
+  "devs-aurora",
+  "devs-matrix",
+  "devs-synthwave",
+  "devs-nebula",
+  "devs-circuit",
+  "devs-hologram",
+  "devs-plasma",
+  "devs-terminal"
 ];
 
 export const VALID_FONT_IDS = [

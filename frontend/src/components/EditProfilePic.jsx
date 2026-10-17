@@ -1,10 +1,12 @@
 import React, { useRef, useState, useEffect } from "react";
 import axios from 'axios';
 import { toast } from "react-toastify";
+import { useTheme } from "../context/ThemeContext";
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
 const EditProfilePic = ({...props}) => {
+  const { isDevs } = useTheme();
   const fileInputRef = useRef(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [user, setUser] = useState(props.user);
@@ -99,15 +101,19 @@ const EditProfilePic = ({...props}) => {
   }, [props.user]);
 
   return (
-    <div className="editPic w-full sm:w-[80%] md:w-full lg:w-[80%] h-[15%] mt-4 flex rounded-[20px] overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-container)]">
+    <div
+      className={`editPic w-full sm:w-[80%] md:w-full lg:w-[80%] h-[15%] mt-4 flex rounded-[20px] overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-container)] ${
+        isDevs ? "devs-glass" : ""
+      }`}
+    >
       {/* --- Left Side --- */}
       <div className="picSide w-[70%] sm:w-[65%] lg:w-[50%] h-full flex justify-start items-center px-4  ">
-        <div className="profilePic relative w-[80px] h-[80px] sm:w-[90px] sm:h-[90px] rounded-full overflow-hidden">
+        <div className="profilePic relative w-[80px] h-[80px] sm:w-[90px] sm:h-[90px] rounded-full overflow-hidden devs:ring-2 devs:ring-[var(--devs-cyan)] devs:shadow-[0_0_22px_rgba(34,240,255,0.45)]">
 
         {/* //Loader  */}
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-surface)]">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 via-red-500 to-yellow-500 animate-spin p-[3px]">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 via-red-500 to-yellow-500 devs:from-[#22f0ff] devs:via-[#8b5cf6] devs:to-[#ff2bd6] animate-spin p-[3px]">
               <div className="w-full h-full bg-[var(--bg-surface)] rounded-full"></div>
               <div className="block w-[20px] h-[20px] absolute top-[20px] bg-[var(--bg-surface)]"></div>
               </div>
@@ -116,7 +122,7 @@ const EditProfilePic = ({...props}) => {
          
           {imgLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-surface)]">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 via-red-500 to-yellow-500 animate-spin p-[3px]">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 via-red-500 to-yellow-500 devs:from-[#22f0ff] devs:via-[#8b5cf6] devs:to-[#ff2bd6] animate-spin p-[3px]">
               <div className="w-full h-full bg-[var(--bg-surface)] rounded-full"></div>
               </div>
             </div>
@@ -130,7 +136,7 @@ const EditProfilePic = ({...props}) => {
             className="w-full h-full object-cover"
           />
         </div>
-        <div className="username px-4 text-[var(--text-primary)] text-[14px] sm:text-[16px] lg:text-[18px] font-bold">
+        <div className="username px-4 text-[var(--text-primary)] text-[14px] sm:text-[16px] lg:text-[18px] font-bold devs:font-mono">
           {user?.username}
         </div>
       </div>
@@ -139,7 +145,7 @@ const EditProfilePic = ({...props}) => {
       <div className="btnSide w-[30%] sm:w-[35%] lg:w-[50%] h-full flex justify-end items-center px-4">
         <button
           onClick={() => setIsModalOpen(true)}
-          className="w-[130px]  sm:w-[150px] h-[50px] bg-[var(--accent-indigo)] hover:bg-[var(--accent-indigo-hover)] cursor-pointer text-[var(--text-on-brand)] text-[12px] sm:text-[16px] font-bold rounded-xl"
+          className="w-[130px]  sm:w-[150px] h-[50px] bg-[var(--accent-indigo)] hover:bg-[var(--accent-indigo-hover)] cursor-pointer text-[var(--text-on-brand)] text-[12px] sm:text-[16px] font-bold rounded-xl devs:bg-[linear-gradient(120deg,#22f0ff,#8b5cf6,#ff2bd6)] devs:hover:bg-[linear-gradient(120deg,#22f0ff,#8b5cf6,#ff2bd6)] devs:font-mono devs:uppercase devs:tracking-wider devs:shadow-[0_0_22px_rgba(34,240,255,0.35)] devs:active:scale-95 devs:transition-transform"
         >
           Change Photo
         </button>
@@ -160,8 +166,8 @@ const EditProfilePic = ({...props}) => {
         <div
           className="absolute h-[600px] inset-0 flex justify-center items-center bg-[var(--overlay-scrim)] backdrop-blur-[var(--overlay-blur)] z-10"
         >
-          <div className="modal bg-[var(--glass-panel-bg)] backdrop-blur-xl w-[90%] sm:w-[350px] rounded-2xl overflow-hidden text-center text-[var(--text-primary)] border border-[var(--glass-panel-border)] shadow-2xl">
-            <div className="py-4 border-b border-[var(--border-popup)] text-[18px] font-semibold">
+          <div className="modal bg-[var(--glass-panel-bg)] backdrop-blur-xl w-[90%] sm:w-[350px] rounded-2xl overflow-hidden text-center text-[var(--text-primary)] border border-[var(--glass-panel-border)] shadow-2xl devs:font-mono devs:rounded-3xl devs:shadow-[0_0_50px_rgba(34,240,255,0.2)]">
+            <div className="py-4 border-b border-[var(--border-popup)] text-[18px] font-semibold devs:text-[14px] devs:uppercase devs:tracking-[0.2em]">
               Change Profile Photo
             </div>
             <button onClick={handleOpenFileDialog} className="block w-full py-3 text-[var(--brand-blue)]  hover:text-[var(--brand-blue-hover)] font-semibold hover:bg-[var(--bg-popup-hover)] cursor-pointer ">

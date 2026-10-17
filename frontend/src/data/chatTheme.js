@@ -240,6 +240,111 @@ export const CHAT_THEMES = [
 ];
 
 // ---------------------------------------------------------------
+// Devs Mode themes
+// ---------------------------------------------------------------
+//
+// These only show up in the picker while Devs Mode is on, and they animate
+// only in Devs Mode (see components/devs/ChatThemeFx.jsx). `bg` and the
+// bubble colors double as the STATIC fallback: that's what a friend who is
+// in light/dark mode sees, and what lite devices (phones, low-end) get.
+//
+// IMPORTANT: the backend validates theme ids (backend/constants/chatAppearance.js),
+// so every id below must also be added to that list.
+
+const DEVS_THEMES_RAW = [
+  {
+    id: "devs-aurora",
+    name: "Aurora Flux",
+    fx: "aurora",
+    bg: "linear-gradient(180deg, #050b1f 0%, #0a1633 100%)",
+    senderBubble: "#22f0ff",
+    senderText: "#021417",
+    receiverBubble: "#13204a",
+    receiverText: "#e6f4ff",
+  },
+  {
+    id: "devs-matrix",
+    name: "Code Rain",
+    fx: "matrix",
+    bg: "#010806",
+    senderBubble: "#00ff9c",
+    senderText: "#00160c",
+    receiverBubble: "#0b2a1c",
+    receiverText: "#d2ffe9",
+  },
+  {
+    id: "devs-synthwave",
+    name: "Synthwave",
+    fx: "synthwave",
+    bg: "linear-gradient(180deg, #12002b 0%, #3a0b52 55%, #7a1673 100%)",
+    senderBubble: "#ff2bd6",
+    senderText: "#ffffff",
+    receiverBubble: "#2a0a4a",
+    receiverText: "#ffe6fb",
+  },
+  {
+    id: "devs-nebula",
+    name: "Nebula Drift",
+    fx: "nebula",
+    bg: "linear-gradient(180deg, #05030f 0%, #150a33 100%)",
+    senderBubble: "#8b5cf6",
+    senderText: "#ffffff",
+    receiverBubble: "#1e1245",
+    receiverText: "#efe9ff",
+  },
+  {
+    id: "devs-circuit",
+    name: "Circuit Pulse",
+    fx: "circuit",
+    bg: "#05080a",
+    senderBubble: "#b6ff3b",
+    senderText: "#101a00",
+    receiverBubble: "#121c16",
+    receiverText: "#eaffd0",
+  },
+  {
+    id: "devs-hologram",
+    name: "Hologram",
+    fx: "hologram",
+    bg: "linear-gradient(180deg, #06101c 0%, #0d1f33 100%)",
+    senderBubble: "#7df7ff",
+    senderText: "#04181c",
+    receiverBubble: "#14293f",
+    receiverText: "#e6fbff",
+  },
+  {
+    id: "devs-plasma",
+    name: "Plasma Wave",
+    fx: "plasma",
+    bg: "linear-gradient(135deg, #1a0030 0%, #00263a 100%)",
+    senderBubble: "#ff6bd6",
+    senderText: "#2a0020",
+    receiverBubble: "#1b1146",
+    receiverText: "#ffeafc",
+  },
+  {
+    id: "devs-terminal",
+    name: "Terminal",
+    fx: "terminal",
+    bg: "#020a03",
+    senderBubble: "#39ff14",
+    senderText: "#021400",
+    receiverBubble: "#0a1f0c",
+    receiverText: "#c8ffc0",
+  },
+];
+
+export const DEVS_CHAT_THEMES = DEVS_THEMES_RAW.map((theme) => ({
+  ...theme,
+  mode: "dark",
+  devs: true,
+}));
+
+export const ALL_CHAT_THEMES = [...CHAT_THEMES, ...DEVS_CHAT_THEMES];
+
+export const isDevsChatTheme = (id) => DEVS_CHAT_THEMES.some((theme) => theme.id === id);
+
+// ---------------------------------------------------------------
 // Fonts
 // ---------------------------------------------------------------
 //
@@ -340,8 +445,10 @@ export const CHAT_FONTS = [
   },
 ];
 
+// Looks in the classic AND the Devs themes, so a conversation that uses a
+// Devs theme still resolves correctly for a friend in light/dark mode.
 export const getThemeById = (id) =>
-  CHAT_THEMES.find((theme) => theme.id === id) || CHAT_THEMES[0];
+  ALL_CHAT_THEMES.find((theme) => theme.id === id) || CHAT_THEMES[0];
 
 export const getFontById = (id) =>
   CHAT_FONTS.find((font) => font.id === id) || CHAT_FONTS[0];

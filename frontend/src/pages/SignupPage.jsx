@@ -3,22 +3,63 @@ import { useForm } from "react-hook-form";
 import { Link, useNavigate } from 'react-router-dom';
 import axios from "axios";
 import { toast } from 'react-toastify';
+import { AtSign, Lock, Mail, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { GoogleIcon, PasswordVisibleIcon, PasswordHiddenIcon } from '../components/Icons';
+import {
+  DevsAuthShell,
+  DevsInput,
+  DevsButton,
+  DevsDivider,
+  DevsLink,
+} from '../components/devs/DevsAuthKit';
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
+
+const emailOrMobileRegex = /^(?:[6-9]\d{9}|[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})$/i;
+const fullNameRegex = /^[a-zA-Z]+(?: [a-zA-Z]+)*$/;
+const usernameRegex = /^(?!.*\.\.)(?!.*\.$)[a-zA-Z0-9._]{1,30}$/;
+
+const contactRules = {
+  required: "This field is required",
+  pattern: {
+    value: emailOrMobileRegex,
+    message: "email address is required",
+  },
+};
+
+const passwordRules = {
+  required: "Password is required",
+  minLength: {
+    value: 6,
+    message: "Password must be at least 6 characters",
+  },
+};
+
+const fullnameRules = {
+  required: "This field is required",
+  pattern: {
+    value: fullNameRegex,
+    message: "Fullname",
+  },
+};
+
+const usernameRules = {
+  required: "This field is required",
+  pattern: {
+    value: usernameRegex,
+    message: "Username",
+  },
+};
 
 const SignupPage = () => {
 
   const { user, refreshUser } = useAuth()
+  const { isDevs } = useTheme()
 
-    const { register, handleSubmit, formState: { errors }, } = useForm();
+    const { register, handleSubmit, formState: { errors, isSubmitting }, } = useForm();
     const navigate = useNavigate();
-
-
-   const emailOrMobileRegex = /^(?:[6-9]\d{9}|[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})$/i;
-   const fullNameRegex = /^[a-zA-Z]+(?: [a-zA-Z]+)*$/;
-   const usernameRegex = /^(?!.*\.\.)(?!.*\.$)[a-zA-Z0-9._]{1,30}$/;
 
     const [pwVisibility, setPwVisibility] = useState(false);
 
@@ -54,8 +95,83 @@ const SignupPage = () => {
   }
 };
 
+  /* ---------------- Devs Mode ---------------- */
+  if (isDevs) {
+    return (
+      <DevsAuthShell
+        title="Create account"
+        subtitle="Sign up to see photos and videos from your friends."
+        headline={["Join the", "network."]}
+        sub="Spin up your profile in seconds. Share posts, drop stories, and chat in real time."
+        footer={
+          <div className="mt-6 flex flex-col items-center gap-3">
+            <DevsLink to="/user/forgot-password">Forgotten your password?</DevsLink>
+            <p className="font-mono text-[12px] text-[var(--text-muted)]">
+              Have an account?{" "}
+              <DevsLink to="/" accent>Log in</DevsLink>
+            </p>
+          </div>
+        }
+      >
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <DevsInput
+            label="email"
+            icon={Mail}
+            placeholder="email address"
+            error={errors.contact?.message}
+            {...register("contact", contactRules)}
+          />
 
+          <DevsInput
+            label="passkey"
+            icon={Lock}
+            type={pwVisibility ? "text" : "password"}
+            placeholder="Password"
+            error={errors.password?.message}
+            right={
+              <button type="button" onClick={handlePwVisibility} className="cursor-pointer">
+                {pwVisibility ? <PasswordHiddenIcon /> : <PasswordVisibleIcon />}
+              </button>
+            }
+            {...register("password", passwordRules)}
+          />
 
+          <DevsInput
+            label="full name"
+            icon={User}
+            placeholder="Fullname"
+            error={errors.fullname?.message}
+            {...register("fullname", fullnameRules)}
+          />
+
+          <DevsInput
+            label="handle"
+            icon={AtSign}
+            placeholder="Username"
+            error={errors.username?.message}
+            {...register("username", usernameRules)}
+          />
+
+          <DevsButton type="submit" loading={isSubmitting} className="mt-2">
+            Sign up
+          </DevsButton>
+        </form>
+
+        <DevsDivider />
+
+        <DevsButton
+          type="button"
+          variant="ghost"
+          onClick={handleGoogleLogin}
+          icon={<GoogleIcon size={18} />}
+        >
+          Continue with Google
+        </DevsButton>
+      </DevsAuthShell>
+    );
+  }
+
+  /* ---------------- Classic (light / dark) ---------------- */
   return (
    <div className="signupPage h-[100vh] w-[100vw] bg-[var(--bg-app)] flex justify-center">
         <div className="container h-full w-[900px] flex justify-center">
@@ -75,13 +191,7 @@ const SignupPage = () => {
         {/*Email/Mobile no Field */}
         <div>
           <input
-            {...register("contact", {
-              required: "This field is required",
-              pattern: {
-                value: emailOrMobileRegex,
-                message: "email address is required",
-              },
-            })}
+            {...register("contact", contactRules)}
            className={`h-[36px] w-[270px] bg-[var(--bg-input)] text-[12px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px]  px-[10px] my-[3px] ${errors.contact ? " border border-[var(--color-error)]" : "border border-[var(--border-input)]" }`}
             placeholder="email address"
           />
@@ -99,13 +209,7 @@ const SignupPage = () => {
             </button>
           <input
             type={pwVisibility ? "text" : "password"}
-            {...register("password", {
-              required: "Password is required",
-              minLength: {
-                value: 6,
-                message: "Password must be at least 6 characters",
-              },
-            })}
+            {...register("password", passwordRules)}
             className={`h-[36px] w-[270px] bg-[var(--bg-input)] text-[12px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px]  px-[10px] my-[3px] ${errors.password ? " border border-[var(--color-error)]" : "border border-[var(--border-input)]" }`}
             placeholder="Password"
           />
@@ -119,13 +223,7 @@ const SignupPage = () => {
        {/*  Full name Field  */}
        <div>
           <input
-            {...register("fullname", {
-              required: "This field is required",
-              pattern: {
-                value: fullNameRegex,
-                message: "Fullname",
-              },
-            })}
+            {...register("fullname", fullnameRules)}
             className={`h-[36px] w-[270px] bg-[var(--bg-input)] text-[12px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px]  px-[10px] my-[3px] ${errors.fullname ? " border border-[var(--color-error)]" : "border border-[var(--border-input)]" }`}
             placeholder="Fullname"
           />
@@ -139,13 +237,7 @@ const SignupPage = () => {
     {/*  username Field  */}
     <div>
           <input
-            {...register("username", {
-              required: "This field is required",
-              pattern: {
-                value: usernameRegex,
-                message: "Username",
-              },
-            })}
+            {...register("username", usernameRules)}
             className={`h-[36px] w-[270px] bg-[var(--bg-input)] text-[12px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px]  px-[10px] my-[3px] ${errors.username ? " border border-[var(--color-error)]" : "border border-[var(--border-input)]" }`}
             placeholder="Username"
           />

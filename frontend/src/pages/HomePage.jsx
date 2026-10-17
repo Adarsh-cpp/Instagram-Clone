@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { motion, useScroll, useSpring } from 'framer-motion'
 import IconSidebar from '../components/IconSidebar'
 import StoryContainer from '../components/StoryContainer'
 import HomepagePostCard from '../components/HomepagePostCard'
 import axios from "axios";
 import MobileFooter from '../components/MobileFooter';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useUpload } from '../context/UploadContext';
@@ -46,6 +48,7 @@ const normalizeNewPost = (post, user) => {
 const HomePage = () => {
 
   const store = useHomeFeedStore();
+  const { isDevs } = useTheme();
 
   const [posts, setPosts] = useState(() => store.current.posts);
   const [nextCursor, setNextCursor] = useState(() => store.current.nextCursor);
@@ -62,6 +65,14 @@ const HomePage = () => {
   const scrollParentRef = useRef(null);
   const listStartRef = useRef(null);
   const [scrollMargin, setScrollMargin] = useState(0);
+
+  // Devs Mode: neon scroll-progress bar for the feed's scroll container
+  const { scrollYProgress } = useScroll({ container: scrollParentRef });
+  const progressX = useSpring(scrollYProgress, {
+    stiffness: 120,
+    damping: 30,
+    restDelta: 0.001,
+  });
 
   const isFetchingRef = useRef(false);
   const hasRestoredScrollRef = useRef(false);
@@ -144,16 +155,18 @@ const HomePage = () => {
     });
   }, [uploads, markConsumed, user]);
 
+  // `isDevs` is a dependency because Devs Mode adds a header above the list,
+  // which moves where the list starts.
   useLayoutEffect(() => {
     if (listStartRef.current) {
       setScrollMargin(listStartRef.current.offsetTop);
     }
-  }, [initialLoading]);
+  }, [initialLoading, isDevs]);
 
   const virtualizer = useVirtualizer({
     count: posts.length,
     getScrollElement: () => scrollParentRef.current,
-    estimateSize: () => 640,
+    estimateSize: () => (isDevs ? 720 : 640),
     overscan: 4,
     scrollMargin,
     useFlushSync: false,
@@ -214,6 +227,19 @@ const HomePage = () => {
   return (
     <div className='homePage w-[100vw] h-[100vh] bg-[var(--bg-app)] flex text-[var(--text-primary)] overflow-x-hidden'>
 
+      {/* Devs Mode: scroll progress bar */}
+      {isDevs && (
+        <motion.div
+          aria-hidden="true"
+          className="fixed top-0 left-0 right-0 h-[2px] origin-left z-40 pointer-events-none"
+          style={{
+            scaleX: progressX,
+            background: "linear-gradient(90deg,#22f0ff,#8b5cf6,#ff2bd6)",
+            boxShadow: "0 0 12px rgba(34,240,255,0.8)",
+          }}
+        />
+      )}
+
       <IconSidebar />
 
       <div
@@ -225,6 +251,19 @@ const HomePage = () => {
         <div className="homeContainer w-full sm:w-[70%] lg:w-[60%] min-h-full flex flex-col items-start">
 
           <StoryContainer />
+
+          {/* Devs Mode: live feed header */}
+          {isDevs && (
+            <div className="w-full xl:w-[75%] mx-auto px-2 pt-4 flex items-center justify-between font-mono text-[11px] uppercase tracking-[0.25em] text-[var(--text-muted)]">
+              <span className="flex items-center gap-2">
+                <span className="devs-pulse-glow w-2 h-2 rounded-full bg-[var(--devs-lime)]" />
+                live feed
+              </span>
+              <span className="devs-text-gradient font-bold">
+                {String(posts.length).padStart(2, "0")} posts
+              </span>
+            </div>
+          )}
 
           <div
             ref={listStartRef}
@@ -238,9 +277,18 @@ const HomePage = () => {
                     ))}
                   </div>
             ) : posts.length === 0 ? (
-              <div className="w-full h-[300px] flex justify-center items-center text-[var(--text-primary)]">
-                No posts available
-              </div>
+              isDevs ? (
+                <div className="devs-glass rounded-3xl w-full h-[300px] flex flex-col gap-3 justify-center items-center text-center">
+                  <span className="devs-float devs-text-gradient font-mono text-[32px] font-bold">{"</>"}</span>
+                  <span className="font-mono text-[13px] text-[var(--text-secondary)]">
+                    No posts available
+                  </span>
+                </div>
+              ) : (
+                <div className="w-full h-[300px] flex justify-center items-center text-[var(--text-primary)]">
+                  No posts available
+                </div>
+              )
             ) : (
               <div
                 style={{
@@ -293,13 +341,26 @@ const HomePage = () => {
 
             {isLoadingMore && (
               <div className="w-full py-4 flex justify-center text-[var(--text-muted)] text-sm">
-                Loading more...
+                {isDevs ? (
+                  <span className="font-mono">
+                    <span className="text-[var(--devs-cyan)]">&gt;</span> Loading more...
+                    <span className="inline-block w-[7px] h-[14px] ml-1 bg-[var(--devs-cyan)] animate-pulse align-middle" />
+                  </span>
+                ) : (
+                  "Loading more..."
+                )}
               </div>
             )}
 
             {!hasMore && posts.length > 0 && (
               <div className="w-full py-4 flex justify-center text-[var(--text-muted)] text-sm">
-                You're all caught up
+                {isDevs ? (
+                  <span className="font-mono text-[12px] tracking-wider">
+                    <span className="text-[var(--devs-lime)]">{"//"}</span> You're all caught up
+                  </span>
+                ) : (
+                  "You're all caught up"
+                )}
               </div>
             )}
 

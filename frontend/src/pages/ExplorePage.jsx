@@ -4,12 +4,14 @@ import axios from "axios"
 import IconSidebar from '../components/IconSidebar'
 import FollowingSuggestionCard from '../components/FollowingSuggestionCard'
 import ExplorePostCard from '../components/ExplorePostCard'
+import { useTheme } from '../context/ThemeContext'
 
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
 const ExplorePage = () => {
 
+    const { isDevs } = useTheme()
 
     const [posts, setPosts] = useState([])
     const [users, setUsers] = useState([])
@@ -82,7 +84,7 @@ useEffect(() => {
       <div className="exploreSection w-full md:w-[80%] flex-1 min-h-0 md:flex-none md:h-full flex flex-col md:flex-row overflow-hidden md:overflow-visible">
 
 
-       <div className="exploreContainer w-full md:w-[70%] lg:w-[65%] h-[50vh] md:h-full md:min-h-full grid grid-cols-3 auto-rows-[110px] xs:auto-rows-[130px] sm:auto-rows-[160px] md:auto-rows-[200px] lg:auto-rows-[250px] gap-[2px] overflow-y-auto hide-scrollbar bg-[var(--bg-app)]">
+       <div className="exploreContainer w-full md:w-[70%] lg:w-[65%] h-[50vh] md:h-full md:min-h-full grid grid-cols-3 auto-rows-[110px] xs:auto-rows-[130px] sm:auto-rows-[160px] md:auto-rows-[200px] lg:auto-rows-[250px] gap-[2px] devs:gap-2 devs:p-2 overflow-y-auto hide-scrollbar bg-[var(--bg-app)]">
   {posts.map((post, index) => {
     const group = Math.floor(index / 5);
     const position = index % 5;
@@ -108,17 +110,31 @@ useEffect(() => {
 </div>
 
 
-<div className="followingSuggestions w-full md:w-[30%] lg:w-[35%] flex-1 min-h-0 md:flex-none md:h-full flex flex-col overflow-y-auto bg-[var(--bg-app)] border-t md:border-t-0 md:border-l border-[var(--border-soft)]">
+<div className="followingSuggestions w-full md:w-[30%] lg:w-[35%] flex-1 min-h-0 md:flex-none md:h-full flex flex-col overflow-y-auto bg-[var(--bg-app)] border-t md:border-t-0 md:border-l border-[var(--border-soft)] devs:backdrop-blur-xl devs:border-[var(--border-popup)]">
 
 
   <div className="heading w-full h-[60px] shrink-0 flex justify-center items-center text-[14px] font-semibold text-center px-2">
-    Find friends and accounts that you like
+    {isDevs ? (
+      <span className="flex flex-col items-center gap-1">
+        <span
+          className="devs-text-gradient font-extrabold text-[20px] leading-none tracking-tight"
+          style={{ fontFamily: "var(--devs-font-display)" }}
+        >
+          Explore
+        </span>
+        <span className="font-mono text-[9px] font-normal uppercase tracking-[0.2em] text-[var(--text-muted)]">
+          Find friends and accounts that you like
+        </span>
+      </span>
+    ) : (
+      "Find friends and accounts that you like"
+    )}
   </div>
 
 
   {/* Search Bar */}
   <div className="searchSection w-full shrink-0 px-3 py-2">
-    <div className="searchContainer w-full h-[40px] bg-[var(--bg-elevated)] rounded-lg flex items-center px-3 border border-[var(--border-soft)] focus-within:border-[var(--brand-blue)] transition-colors">
+    <div className="searchContainer w-full h-[40px] bg-[var(--bg-elevated)] rounded-lg flex items-center px-3 border border-[var(--border-soft)] focus-within:border-[var(--brand-blue)] transition-colors devs:rounded-xl devs:bg-[var(--bg-input)] devs:border-[var(--border-input)] devs:focus-within:border-[var(--devs-cyan)] devs:focus-within:shadow-[0_0_18px_rgba(34,240,255,0.25)]">
       <svg 
         className="w-5 h-5 text-[var(--text-muted)] mr-2" 
         fill="none" 
@@ -137,12 +153,12 @@ useEffect(() => {
         placeholder="Search users..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        className="w-full bg-transparent text-[var(--text-primary)] text-sm outline-none placeholder-[var(--text-muted)]"
+        className="w-full bg-transparent text-[var(--text-primary)] text-sm outline-none placeholder-[var(--text-muted)] devs:font-mono devs:text-[13px]"
       />
       {searchQuery && (
         <button
           onClick={() => setSearchQuery("")}
-          className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+          className="text-[var(--text-muted)] hover:text-[var(--text-primary)] devs:hover:text-[var(--devs-cyan)] transition-colors"
         >
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
             <path 
@@ -168,7 +184,8 @@ useEffect(() => {
         />
       ))
     ) : (
-      <div className="w-full flex justify-center items-center py-8 text-[var(--text-muted)] text-sm">
+      <div className="w-full flex justify-center items-center py-8 text-[var(--text-muted)] text-sm devs:font-mono">
+        {isDevs && <span className="text-[var(--devs-cyan)] mr-2">&gt;</span>}
         No users found
       </div>
     )}

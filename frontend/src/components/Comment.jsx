@@ -1,10 +1,13 @@
 // Comment.jsx
 import React, { useState } from "react";
+import { motion } from "framer-motion";
 import { BadgeCheck } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { getTimeAgo } from "../utils/timeAgo";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+import LikeBurst from "./devs/LikeBurst";
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL;
 
@@ -48,6 +51,7 @@ const Comment = ({
 }) => {
 
   const { user, refreshUser } = useAuth();
+  const { isDevs } = useTheme();
   const isOwnComment = user?._id?.toString() === comment?.author?._id?.toString();
 
   // Either the person who wrote this comment, or the person who owns
@@ -77,6 +81,7 @@ const Comment = ({
   );
   const [likesCount, setLikesCount] = useState(isRealComment ? comment.likes?.length || 0 : 0);
   const [showHeartPop, setShowHeartPop] = useState(false);
+  const [likeBurst, setLikeBurst] = useState(0); // Devs Mode only
 
   const [replies, setReplies] = useState(comment?.replies || []);
   const [showReplies, setShowReplies] = useState(false);
@@ -101,6 +106,9 @@ const Comment = ({
 
       setIsLiked(data.liked);
       setLikesCount(data.likesCount);
+
+      // Devs Mode: neon burst when a like is confirmed
+      if (data.liked && isDevs) setLikeBurst((n) => n + 1);
     } catch (error) {
       console.log(error);
     }
@@ -108,8 +116,10 @@ const Comment = ({
 
   const handleDoubleClick = () => {
     if (!isRealComment || isLiked) return; // double-click only ever likes, never unlikes
-    setShowHeartPop(true);
-    setTimeout(() => setShowHeartPop(false), 700);
+    if (!isDevs) {
+      setShowHeartPop(true);
+      setTimeout(() => setShowHeartPop(false), 700);
+    }
     toggleLike();
   };
 
@@ -186,27 +196,66 @@ const Comment = ({
     }
   };
 
+  const likeButton = (
+    <button
+      onClick={toggleLike}
+      className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition cursor-pointer px-1"
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill={isLiked ? "var(--color-danger)" : "none"}
+        stroke={isLiked ? "var(--color-danger)" : "currentColor"}
+        strokeWidth="2"
+        style={
+          isDevs && isLiked
+            ? { filter: "drop-shadow(0 0 6px rgba(255,59,107,0.9))" }
+            : undefined
+        }
+      >
+        <path d="M12 21s-6.7-4.35-9.33-8.2C1.1 10.6 1.5 7.3 4.2 5.6c2.2-1.4 4.9-.8 6.4 1.1L12 8l1.4-1.3c1.5-1.9 4.2-2.5 6.4-1.1 2.7 1.7 3.1 5 1.53 7.2C18.7 16.65 12 21 12 21z" />
+      </svg>
+    </button>
+  );
+
   return (
-    <div className={isReply ? "flex flex-col ml-10 sm:ml-12 mt-2" : "flex flex-col"}>
-      <div className="flex gap-3 rounded-2xl px-2 py-3 sm:px-3 hover:bg-[var(--bg-row-hover)] transition">
+    <motion.div
+      {...(isDevs
+        ? {
+            initial: { opacity: 0, y: 10 },
+            animate: { opacity: 1, y: 0 },
+            transition: { duration: 0.3 },
+          }
+        : {})}
+      className={isReply ? "flex flex-col ml-10 sm:ml-12 mt-2" : "flex flex-col"}
+    >
+      <div className="flex gap-3 rounded-2xl px-2 py-3 sm:px-3 hover:bg-[var(--bg-row-hover)] transition devs:hover:shadow-[inset_2px_0_0_var(--devs-cyan)]">
         <img
           src={displayDP}
           alt={displayAuthor}
           className={`${
             isReply ? "h-8 w-8" : "h-10 w-10 sm:h-11 sm:w-11"
-          } rounded-full object-cover shrink-0`}
+          } rounded-full object-cover shrink-0 devs:ring-1 devs:ring-[var(--devs-violet)]`}
         />
 
         <div className="min-w-0 flex-1" onDoubleClick={handleDoubleClick}>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h4 className="text-sm sm:text-[15px] font-semibold text-[var(--text-primary)] truncate flex items-center gap-1">
+            <h4 className="text-sm sm:text-[15px] font-semibold text-[var(--text-primary)] truncate flex items-center gap-1 devs:font-bold">
              {isOwnComment ? displayAuthor : displayAuthor}
              {isAdminAuthor && (
-               <BadgeCheck size={13} className="text-sky-400 shrink-0" />
+               <BadgeCheck
+                 size={13}
+                 className={`shrink-0 ${
+                   isDevs
+                     ? "text-[var(--devs-cyan)] drop-shadow-[0_0_5px_rgba(34,240,255,0.9)]"
+                     : "text-sky-400"
+                 }`}
+               />
              )}
             </h4>
 
-            <span className="text-[11px] sm:text-xs text-[var(--text-muted)]">{commentTime}</span>
+            <span className="text-[11px] sm:text-xs text-[var(--text-muted)] devs:font-mono">{commentTime}</span>
           </div>
 
           <p className="mt-1 text-sm sm:text-[15px] leading-5 text-[var(--text-secondary)] break-words">
@@ -214,10 +263,10 @@ const Comment = ({
           </p>
 
           {isRealComment && (
-            <div className="mt-2 flex items-center gap-4 text-xs sm:text-sm text-[var(--text-muted)]">
+            <div className="mt-2 flex items-center gap-4 text-xs sm:text-sm text-[var(--text-muted)] devs:font-mono devs:text-[11px] devs:sm:text-[11px] devs:uppercase devs:tracking-wider">
               <button
                 onClick={isReply ? () => onReplyClick?.(displayAuthor) : openReplyBox}
-                className="hover:text-[var(--text-primary)] transition cursor-pointer"
+                className="hover:text-[var(--text-primary)] devs:hover:text-[var(--devs-cyan)] transition cursor-pointer"
               >
                 Reply
               </button>
@@ -229,7 +278,7 @@ const Comment = ({
               {!isReply && replies.length > 0 && (
                 <button
                   onClick={() => setShowReplies((prev) => !prev)}
-                  className="hover:text-[var(--text-primary)] transition cursor-pointer font-semibold"
+                  className="hover:text-[var(--text-primary)] devs:hover:text-[var(--devs-cyan)] transition cursor-pointer font-semibold"
                 >
                   {showReplies ? "Hide replies" : `Replies (${replies.length})`}
                 </button>
@@ -240,14 +289,16 @@ const Comment = ({
 
         {isRealComment && (
           <div className="shrink-0 relative flex flex-col items-center gap-1">
-            <button
-              onClick={toggleLike}
-              className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition cursor-pointer px-1"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill={isLiked ? "var(--color-danger)" : "none"} stroke={isLiked ? "var(--color-danger)" : "currentColor"} strokeWidth="2">
-                <path d="M12 21s-6.7-4.35-9.33-8.2C1.1 10.6 1.5 7.3 4.2 5.6c2.2-1.4 4.9-.8 6.4 1.1L12 8l1.4-1.3c1.5-1.9 4.2-2.5 6.4-1.1 2.7 1.7 3.1 5 1.53 7.2C18.7 16.65 12 21 12 21z" />
-              </svg>
-            </button>
+            {isDevs ? (
+              <span className="relative flex">
+                <motion.span whileTap={{ scale: 0.7 }} className="flex">
+                  {likeButton}
+                </motion.span>
+                <LikeBurst burstKey={likeBurst} variant="mini" />
+              </span>
+            ) : (
+              likeButton
+            )}
 
             {showHeartPop && (
               <span className="absolute -top-3 text-[var(--color-danger)] text-lg animate-ping pointer-events-none">
@@ -273,7 +324,11 @@ const Comment = ({
                       className="fixed inset-0 z-40"
                       onClick={() => setShowMenu(false)}
                     />
-                    <div className="absolute right-0 top-full mt-1 z-50 w-32 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-surface)] shadow-lg py-1">
+                    <div
+                      className={`absolute right-0 top-full mt-1 z-50 w-32 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-surface)] shadow-lg py-1 ${
+                        isDevs ? "devs-glass !rounded-xl font-mono" : ""
+                      }`}
+                    >
                       <button
                         onClick={() => {
                           setShowMenu(false);
@@ -294,13 +349,24 @@ const Comment = ({
 
       {/* delete confirmation dialog */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(0,0,0,0.6)] px-4">
-          <div className="w-full max-w-xs rounded-2xl bg-[var(--bg-surface)] shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(0,0,0,0.6)] px-4 devs:backdrop-blur-sm">
+          <motion.div
+            {...(isDevs
+              ? {
+                  initial: { scale: 0.9, y: 16, opacity: 0 },
+                  animate: { scale: 1, y: 0, opacity: 1 },
+                  transition: { type: "spring", stiffness: 380, damping: 28 },
+                }
+              : {})}
+            className={`w-full max-w-xs rounded-2xl bg-[var(--bg-surface)] shadow-2xl overflow-hidden ${
+              isDevs ? "devs-glass devs-neon-border !rounded-3xl" : ""
+            }`}
+          >
             <div className="px-5 py-5 text-center">
-              <h3 className="text-sm sm:text-base font-semibold text-[var(--text-primary)]">
+              <h3 className="text-sm sm:text-base font-semibold text-[var(--text-primary)] devs:font-bold">
                 Delete comment?
               </h3>
-              <p className="mt-1 text-xs sm:text-sm text-[var(--text-muted)]">
+              <p className="mt-1 text-xs sm:text-sm text-[var(--text-muted)] devs:font-mono devs:text-[11px] devs:sm:text-[11px]">
                 This can't be undone. Are you sure?
               </p>
             </div>
@@ -320,7 +386,7 @@ const Comment = ({
                 {deleting ? "Deleting..." : "Delete"}
               </button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
 
@@ -355,19 +421,19 @@ const Comment = ({
                 if (e.key === "Enter" && !e.shiftKey) handlePostReply();
               }}
               placeholder={replyTarget ? `Reply to @${replyTarget.username}...` : "Write a reply..."}
-              className="flex-1 bg-transparent text-sm text-[var(--text-primary)] outline-none border-b border-[var(--border-popup)] focus:border-[var(--border-input)] py-1"
+              className="flex-1 bg-transparent text-sm text-[var(--text-primary)] outline-none border-b border-[var(--border-popup)] focus:border-[var(--border-input)] py-1 devs:font-mono devs:text-[13px] devs:focus:border-[var(--devs-cyan)]"
             />
             <button
               onClick={handlePostReply}
               disabled={posting || !replyText.trim()}
-              className="text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-40 transition cursor-pointer"
+              className="text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] devs:hover:text-[var(--devs-cyan)] disabled:opacity-40 transition cursor-pointer devs:font-mono devs:uppercase devs:tracking-widest"
             >
               Post
             </button>
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 };
 

@@ -5,11 +5,14 @@ import Chat from '../components/Chat'
 import axios from 'axios'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 import { BadgeCheck, Search } from 'lucide-react'
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
 const DirectMessagePage = () => {
+
+  const { isDevs } = useTheme()
 
   const [conversations, setConversations] = useState([])
 
@@ -46,20 +49,25 @@ const DirectMessagePage = () => {
   return (
     <div className="messagePage w-screen h-screen flex bg-[var(--bg-app)] overflow-hidden">
 
-      <div className={`messagesList w-full ${conversationId ? "hidden" : "block"} md:block md:w-[35%] lg:w-[30%] h-full border-r border-[var(--border-soft)] bg-[var(--bg-app)] `}>
+      <div className={`messagesList w-full ${conversationId ? "hidden" : "block"} md:block md:w-[35%] lg:w-[30%] h-full border-r border-[var(--border-soft)] bg-[var(--bg-app)] devs:backdrop-blur-xl devs:border-[var(--border-popup)] `}>
 
         <div className="upperPart w-full h-[20%]">
 
           <div className="accName w-full h-[40%] text-[var(--text-primary)] text-[18px] sm:text-[20px] font-semibold px-4 sm:px-8 flex justify-start items-center gap-1.5">
-            {user?.username}
+            <span
+              className={isDevs ? "devs-text-gradient font-extrabold" : ""}
+              style={isDevs ? { fontFamily: "var(--devs-font-display)" } : undefined}
+            >
+              {user?.username}
+            </span>
             {user?.role === "admin" && (
-            <BadgeCheck size={14} className="text-sky-400 shrink-0" />
+            <BadgeCheck size={14} className="text-sky-400 devs:text-[var(--devs-cyan)] devs:drop-shadow-[0_0_5px_rgba(34,240,255,0.9)] shrink-0" />
             )}
           </div>
 
           <div className="searchSection w-full h-[60%] flex justify-center items-center border-b border-[var(--border-soft)]">
 
-            <div className="searchbar w-[90%] h-[60%] flex justify-center items-center bg-[var(--bg-elevated)] rounded-3xl overflow-hidden">
+            <div className="searchbar w-[90%] h-[60%] flex justify-center items-center bg-[var(--bg-elevated)] rounded-3xl overflow-hidden devs:bg-[var(--bg-input)] devs:border devs:border-[var(--border-input)] devs:transition-all devs:focus-within:border-[var(--devs-cyan)] devs:focus-within:shadow-[0_0_18px_rgba(34,240,255,0.25)]">
 
               <div className="searchIcon w-[15%] sm:w-[10%] h-full flex justify-center items-center">
                 <Search className="w-5 h-5 sm:w-7 sm:h-7 text-[var(--text-primary)]" />
@@ -70,7 +78,7 @@ const DirectMessagePage = () => {
                   type="text"
                   name="search"
                   id="search"
-                  className="w-full h-full outline-none text-[var(--text-primary)] px-4 bg-transparent"
+                  className="w-full h-full outline-none text-[var(--text-primary)] px-4 bg-transparent devs:font-mono devs:text-[14px]"
                   placeholder="Search"
                 />
               </div>

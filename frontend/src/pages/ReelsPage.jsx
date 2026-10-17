@@ -14,12 +14,15 @@ import {
   MapPin,
   Send
 } from 'lucide-react'
+import { motion } from 'framer-motion'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 import ReelCommentsOverlay from '../components/ReelCommentsOverlay'
 import ShareOverlay from '../components/ShareOverlay'
+import LikeBurst from '../components/devs/LikeBurst'
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 const LIMIT = 5
@@ -38,9 +41,30 @@ const formatCount = (n = 0) => {
 
 const stop = (e) => e.stopPropagation()
 
+// Devs Mode: glowing HUD brackets on the reel card (desktop)
+const HUD_CORNERS = [
+  'top-2 left-2 border-t-2 border-l-2 rounded-tl-lg',
+  'top-2 right-2 border-t-2 border-r-2 rounded-tr-lg',
+  'bottom-2 left-2 border-b-2 border-l-2 rounded-bl-lg',
+  'bottom-2 right-2 border-b-2 border-r-2 rounded-br-lg',
+]
+
+// Wraps an action-rail icon in a glass circle in Devs Mode only; in
+// light/dark the icon is rendered exactly as before (no extra element).
+const RailIcon = ({ children }) => {
+  const { isDevs } = useTheme()
+  if (!isDevs) return <>{children}</>
+  return (
+    <span className="w-11 h-11 rounded-full devs-glass flex items-center justify-center transition-transform duration-200 hover:scale-110 active:scale-90">
+      {children}
+    </span>
+  )
+}
+
 const ReelsPage = () => {
 
   const { user, refreshUser } = useAuth();
+  const { isDevs } = useTheme();
 
   const videoRef = useRef(null)
   const sectionRef = useRef(null)
@@ -62,6 +86,10 @@ const ReelsPage = () => {
   const [isMuted, setIsMuted] = useState(true)
   const [showPlayIcon, setShowPlayIcon] = useState(true)
   const [showLikeBurst, setShowLikeBurst] = useState(false)
+
+  // Devs Mode only: neon burst trigger + playback progress
+  const [burstKey, setBurstKey] = useState(0)
+  const [progress, setProgress] = useState(0)
 
   const [videoAspect, setVideoAspect] = useState(9 / 16)
   const [isLandscape, setIsLandscape] = useState(false)
@@ -134,6 +162,12 @@ const ReelsPage = () => {
     const aspect = video.videoWidth / video.videoHeight
     setVideoAspect(aspect)
     setIsLandscape(aspect > 1)
+  }
+
+  // Devs Mode: drives the neon progress bar at the bottom of the reel
+  const handleVideoTimeUpdate = () => {
+    const v = videoRef.current
+    if (v && v.duration) setProgress((v.currentTime / v.duration) * 100)
   }
 
   const loadReels = useCallback(async () => {
@@ -226,6 +260,7 @@ const ReelsPage = () => {
   useEffect(() => {
     setIsPlaying(false)
     setShowPlayIcon(true)
+    setProgress(0)
     const video = videoRef.current
     if (video) {
       video.currentTime = 0
@@ -288,9 +323,14 @@ const ReelsPage = () => {
       )
     )
 
-    setShowLikeBurst(true)
-    window.clearTimeout(triggerLike._t)
-    triggerLike._t = window.setTimeout(() => setShowLikeBurst(false), 900)
+    if (isDevs) {
+      // Devs Mode: neon burst, only when the reel becomes liked
+      if (!wasLiked) setBurstKey((n) => n + 1)
+    } else {
+      setShowLikeBurst(true)
+      window.clearTimeout(triggerLike._t)
+      triggerLike._t = window.setTimeout(() => setShowLikeBurst(false), 900)
+    }
 
     try {
       await axios.post(`${BASE_URL}/reels/${reelId}/like`, {}, authHeaders())
@@ -436,28 +476,31 @@ const ReelsPage = () => {
           <button
             onClick={goToPrev}
             disabled={currentIndex === 0}
-            className="w-10 h-10 rounded-full bg-neutral-800/70 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white"
+            className="w-10 h-10 rounded-full bg-neutral-800/70 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white devs:bg-[rgba(10,12,32,0.7)] devs:backdrop-blur-md devs:border devs:border-[var(--border-popup)] devs:text-[var(--devs-cyan)] devs:hover:bg-[rgba(10,12,32,0.7)] devs:hover:shadow-[0_0_18px_rgba(34,240,255,0.5)] devs:transition-shadow"
           >
             <ChevronUp size={18} />
           </button>
           <button
             onClick={goToNext}
             disabled={currentIndex >= reels.length - 1}
-            className="w-10 h-10 rounded-full bg-neutral-800/70 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white"
+            className="w-10 h-10 rounded-full bg-neutral-800/70 hover:bg-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white devs:bg-[rgba(10,12,32,0.7)] devs:backdrop-blur-md devs:border devs:border-[var(--border-popup)] devs:text-[var(--devs-cyan)] devs:hover:bg-[rgba(10,12,32,0.7)] devs:hover:shadow-[0_0_18px_rgba(34,240,255,0.5)] devs:transition-shadow"
           >
             <ChevronDown size={18} />
           </button>
         </div>
 
         {!currentReel && !isFeedLoading && (
-          <div className="text-[var(--text-muted)] text-sm">No reels yet</div>
+          <div className="text-[var(--text-muted)] text-sm devs:font-mono">
+            {isDevs && <span className="text-[var(--devs-cyan)] mr-2">&gt;</span>}
+            No reels yet
+          </div>
         )}
 
         {currentReel && (
           // The reel box: full screen on mobile, a rounded card on desktop.
           // Everything (video, action icons, creator info) lives inside it.
           <div
-            className="relative bg-black md:rounded-md overflow-hidden select-none cursor-pointer shrink-0"
+            className="relative bg-black md:rounded-md overflow-hidden select-none cursor-pointer shrink-0 devs:md:!rounded-3xl devs:ring-1 devs:ring-[rgba(34,240,255,0.3)] devs:shadow-[0_0_70px_rgba(34,240,255,0.18),0_0_120px_rgba(139,92,246,0.12)]"
             style={reelBoxStyle}
             onClick={handleVideoClick}
             onTouchStart={handleTouchStart}
@@ -473,6 +516,7 @@ const ReelsPage = () => {
               muted={isMuted}
               playsInline
               onLoadedMetadata={handleLoadedMetadata}
+              onTimeUpdate={isDevs ? handleVideoTimeUpdate : undefined}
               onClick={(e) => e.stopPropagation()}
               style={{ pointerEvents: 'none' }}
             />
@@ -480,15 +524,50 @@ const ReelsPage = () => {
             {/* readability gradient behind the bottom overlays */}
             <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
 
+            {/* Devs Mode: HUD brackets (desktop), counter chip, progress bar */}
+            {isDevs && (
+              <>
+                <div className="hidden md:block">
+                  {HUD_CORNERS.map((c) => (
+                    <span
+                      key={c}
+                      className={`absolute w-5 h-5 pointer-events-none z-10 ${c}`}
+                      style={{
+                        borderColor: 'rgba(34,240,255,0.75)',
+                        filter: 'drop-shadow(0 0 4px rgba(34,240,255,0.8))',
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <div className="absolute top-3 left-3 z-10 devs-glass rounded-full px-3 py-1 font-mono text-[10px] tracking-widest text-white pointer-events-none">
+                  {String(currentIndex + 1).padStart(2, '0')} / {String(reels.length).padStart(2, '0')}
+                </div>
+
+                <div className="absolute inset-x-0 bottom-0 h-[3px] bg-white/10 pointer-events-none z-10">
+                  <div
+                    className="h-full"
+                    style={{
+                      width: `${progress}%`,
+                      background: 'linear-gradient(90deg,#22f0ff,#8b5cf6,#ff2bd6)',
+                      boxShadow: '0 0 10px rgba(34,240,255,0.9)',
+                    }}
+                  />
+                </div>
+
+                <LikeBurst burstKey={burstKey} variant="big" />
+              </>
+            )}
+
             {showPlayIcon && !isPlaying && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-black/50 flex items-center justify-center">
+                <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-black/50 flex items-center justify-center devs:backdrop-blur-md devs:border devs:border-[var(--devs-cyan)] devs:shadow-[0_0_30px_rgba(34,240,255,0.5)]">
                   <Play size={22} fill="white" className="ml-1 text-white" />
                 </div>
               </div>
             )}
 
-            {showLikeBurst && (
+            {showLikeBurst && !isDevs && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <img
                   src="/images/gradient-like-icon.png"
@@ -500,7 +579,7 @@ const ReelsPage = () => {
 
             {/* mute toggle — top right so the bottom-right corner is free for the action icons */}
             <button
-              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center z-10"
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center z-10 devs:backdrop-blur-md devs:border devs:border-[var(--border-popup)]"
               onClick={(e) => {
                 e.stopPropagation()
                 setIsMuted((m) => !m)
@@ -522,14 +601,14 @@ const ReelsPage = () => {
                     <img
                       src={currentReel.author?.profilePic || "/images/default-profile-pic.jpg"}
                       alt={currentReel.author?.username}
-                      className="w-8 h-8 rounded-full border border-yellow-400 object-cover"
+                      className="w-8 h-8 rounded-full border border-yellow-400 object-cover devs:border-[var(--devs-cyan)] devs:shadow-[0_0_12px_rgba(34,240,255,0.7)]"
                     />
                   </NavLink>
                   <NavLink to={`/user/get-profile/${currentReel?.author?._id}`}>
-                    <span className={`font-semibold text-sm flex items-center gap-1 ${overlayShadow}`}>
+                    <span className={`font-semibold text-sm flex items-center gap-1 devs:font-bold ${overlayShadow}`}>
                       {currentReel.author?.username}
                       {currentReel.author?.role === "admin" && (
-                        <BadgeCheck size={13} className="text-sky-400" />
+                        <BadgeCheck size={13} className="text-sky-400 devs:text-[var(--devs-cyan)]" />
                       )}
                     </span>
                   </NavLink>
@@ -541,7 +620,7 @@ const ReelsPage = () => {
                     user?._id?.toString() !== currentReel?.author?._id?.toString() && (
                       <>
                         <span className="text-sm text-neutral-300">·</span>
-                        <button className={`text-sky-400 text-sm font-semibold ${overlayShadow}`}>
+                        <button className={`text-sky-400 text-sm font-semibold devs:text-[var(--devs-cyan)] devs:font-mono devs:uppercase devs:tracking-widest devs:text-[10px] devs:border devs:border-[var(--devs-cyan)] devs:rounded-full devs:px-2.5 devs:py-0.5 ${overlayShadow}`}>
                           Follow
                         </button>
                       </>
@@ -549,7 +628,7 @@ const ReelsPage = () => {
                 </div>
 
                 {currentReel.location && (
-                  <div className={`flex items-center gap-1 text-xs text-neutral-200 mt-1 ml-10 ${overlayShadow}`}>
+                  <div className={`flex items-center gap-1 text-xs text-neutral-200 mt-1 ml-10 devs:font-mono ${overlayShadow}`}>
                     <MapPin size={12} />
                     {currentReel.location}
                   </div>
@@ -567,39 +646,47 @@ const ReelsPage = () => {
                 onClick={stop}
                 onTouchStart={stop}
                 onTouchEnd={stop}
-                className="absolute right-2 bottom-[76px] md:bottom-4 z-10 flex flex-col items-center gap-5 text-white cursor-default"
+                className="absolute right-2 bottom-[76px] md:bottom-4 z-10 flex flex-col items-center gap-5 devs:gap-3 text-white cursor-default"
               >
                 <button className="flex flex-col items-center gap-1 cursor-pointer" onClick={triggerLike}>
-                  <Heart
-                    size={26}
-                    className={`${currentReel.isLiked ? 'text-red-500' : 'text-white'} ${overlayShadow}`}
-                    fill={currentReel.isLiked ? 'currentColor' : 'none'}
-                  />
-                  <span className={`text-xs ${overlayShadow}`}>{formatCount(currentReel.likesCount)}</span>
+                  <RailIcon>
+                    <Heart
+                      size={26}
+                      className={`${currentReel.isLiked ? 'text-red-500 devs:text-[var(--devs-magenta)] devs:drop-shadow-[0_0_8px_rgba(255,43,214,0.9)]' : 'text-white'} ${overlayShadow}`}
+                      fill={currentReel.isLiked ? 'currentColor' : 'none'}
+                    />
+                  </RailIcon>
+                  <span className={`text-xs devs:font-mono ${overlayShadow}`}>{formatCount(currentReel.likesCount)}</span>
                 </button>
 
                 <button
                   onClick={() => setIsCommentsOpen(true)}
                   className="flex flex-col items-center gap-1 cursor-pointer"
                 >
-                  <MessageCircle size={26} className={overlayShadow} />
-                  <span className={`text-xs ${overlayShadow}`}>{formatCount(currentReel.commentsCount)}</span>
+                  <RailIcon>
+                    <MessageCircle size={26} className={overlayShadow} />
+                  </RailIcon>
+                  <span className={`text-xs devs:font-mono ${overlayShadow}`}>{formatCount(currentReel.commentsCount)}</span>
                 </button>
 
                 <button
                   onClick={() => setIsShareOpen(true)}
                   className="flex flex-col items-center gap-1 cursor-pointer"
                 >
-                  <Send size={26} className={overlayShadow} />
-                  <span className={`text-xs ${overlayShadow}`}>{formatCount(currentReel.sharesCount)}</span>
+                  <RailIcon>
+                    <Send size={26} className={overlayShadow} />
+                  </RailIcon>
+                  <span className={`text-xs devs:font-mono ${overlayShadow}`}>{formatCount(currentReel.sharesCount)}</span>
                 </button>
 
                 <button className="cursor-pointer" onClick={triggerSave}>
-                  <Bookmark
-                    size={24}
-                    className={overlayShadow}
-                    fill={currentReel.isSaved ? 'currentColor' : 'none'}
-                  />
+                  <RailIcon>
+                    <Bookmark
+                      size={24}
+                      className={`${overlayShadow} ${currentReel.isSaved ? 'devs:text-[var(--devs-cyan)] devs:drop-shadow-[0_0_8px_rgba(34,240,255,0.9)]' : ''}`}
+                      fill={currentReel.isSaved ? 'currentColor' : 'none'}
+                    />
+                  </RailIcon>
                 </button>
 
                 {canDeleteReel && (
@@ -609,17 +696,19 @@ const ReelsPage = () => {
                       onClick={() => setIsMenuOpen((prev) => !prev)}
                       aria-label="Reel options"
                     >
-                      <MoreHorizontal size={24} className={overlayShadow} />
+                      <RailIcon>
+                        <MoreHorizontal size={24} className={overlayShadow} />
+                      </RailIcon>
                     </button>
 
                     {isMenuOpen && (
-                      <div className="absolute right-0 bottom-[130%] w-[160px] bg-[var(--bg-surface)] border border-[var(--border-soft)] rounded-xl shadow-2xl overflow-hidden z-20">
+                      <div className="absolute right-0 bottom-[130%] w-[160px] bg-[var(--bg-surface)] border border-[var(--border-soft)] rounded-xl shadow-2xl overflow-hidden z-20 devs:devs-glass devs:!rounded-2xl">
                         <button
                           onClick={() => {
                             setIsMenuOpen(false)
                             setIsDeleteConfirmOpen(true)
                           }}
-                          className="w-full text-left px-4 py-3 text-sm font-semibold text-[var(--color-danger)] hover:bg-[var(--bg-row-hover)] cursor-pointer transition"
+                          className="w-full text-left px-4 py-3 text-sm font-semibold text-[var(--color-danger)] hover:bg-[var(--bg-row-hover)] cursor-pointer transition devs:font-mono"
                         >
                           Delete
                         </button>
@@ -658,29 +747,40 @@ const ReelsPage = () => {
 
       {/* Delete confirmation */}
       {isDeleteConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex justify-center items-center bg-black/70 p-4">
-          <div className="w-full max-w-[340px] rounded-2xl bg-[var(--bg-surface)] overflow-hidden text-center shadow-2xl">
+        <div className="fixed inset-0 z-50 flex justify-center items-center bg-black/70 p-4 devs:backdrop-blur-sm">
+          <motion.div
+            {...(isDevs
+              ? {
+                  initial: { scale: 0.9, y: 16, opacity: 0 },
+                  animate: { scale: 1, y: 0, opacity: 1 },
+                  transition: { type: 'spring', stiffness: 380, damping: 28 },
+                }
+              : {})}
+            className={`w-full max-w-[340px] rounded-2xl bg-[var(--bg-surface)] overflow-hidden text-center shadow-2xl ${
+              isDevs ? 'devs-glass devs-neon-border !rounded-3xl' : ''
+            }`}
+          >
             <div className="px-6 py-6 border-b border-[var(--border-soft)]">
-              <h3 className="text-[var(--text-primary)] font-semibold text-base mb-2">Delete reel?</h3>
-              <p className="text-[var(--text-muted)] text-sm">
+              <h3 className="text-[var(--text-primary)] font-semibold text-base mb-2 devs:font-bold">Delete reel?</h3>
+              <p className="text-[var(--text-muted)] text-sm devs:font-mono devs:text-[12px] devs:leading-relaxed">
                 This action cannot be undone. This reel will be permanently removed.
               </p>
             </div>
             <button
               onClick={handleDeleteReel}
               disabled={isDeleting}
-              className="w-full py-3 text-[var(--color-danger)] font-semibold text-sm border-b border-[var(--border-soft)] hover:bg-[var(--bg-row-hover)] transition cursor-pointer disabled:opacity-50"
+              className="w-full py-3 text-[var(--color-danger)] font-semibold text-sm border-b border-[var(--border-soft)] hover:bg-[var(--bg-row-hover)] transition cursor-pointer disabled:opacity-50 devs:font-mono devs:hover:bg-[var(--bg-danger-hover)]"
             >
               {isDeleting ? "Deleting..." : "Delete"}
             </button>
             <button
               onClick={() => setIsDeleteConfirmOpen(false)}
               disabled={isDeleting}
-              className="w-full py-3 text-[var(--text-primary)] font-medium text-sm hover:bg-[var(--bg-row-hover)] transition cursor-pointer disabled:opacity-50"
+              className="w-full py-3 text-[var(--text-primary)] font-medium text-sm hover:bg-[var(--bg-row-hover)] transition cursor-pointer disabled:opacity-50 devs:font-mono"
             >
               Cancel
             </button>
-          </div>
+          </motion.div>
         </div>
       )}
 

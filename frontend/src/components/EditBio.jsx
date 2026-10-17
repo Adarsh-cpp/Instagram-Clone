@@ -18,7 +18,7 @@ const EditBio = () => {
     })}
     defaultValue="I freeze moments, stealing them from time" // <-- previous bio pre-filled
     rows={3}
-    className={`w-full h-full bg-[var(--bg-input)] text-[12px] resize-none outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px] p-2 ${
+    className={`w-full h-full bg-[var(--bg-input)] text-[12px] resize-none outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px] p-2 devs:font-mono devs:rounded-2xl devs:p-3 devs:transition-all devs:duration-200 devs:focus:border-[var(--devs-cyan)] devs:focus:shadow-[0_0_0_3px_rgba(34,240,255,0.15),0_0_20px_rgba(34,240,255,0.2)] ${
       errors.bio
         ? "border border-[var(--color-error)]"
         : "border border-[var(--border-input)]"
@@ -26,7 +26,7 @@ const EditBio = () => {
     placeholder="Write something about yourself..."
   />
   {errors.bio && (
-    <p className="text-[var(--color-error)] text-sm mt-1">
+    <p className="text-[var(--color-error)] text-sm mt-1 devs:font-mono devs:text-[12px]">
       {errors.bio.message}
     </p>
   )}

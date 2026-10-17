@@ -1,9 +1,19 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import axios from "axios";
+import {
+  AnimatePresence,
+  motion,
+  useMotionValue,
+  useSpring,
+  useTransform,
+} from "framer-motion";
 import CommentsOverlay from "./CommentsOverlay";
 import ShareOverlay from "./ShareOverlay";
+import LikeBurst from "./devs/LikeBurst";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { NavLink } from "react-router-dom";
 import {
   ChevronLeft,
@@ -14,6 +24,7 @@ import {
   Send,
   Bookmark,
   BadgeCheck,
+  MapPin,
 } from "lucide-react";
 import { getTimeAgo } from "../utils/timeAgo";
 
@@ -24,8 +35,115 @@ const authConfig = () => ({
   headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
 });
 
+/* ====================================================================
+   DEVS MODE helpers (only used when the theme is "devs")
+   ==================================================================== */
+
+// Slot-machine style number: rolls up/down whenever the value changes
+const AnimatedCount = ({ value }) => (
+  <span className="relative inline-flex h-[18px] min-w-[10px] overflow-hidden items-center">
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.span
+        key={value}
+        initial={{ y: 14, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: -14, opacity: 0 }}
+        transition={{ duration: 0.16 }}
+        className="font-mono text-[13px] font-bold leading-none"
+      >
+        {value}
+      </motion.span>
+    </AnimatePresence>
+  </span>
+);
+
+// Colours #hashtags and @mentions in captions
+const renderCaption = (text = "") =>
+  text.split(/([#@][\w.]+)/g).map((part, i) =>
+    /^[#@][\w.]+$/.test(part) ? (
+      <span key={i} className="text-[var(--devs-cyan)]">
+        {part}
+      </span>
+    ) : (
+      part
+    )
+  );
+
+// Glowing HUD brackets in the four corners of the media
+const HUD_CORNERS = [
+  "top-2 left-2 border-t-2 border-l-2 rounded-tl-lg",
+  "top-2 right-2 border-t-2 border-r-2 rounded-tr-lg",
+  "bottom-2 left-2 border-b-2 border-l-2 rounded-bl-lg",
+  "bottom-2 right-2 border-b-2 border-r-2 rounded-br-lg",
+];
+
+const HudCorners = () => (
+  <>
+    {HUD_CORNERS.map((c) => (
+      <span
+        key={c}
+        className={`absolute w-4 h-4 pointer-events-none z-10 ${c}`}
+        style={{
+          borderColor: "rgba(34,240,255,0.7)",
+          filter: "drop-shadow(0 0 4px rgba(34,240,255,0.8))",
+        }}
+      />
+    ))}
+  </>
+);
+
+// Media frame that leans toward the cursor (desktop only)
+const TiltFrame = ({ children, className, disabled, ...rest }) => {
+  const ref = useRef(null);
+  const mx = useMotionValue(0);
+  const my = useMotionValue(0);
+  const rotateX = useSpring(useTransform(my, [-0.5, 0.5], [3, -3]), {
+    stiffness: 140,
+    damping: 20,
+  });
+  const rotateY = useSpring(useTransform(mx, [-0.5, 0.5], [-4, 4]), {
+    stiffness: 140,
+    damping: 20,
+  });
+
+  const onMove = (e) => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    mx.set((e.clientX - rect.left) / rect.width - 0.5);
+    my.set((e.clientY - rect.top) / rect.height - 0.5);
+  };
+
+  const reset = () => {
+    mx.set(0);
+    my.set(0);
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      onPointerMove={disabled ? undefined : onMove}
+      onPointerLeave={disabled ? undefined : reset}
+      style={disabled ? undefined : { rotateX, rotateY, transformPerspective: 1100 }}
+      className={className}
+      {...rest}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+const slideVariants = {
+  enter: (dir) => ({ x: dir * 70, opacity: 0, scale: 1.04 }),
+  center: { x: 0, opacity: 1, scale: 1 },
+  exit: (dir) => ({ x: dir * -70, opacity: 0, scale: 0.98 }),
+};
+
+const pillClass =
+  "h-[38px] px-3 rounded-full flex items-center gap-2 cursor-pointer border border-[var(--border-soft)] bg-[var(--bg-surface)] hover:border-[var(--border-popup)] transition-colors";
+
 const HomepagePostCard = ({ ...props }) => {
   const { user } = useAuth();
+  const { isDevs, lite } = useTheme();
 
   // The author id can arrive as a flat `authorId`, or inside a populated
   // `author` object (e.g. right after creating a post, before any refetch).
@@ -91,6 +209,11 @@ const HomepagePostCard = ({ ...props }) => {
   const [showFullCaption, setShowFullCaption] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
 
+  // Devs Mode only: carousel slide direction + like-burst triggers
+  const [slideDir, setSlideDir] = useState(1);
+  const [bigBurst, setBigBurst] = useState(0);
+  const [likeBurst, setLikeBurst] = useState(0);
+
   // Follow state — kept as real state (synced from context) instead of
   // derived inline, so a toggle can update it immediately without a refresh.
   const [isFollowing, setIsFollowing] = useState(false);
@@ -150,12 +273,14 @@ const HomepagePostCard = ({ ...props }) => {
 
   const goPrev = useCallback((e) => {
     e.stopPropagation();
+    setSlideDir(-1);
     setActiveSlide((i) => Math.max(0, i - 1));
   }, []);
 
   const goNext = useCallback(
     (e) => {
       e.stopPropagation();
+      setSlideDir(1);
       setActiveSlide((i) => Math.min(mediaList.length - 1, i + 1));
     },
     [mediaList.length]
@@ -168,6 +293,7 @@ const HomepagePostCard = ({ ...props }) => {
     if (touchStartX.current == null) return;
     const delta = e.changedTouches[0].clientX - touchStartX.current;
     if (Math.abs(delta) > 40) {
+      setSlideDir(delta > 0 ? -1 : 1);
       setActiveSlide((i) =>
         delta > 0 ? Math.max(0, i - 1) : Math.min(mediaList.length - 1, i + 1)
       );
@@ -184,29 +310,42 @@ const HomepagePostCard = ({ ...props }) => {
       );
       setIsLiked(response.data.liked);
       setLikesCount((prev) => (response.data.liked ? prev + 1 : prev - 1));
+      return response.data.liked;
     } catch (error) {
       console.log(error);
+      return null;
     }
   }, [props?.postId]);
 
   const doubleClickToLike = useCallback(async () => {
-    const heart = animatedLikeRef.current;
-    heart.style.transition = "none";
-    heart.style.width = "0px";
-    heart.style.opacity = "1";
-    heart.style.transform = "translate(0%, 0%)";
-    void heart.offsetWidth;
-    heart.style.transition = "all 0.5s ease-out";
-    heart.style.width = "300px";
-    setTimeout(() => {
-      heart.style.opacity = "0";
-      heart.style.transform = "translateY(-200%)";
-    }, 1000);
+    if (isDevs) {
+      // Devs Mode: neon burst instead of the plain white heart
+      setBigBurst((n) => n + 1);
+    } else {
+      const heart = animatedLikeRef.current;
+      heart.style.transition = "none";
+      heart.style.width = "0px";
+      heart.style.opacity = "1";
+      heart.style.transform = "translate(0%, 0%)";
+      void heart.offsetWidth;
+      heart.style.transition = "all 0.5s ease-out";
+      heart.style.width = "300px";
+      setTimeout(() => {
+        heart.style.opacity = "0";
+        heart.style.transform = "translateY(-200%)";
+      }, 1000);
+    }
 
     if (!isLiked) {
       await toggleLike();
     }
-  }, [isLiked, toggleLike]);
+  }, [isLiked, toggleLike, isDevs]);
+
+  // Devs Mode like button: same API call, plus a small burst when it becomes liked
+  const handleDevsLike = async () => {
+    const liked = await toggleLike();
+    if (liked) setLikeBurst((n) => n + 1);
+  };
 
   const handleSave = useCallback(async () => {
     const prevValue = isSaved;
@@ -285,6 +424,451 @@ const HomepagePostCard = ({ ...props }) => {
   // drop it via onDeleted, but this guards against a stale render in between
   if (isDeleted) return null;
 
+  const aspectClass =
+    props.aspectRatio === "1:1"
+      ? "aspect-square"
+      : props.aspectRatio === "16:9"
+      ? "aspect-video"
+      : "aspect-[4/5]";
+
+  /* ====================================================================
+     DEVS MODE
+     ==================================================================== */
+  if (isDevs) {
+    const item = mediaList[activeSlide];
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 28, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
+        className="postCard devs-glass rounded-3xl p-3 sm:p-4 w-full mt-4 transition-shadow duration-300 hover:shadow-[0_0_40px_rgba(34,240,255,0.12)]"
+      >
+        {/* Header */}
+        <div className="header w-full flex items-center gap-3 pb-3">
+          <div className="relative w-[46px] h-[46px] shrink-0">
+            <span
+              className="absolute -inset-[2px] rounded-full"
+              style={{
+                background:
+                  "conic-gradient(from var(--devs-angle), #22f0ff, #8b5cf6, #ff2bd6, #22f0ff)",
+                animation: lite ? "none" : "devs-spin 5s linear infinite",
+              }}
+            />
+            <div className="relative w-full h-full rounded-full overflow-hidden border-2 border-[#04050e] bg-black">
+              <img
+                src={authorProfileImg ? authorProfileImg : "/images/default-profile-pic.jpg"}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+            </div>
+          </div>
+
+          <div className="profileInfo flex-1 min-w-0 text-[var(--text-primary)]">
+            <div className="info flex items-center gap-2 min-w-0">
+              <NavLink to={profileURL} className="min-w-0 max-w-[55%]">
+                <div className="name cursor-pointer flex items-center gap-1 min-w-0 font-bold">
+                  <span className="truncate">{authorName}</span>
+                  {isAdminAuthor && (
+                    <BadgeCheck
+                      size={15}
+                      className="text-[var(--devs-cyan)] shrink-0"
+                      style={{ filter: "drop-shadow(0 0 5px rgba(34,240,255,0.9))" }}
+                    />
+                  )}
+                </div>
+              </NavLink>
+              <span className="day shrink-0 whitespace-nowrap font-mono text-[11px] text-[var(--text-muted)]">
+                {getTimeAgo(props.createdAt)}
+              </span>
+              {followDisplay && (
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.9 }}
+                  whileHover={{ scale: 1.06 }}
+                  onClick={handleFollowToggle}
+                  className="follow shrink-0 whitespace-nowrap font-mono text-[10px] uppercase tracking-widest px-2.5 py-0.5 rounded-full text-[var(--devs-cyan)] border border-[var(--devs-cyan)] hover:bg-[rgba(34,240,255,0.12)] cursor-pointer"
+                >
+                  Follow
+                </motion.button>
+              )}
+            </div>
+            <div className="location mt-0.5 flex items-center gap-1 font-mono text-[11px] text-[var(--text-muted)]">
+              <MapPin size={11} />
+              <span className="truncate">{props.location?.name || "India"}</span>
+            </div>
+          </div>
+
+          {/* 3-dot menu */}
+          {canDeletePost && (
+            <div ref={menuRef} className="relative ml-auto">
+              <motion.button
+                whileTap={{ scale: 0.85 }}
+                whileHover={{ rotate: 90 }}
+                onClick={() => setIsMenuOpen((prev) => !prev)}
+                className="text-[var(--text-muted)] hover:text-[var(--devs-cyan)] transition-colors cursor-pointer p-1"
+                aria-label="Post options"
+              >
+                <MoreHorizontal size={22} />
+              </motion.button>
+
+              <AnimatePresence>
+                {isMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-[110%] w-[170px] devs-glass rounded-2xl overflow-hidden z-20"
+                  >
+                    <button
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        setIsDeleteConfirmOpen(true);
+                      }}
+                      className="w-full text-left px-4 py-3 text-sm font-mono font-semibold text-[var(--color-danger)] hover:bg-[var(--bg-danger-hover)] cursor-pointer transition"
+                    >
+                      Delete
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
+
+        {/* Post media (HUD frame + carousel) */}
+        <TiltFrame
+          disabled={lite}
+          onDoubleClick={doubleClickToLike}
+          onTouchStart={isCarousel ? handleTouchStart : undefined}
+          onTouchEnd={isCarousel ? handleTouchEnd : undefined}
+          className={`postImg group relative w-full select-none rounded-2xl overflow-hidden bg-black ${aspectClass}`}
+        >
+          <AnimatePresence initial={false} custom={slideDir}>
+            <motion.div
+              key={activeSlide}
+              custom={slideDir}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.35, ease: [0.2, 0.8, 0.2, 1] }}
+              className="absolute inset-0"
+            >
+              {item?.mediaType === "video" ? (
+                <video
+                  src={item.url}
+                  className="w-full h-full object-cover"
+                  controls
+                  muted
+                  loop
+                  playsInline
+                />
+              ) : (
+                <img src={item?.url} alt="" className="w-full h-full object-cover" />
+              )}
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Scanlines + soft bottom shade */}
+          <div
+            className="absolute inset-0 pointer-events-none z-[5] opacity-[0.1]"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(0deg, rgba(255,255,255,0.6) 0, rgba(255,255,255,0.6) 1px, transparent 1px, transparent 3px)",
+              mixBlendMode: "overlay",
+            }}
+          />
+          <div className="absolute inset-x-0 bottom-0 h-1/4 pointer-events-none z-[5] bg-gradient-to-t from-black/35 to-transparent" />
+
+          <HudCorners />
+          <LikeBurst burstKey={bigBurst} variant="big" />
+
+          {isCarousel && activeSlide > 0 && (
+            <button
+              type="button"
+              onClick={goPrev}
+              onDoubleClick={(e) => e.stopPropagation()}
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full devs-glass flex items-center justify-center cursor-pointer z-10 opacity-80 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+              aria-label="Previous"
+            >
+              <ChevronLeft size={18} color="white" />
+            </button>
+          )}
+          {isCarousel && activeSlide < mediaList.length - 1 && (
+            <button
+              type="button"
+              onClick={goNext}
+              onDoubleClick={(e) => e.stopPropagation()}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full devs-glass flex items-center justify-center cursor-pointer z-10 opacity-80 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+              aria-label="Next"
+            >
+              <ChevronRight size={18} color="white" />
+            </button>
+          )}
+
+          {isCarousel && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 devs-glass rounded-full px-3 py-0.5 font-mono text-[10px] tracking-widest text-[var(--text-primary)] z-10">
+              {String(activeSlide + 1).padStart(2, "0")} / {String(mediaList.length).padStart(2, "0")}
+            </div>
+          )}
+
+          {isCarousel && (
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10">
+              {mediaList.map((_, i) => (
+                <motion.span
+                  key={i}
+                  animate={{ width: i === activeSlide ? 18 : 6 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 28 }}
+                  className="h-1.5 rounded-full"
+                  style={{
+                    background:
+                      i === activeSlide
+                        ? "linear-gradient(90deg,#22f0ff,#ff2bd6)"
+                        : "rgba(255,255,255,0.4)",
+                    boxShadow: i === activeSlide ? "0 0 8px rgba(34,240,255,0.8)" : "none",
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </TiltFrame>
+
+        {/* Footer */}
+        <div className="footer w-full mt-3 text-[var(--text-primary)]">
+          <div className="iconSection w-full flex items-center gap-2">
+            {/* Like */}
+            <motion.button
+              type="button"
+              onClick={handleDevsLike}
+              whileTap={{ scale: 0.88 }}
+              whileHover={{ y: -2 }}
+              aria-label={isLiked ? "Unlike" : "Like"}
+              className={`${pillClass} ${
+                isLiked
+                  ? "!border-[var(--devs-magenta)] shadow-[0_0_18px_rgba(255,43,214,0.35)]"
+                  : ""
+              }`}
+            >
+              <span className="relative flex">
+                <motion.span
+                  initial={false}
+                  animate={
+                    isLiked
+                      ? { scale: [1, 1.5, 0.92, 1.12, 1], rotate: [0, -12, 8, 0, 0] }
+                      : { scale: 1, rotate: 0 }
+                  }
+                  transition={{ duration: 0.5 }}
+                  className="flex"
+                >
+                  <Heart
+                    size={21}
+                    color={isLiked ? "var(--devs-magenta)" : "var(--text-primary)"}
+                    fill={isLiked ? "var(--devs-magenta)" : "none"}
+                    strokeWidth={isLiked ? 0 : 1.8}
+                    style={{
+                      filter: isLiked ? "drop-shadow(0 0 8px rgba(255,43,214,0.8))" : "none",
+                    }}
+                  />
+                </motion.span>
+                <LikeBurst burstKey={likeBurst} variant="mini" />
+              </span>
+              <AnimatedCount value={likesCount} />
+            </motion.button>
+
+            {/* Comments */}
+            <motion.button
+              type="button"
+              onClick={() => setIsCommentsOpen(true)}
+              whileHover="hover"
+              whileTap={{ scale: 0.9 }}
+              variants={{ hover: { y: -2 } }}
+              aria-label="Comments"
+              className={pillClass}
+            >
+              <motion.span
+                variants={{ hover: { rotate: [0, -12, 12, 0] } }}
+                transition={{ duration: 0.4 }}
+                className="flex"
+              >
+                <MessageCircle
+                  size={20}
+                  className="-scale-x-100"
+                  color="var(--text-primary)"
+                  strokeWidth={1.8}
+                />
+              </motion.span>
+              <AnimatedCount value={commentsCount} />
+            </motion.button>
+
+            {/* Share */}
+            <motion.button
+              type="button"
+              onClick={() => setIsShareOpen(true)}
+              whileHover="hover"
+              whileTap={{ scale: 0.9 }}
+              variants={{ hover: { y: -2 } }}
+              aria-label="Share"
+              className={pillClass}
+            >
+              <motion.span
+                variants={{ hover: { x: 3, y: -3 } }}
+                transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                className="flex"
+              >
+                <Send size={19} color="var(--text-primary)" strokeWidth={1.8} />
+              </motion.span>
+            </motion.button>
+
+            {/* Save */}
+            <motion.button
+              type="button"
+              onClick={handleSave}
+              whileTap={{ scale: 0.8 }}
+              aria-label={isSaved ? "Unsave" : "Save"}
+              className="ml-auto h-[38px] w-[38px] rounded-full flex items-center justify-center cursor-pointer"
+            >
+              <motion.span
+                initial={false}
+                animate={
+                  isSaved
+                    ? { scale: [1, 1.3, 1], rotate: [0, -10, 0] }
+                    : { scale: 1, rotate: 0 }
+                }
+                transition={{ duration: 0.4 }}
+                className="flex"
+              >
+                <Bookmark
+                  size={22}
+                  color={isSaved ? "var(--devs-cyan)" : "var(--text-primary)"}
+                  fill={isSaved ? "var(--devs-cyan)" : "none"}
+                  strokeWidth={1.8}
+                  style={{
+                    filter: isSaved ? "drop-shadow(0 0 7px rgba(34,240,255,0.8))" : "none",
+                  }}
+                />
+              </motion.span>
+            </motion.button>
+          </div>
+
+          <div className="captionSection mt-3 px-1 text-[14px] leading-relaxed">
+            <span className="devs-text-gradient font-bold">{authorName}</span>
+            &nbsp;
+            {!showFullCaption ? (
+              <>
+                <span>{renderCaption(props.caption?.slice(0, 50))}</span>
+                {props.caption?.length > 50 && (
+                  <span
+                    onClick={() => setShowFullCaption(true)}
+                    className="font-mono text-[12px] text-[var(--devs-cyan)] pl-2 cursor-pointer hover:[text-shadow:0_0_10px_rgba(34,240,255,0.8)]"
+                  >
+                    more
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="mt-1 break-words">{renderCaption(props.caption)}</div>
+                <span
+                  onClick={() => setShowFullCaption(false)}
+                  className="font-mono text-[12px] text-[var(--devs-cyan)] cursor-pointer hover:[text-shadow:0_0_10px_rgba(34,240,255,0.8)]"
+                >
+                  less
+                </span>
+              </>
+            )}
+          </div>
+
+          <div className="cmntSection mt-2 px-1 flex flex-col gap-2 font-mono text-[12px]">
+            <button
+              type="button"
+              onClick={() => setIsCommentsOpen(true)}
+              className="cmntsCount text-left w-fit text-[var(--text-muted)] hover:text-[var(--devs-cyan)] transition-colors cursor-pointer"
+            >
+              <span className="text-[var(--devs-lime)]">&gt;</span> View all {commentsCount} comments
+            </button>
+            <div
+              onClick={() => setIsCommentsOpen(true)}
+              className="allCmnts h-[36px] rounded-xl bg-[var(--bg-input)] border border-[var(--border-soft)] px-3 flex items-center text-[var(--text-muted)] cursor-text hover:border-[var(--border-popup)] transition-colors"
+            >
+              Add a comment...
+            </div>
+          </div>
+        </div>
+
+        {isCommentsOpen && (
+          <CommentsOverlay
+            post={post}
+            authorId={resolvedAuthorId}
+            authorRole={props.authorRole}
+            onClose={() => setIsCommentsOpen(false)}
+            onLikesCountChange={(count) => setLikesCount(count)}
+            onSaveChange={(saved) => setIsSaved(saved)}
+            onCommentAdded={() => setCommentsCount((prev) => prev + 1)}
+            initialIsLiked={isLiked}
+            initialIsSaved={isSaved}
+          />
+        )}
+
+        {isShareOpen && (
+          <ShareOverlay post={post} onClose={() => setIsShareOpen(false)} />
+        )}
+
+        {/* Delete confirmation.
+            Rendered in a portal so it covers the whole screen: the feed rows are
+            positioned with `transform`, which would otherwise trap a `fixed` modal. */}
+        {createPortal(
+          <AnimatePresence>
+            {isDeleteConfirmOpen && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[10000] flex justify-center items-center bg-black/70 backdrop-blur-sm p-4"
+              >
+                <motion.div
+                  initial={{ scale: 0.9, y: 20, opacity: 0 }}
+                  animate={{ scale: 1, y: 0, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  transition={{ type: "spring", stiffness: 380, damping: 28 }}
+                  className="devs-glass devs-neon-border w-full max-w-[340px] rounded-3xl overflow-hidden text-center"
+                >
+                  <div className="px-6 py-6 border-b border-[var(--border-soft)]">
+                    <h3 className="text-[var(--text-primary)] font-bold text-base mb-2" style={{ fontFamily: "var(--devs-font-display)" }}>
+                      Delete post?
+                    </h3>
+                    <p className="text-[var(--text-muted)] text-[12px] font-mono leading-relaxed">
+                      This action cannot be undone. This post will be permanently removed.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleDeletePost}
+                    disabled={isDeleting}
+                    className="w-full py-3 text-[var(--color-danger)] font-mono font-semibold text-sm border-b border-[var(--border-soft)] hover:bg-[var(--bg-danger-hover)] transition cursor-pointer disabled:opacity-50"
+                  >
+                    {isDeleting ? "Deleting..." : "Delete"}
+                  </button>
+                  <button
+                    onClick={() => setIsDeleteConfirmOpen(false)}
+                    disabled={isDeleting}
+                    className="w-full py-3 text-[var(--text-primary)] font-mono font-medium text-sm hover:bg-[var(--bg-row-hover)] transition cursor-pointer disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body
+        )}
+      </motion.div>
+    );
+  }
+
+  /* ====================================================================
+     CLASSIC (light / dark) - unchanged
+     ==================================================================== */
   return (
     <div className="postCard w-full mt-4 ">
       {/* Header */}
@@ -353,13 +937,7 @@ const HomepagePostCard = ({ ...props }) => {
 
       {/* Post media (carousel) */}
       <div
-        className={`postImg relative w-full select-none ${
-          props.aspectRatio === "1:1"
-            ? "aspect-square"
-            : props.aspectRatio === "16:9"
-            ? "aspect-video"
-            : "aspect-[4/5]"
-        }`}
+        className={`postImg relative w-full select-none ${aspectClass}`}
         onDoubleClick={doubleClickToLike}
         onTouchStart={isCarousel ? handleTouchStart : undefined}
         onTouchEnd={isCarousel ? handleTouchEnd : undefined}

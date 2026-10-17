@@ -2,6 +2,8 @@ import userModel from "../models/user.model.js"
 import jwt from "jsonwebtoken";
 
 export const authUser = async (req, res, next) => {
+
+  console.log("authUser hit:", req.method, req.originalUrl);
   
  // Extract token from cookies or Authorization header
    const token = req.cookies.token || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
@@ -25,8 +27,9 @@ export const authUser = async (req, res, next) => {
     // req.body.userId = user._id;
     next();
 
-   } catch (error) {
-    res.status(403).json({ error: error.message });
-   }
+  } catch (error) {
+  console.error("authUser failed:", error.name, "-", error.message);
+  res.status(403).json({ error: error.message });
+}
 
 }

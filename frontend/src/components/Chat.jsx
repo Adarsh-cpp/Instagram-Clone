@@ -6,14 +6,16 @@ import socket from '../socket';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import MessageBox from './MessageBox';
 import StickerPicker from './StickerPicker';
 import ThemeOverlay from './ThemeOverlay';
+import ChatThemeFx from './devs/ChatThemeFx';
 import { useSocket } from '../context/SocketContext';
 import { getTimeAgo } from '../utils/timeAgo';
 import { formatDateHeader, isSameDay } from '../utils/dateTime';
-import { CHAT_THEMES, getFontById, loadChatFont } from "../data/chatTheme";
+import { getThemeById, getFontById, loadChatFont } from "../data/chatTheme";
 import {
   generateAiReplySuggestions,
   getAiErrorMessage,
@@ -131,7 +133,7 @@ const EmojiPicker = ({ pickerRef, recentEmojis, onSelect }) => {
   return (
     <div
       ref={pickerRef}
-      className="emojiPicker absolute bottom-full left-2 mb-2 z-30 w-[340px] max-w-[96%] rounded-2xl overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-soft)] shadow-lg"
+      className="emojiPicker absolute bottom-full left-2 mb-2 z-30 w-[340px] max-w-[96%] rounded-2xl overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-soft)] shadow-lg devs:backdrop-blur-xl devs:rounded-3xl devs:border-[var(--border-popup)] devs:shadow-[0_0_40px_rgba(34,240,255,0.15)]"
     >
       <div className="flex items-center border-b border-[var(--border-soft)] px-1">
         {categories.map((category) => (
@@ -154,7 +156,7 @@ const EmojiPicker = ({ pickerRef, recentEmojis, onSelect }) => {
       </div>
 
       <div className="no-scrollbar h-[220px] overflow-y-auto p-2">
-        <div className="px-1 pb-1.5 text-[12px] text-[var(--text-muted)]">
+        <div className="px-1 pb-1.5 text-[12px] text-[var(--text-muted)] devs:font-mono devs:uppercase devs:tracking-widest devs:text-[10px]">
           {activeCategory.label}
         </div>
 
@@ -165,7 +167,7 @@ const EmojiPicker = ({ pickerRef, recentEmojis, onSelect }) => {
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => onSelect(emoji)}
-              className="aspect-square flex items-center justify-center text-[22px] leading-none rounded-lg hover:bg-[var(--bg-menu-hover)] cursor-pointer"
+              className="aspect-square flex items-center justify-center text-[22px] leading-none rounded-lg hover:bg-[var(--bg-menu-hover)] cursor-pointer devs:hover:scale-125 devs:transition-transform"
             >
               {emoji}
             </button>
@@ -204,6 +206,7 @@ const getReplyPreviewInfo = (msg) => {
 const Chat = ({ onConversationActivity }) => {
 
   const { onlineUsers, lastSeenMap } = useSocket()
+  const { isDevs } = useTheme()
 
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
@@ -260,6 +263,7 @@ const Chat = ({ onConversationActivity }) => {
   const messageInputRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const emojiButtonRef = useRef(null);
+  const infoMenuRef = useRef(null);
 
   // pagination refs — kept in sync with state for use inside callbacks
   // that shouldn't be re-created every render
@@ -293,11 +297,12 @@ const Chat = ({ onConversationActivity }) => {
   // The theme actually applied to this conversation. ThemeOverlay's
   // preview is fully self-contained (see ThemePreviewPanel) and never
   // reaches into this component's state.
+  // getThemeById also knows the Devs Mode themes, so a conversation that
+  // uses one still resolves (as a static theme) for a friend in light/dark.
   const currentThemeId = conversation?.chatTheme || "default";
   const isDefaultTheme = currentThemeId === "default";
-  const activeTheme =
-    CHAT_THEMES.find((theme) => theme.id === currentThemeId) ||
-    CHAT_THEMES.find((theme) => theme.id === "default");
+  const activeTheme = getThemeById(currentThemeId);
+  const isDevsChatTheme = !!activeTheme?.devs;
 
   // The font applied to this conversation. Only the id is persisted; the
   // stack + stylesheet are resolved client-side from the catalog.
@@ -318,15 +323,22 @@ const Chat = ({ onConversationActivity }) => {
   // global light/dark CSS vars (so it flips automatically with the
   // site-wide theme toggle). A custom picked chat theme keeps its own
   // fixed flat black/white regardless of app mode, per its own `mode`.
+  // Devs themes get a glass pill with a glowing edge in the theme's colour.
   const isCustomLightTheme = !isDefaultTheme && activeTheme?.mode === "light";
   const inputBarBg = isDefaultTheme
     ? "var(--bg-input)"
+    : isDevsChatTheme
+    ? "rgba(4,5,14,0.65)"
     : isCustomLightTheme ? "#FFFFFF" : "#000000";
   const inputBarText = isDefaultTheme
     ? "var(--text-input)"
+    : isDevsChatTheme
+    ? "#FFFFFF"
     : isCustomLightTheme ? "#111111" : "#FFFFFF";
   const inputBarBorder = isDefaultTheme
     ? "var(--border-input)"
+    : isDevsChatTheme
+    ? `${activeTheme.senderBubble}77`
     : isCustomLightTheme ? "#E0E0E0" : "#2A2A2A";
 
   // Mobile back arrow: pop the history entry that opening this chat
@@ -558,7 +570,7 @@ const Chat = ({ onConversationActivity }) => {
     if (listStartRef.current) {
       setScrollMargin(listStartRef.current.offsetTop);
     }
-  }, [initialLoading, friend?._id, currentFontId]);
+  }, [initialLoading, friend?._id, currentFontId, isDevs]);
 
   // keep offsets correct when the viewport is resized / rotated
   useEffect(() => {
@@ -868,6 +880,11 @@ const Chat = ({ onConversationActivity }) => {
     setIsEmojiPickerOpen(false);
   }, [conversationId]);
 
+  // info menu: close it when switching to another conversation
+  useEffect(() => {
+    setIsInfoMenuOpen(false);
+  }, [conversationId]);
+
   // emoji picker: close on outside press or Escape. Presses on the picker
   // itself and on the smiley button are ignored here (the button toggles it
   // on its own). Pressing the sticker / sparkle / attach buttons or the chat
@@ -896,6 +913,32 @@ const Chat = ({ onConversationActivity }) => {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isEmojiPickerOpen]);
+
+  // info ("i") menu: close on outside press or Escape. This replaces the old
+  // full-screen `fixed inset-0` backdrop — in Devs mode the header has
+  // `backdrop-filter`, which turns it into the containing block for fixed
+  // descendants, so that backdrop only covered the header instead of the page.
+  // Presses inside the button/menu wrapper are ignored (the button toggles
+  // the menu on its own).
+  useEffect(() => {
+    if (!isInfoMenuOpen) return;
+
+    const handlePointerDown = (e) => {
+      if (infoMenuRef.current?.contains(e.target)) return;
+      setIsInfoMenuOpen(false);
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setIsInfoMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isInfoMenuOpen]);
 
   const handleTyping = (e) => {
     setMessage(e.target.value);
@@ -1261,7 +1304,12 @@ const Chat = ({ onConversationActivity }) => {
     return (
     <div className={`messageDisplay ${conversationId ? "flex" : "hidden"} md:flex flex-col relative w-full md:w-[65%] lg:w-[70%] h-[100dvh] md:h-full bg-[var(--bg-app)] overflow-hidden`}>
 
-      <div className="reciverDetails w-full h-[64px] md:h-[85px] shrink-0 flex items-center border-b border-[var(--border-soft)]">
+      {/* `relative z-40`: in Devs mode this header has backdrop-blur, which
+          makes it its own stacking context. Without an explicit z-index it
+          paints BELOW the later `themedArea` (relative + isolate), so the
+          info popup that hangs below the header got covered/cut off. Lifting
+          the header above the themed area fixes that in every mode. */}
+      <div className="reciverDetails relative z-40 w-full h-[64px] md:h-[85px] shrink-0 flex items-center border-b border-[var(--border-soft)] devs:bg-[var(--bg-panel)] devs:backdrop-blur-xl">
 
         <button
           type="button"
@@ -1274,10 +1322,13 @@ const Chat = ({ onConversationActivity }) => {
 
         <div className="messageCard flex-1 min-w-0 h-full flex items-center gap-2 px-2 cursor-pointer">
 
-          <div className="profilePicSection shrink-0 flex justify-center items-center">
-            <div className="profilePic w-[40px] h-[40px] md:w-[52px] md:h-[52px] lg:w-[64px] lg:h-[64px] rounded-full overflow-hidden">
+          <div className="profilePicSection relative shrink-0 flex justify-center items-center">
+            <div className="profilePic w-[40px] h-[40px] md:w-[52px] md:h-[52px] lg:w-[64px] lg:h-[64px] rounded-full overflow-hidden devs:ring-2 devs:ring-[var(--devs-violet)]">
               <img src={friend?.profilePic ? friend.profilePic : "/images/default-profile-pic.jpg" } alt="" className="w-full h-full object-cover" />
             </div>
+            {isDevs && isFriendOnline && (
+              <span className="devs-pulse-glow absolute bottom-0 right-0 w-3 h-3 rounded-full bg-[var(--devs-lime)] border-2 border-[#04050e]" />
+            )}
           </div>
 
           <div className="messageDetails min-w-0 flex flex-col justify-center">
@@ -1286,20 +1337,20 @@ const Chat = ({ onConversationActivity }) => {
                   to={`/user/get-profile/${friend?._id}`}
                   className="inline-flex items-center gap-1 max-w-full"
                 >
-                  <span className="truncate">
+                  <span className={`truncate ${isDevs ? "font-bold" : ""}`}>
                     {friend?.fullname}
                   </span>
 
                   {friend?.role === "admin" && (
                     <BadgeCheck
                       size={18}
-                      className="text-sky-400 shrink-0"
+                      className="text-sky-400 devs:text-[var(--devs-cyan)] devs:drop-shadow-[0_0_6px_rgba(34,240,255,0.9)] shrink-0"
                     />
                   )}
                 </Link>
               </div>
-            <div className="lastMsg text-[12px] lg:text-[14px] truncate">
-              <span className={isFriendOnline ? "text-green-500" : "text-[var(--text-muted)]"}>
+            <div className="lastMsg text-[12px] lg:text-[14px] truncate devs:font-mono devs:text-[11px]">
+              <span className={isFriendOnline ? "text-green-500 devs:text-[var(--devs-lime)]" : "text-[var(--text-muted)]"}>
                 {activeStatusText}
               </span>
             </div>
@@ -1307,37 +1358,37 @@ const Chat = ({ onConversationActivity }) => {
 
         </div>
 
-        <div className="profileInfoBtnSection shrink-0 h-full flex justify-end items-center relative">
+        <div
+          ref={infoMenuRef}
+          className="profileInfoBtnSection shrink-0 h-full flex justify-end items-center relative"
+        >
           <button
             type="button"
             aria-label="Chat options"
+            aria-expanded={isInfoMenuOpen}
             onClick={() => setIsInfoMenuOpen((prev) => !prev)}
-            className="btn w-[30px] h-[30px] md:w-[35px] md:h-[35px] mr-3 md:mr-4 flex items-center justify-center cursor-pointer"
+            className="btn w-[30px] h-[30px] md:w-[35px] md:h-[35px] mr-3 md:mr-4 flex items-center justify-center cursor-pointer devs:hover:drop-shadow-[0_0_8px_rgba(34,240,255,0.8)] devs:transition-all"
           >
             <Info size={22} color="var(--text-primary)" />
           </button>
 
           {isInfoMenuOpen && (
-            <>
-              {/* backdrop — closes the popup on outside click without
-                  stealing clicks from the rest of the page */}
-              <div
-                className="fixed inset-0 z-40"
-                onClick={() => setIsInfoMenuOpen(false)}
-              />
-              <div className="absolute right-3 md:right-4 top-[52px] md:top-[60px] z-50 w-[200px] rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-soft)] shadow-lg py-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsInfoMenuOpen(false);
-                    setIsThemeOverlayOpen(true);
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-[14px] text-[var(--text-primary)] hover:bg-[var(--bg-menu-hover)] cursor-pointer"
-                >
-                  Change chat settings
-                </button>
-              </div>
-            </>
+            // Outside-click handling lives in the effect above (no fixed
+            // backdrop). In Devs mode the popup uses a SOLID elevated
+            // background — a translucent blur over the chat area looked cut
+            // off — and sits at a high z-index within the lifted header.
+            <div className="absolute right-3 md:right-4 top-[52px] md:top-[60px] z-50 w-[200px] rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-soft)] shadow-lg py-1 devs:rounded-2xl devs:border-[var(--border-popup)] devs:font-mono devs:shadow-[0_0_30px_rgba(34,240,255,0.2)]">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsInfoMenuOpen(false);
+                  setIsThemeOverlayOpen(true);
+                }}
+                className="w-full text-left px-4 py-2.5 text-[14px] text-[var(--text-primary)] hover:bg-[var(--bg-menu-hover)] cursor-pointer devs:text-[13px] whitespace-nowrap"
+              >
+                Change chat settings
+              </button>
+            </div>
           )}
         </div>
 
@@ -1350,14 +1401,20 @@ const Chat = ({ onConversationActivity }) => {
           area ends. The font lives here too, so the input inherits it.
           For the "default" theme we deliberately paint no inline
           background at all, so the app-level bg-[var(--bg-app)] on the
-          outer wrapper shows through and flips with the global toggle. */}
+          outer wrapper shows through and flips with the global toggle.
+
+          `relative isolate`: lets the Devs Mode animated layer sit at
+          z-index -1 (above this background, behind the messages). */}
       <div
-        className="themedArea flex-1 min-h-0 w-full flex flex-col transition-[background] duration-700 ease-in-out"
+        className="themedArea relative isolate flex-1 min-h-0 w-full flex flex-col transition-[background] duration-700 ease-in-out"
         style={{
           ...(activeTheme?.bg && !isDefaultTheme ? { background: activeTheme.bg } : {}),
           ...chatFontStyle,
         }}
       >
+
+        {/* Devs Mode: animated background of the chosen Devs theme */}
+        {isDevs && activeTheme?.fx && <ChatThemeFx fx={activeTheme.fx} />}
 
         {/* overscroll-none: dragging past the last message must not bounce
             or chain up to the page on mobile (see the mobile effect above) */}
@@ -1370,23 +1427,23 @@ const Chat = ({ onConversationActivity }) => {
           <div className="viewProfileSection w-full h-[220px] sm:h-[250px] flex flex-col justify-center items-center">
 
             <div className="profilePicSection w-full h-[100px] sm:h-[120px] flex justify-center items-center">
-              <div className="profilePic w-[72px] h-[72px] sm:w-[80px] sm:h-[80px] lg:w-[100px] lg:h-[100px] rounded-full overflow-hidden">
+              <div className="profilePic w-[72px] h-[72px] sm:w-[80px] sm:h-[80px] lg:w-[100px] lg:h-[100px] rounded-full overflow-hidden devs:ring-2 devs:ring-[var(--devs-cyan)] devs:shadow-[0_0_30px_rgba(34,240,255,0.4)]">
                 <img src={friend?.profilePic ? friend.profilePic : "/images/default-profile-pic.jpg"} alt="" className="w-full h-full object-cover" />
               </div>
             </div>
 
             <div className="namesSection w-full px-4 text-center">
               <div className="fullname w-full flex justify-center items-center text-[var(--text-primary)] text-[18px] sm:text-[20px] lg:text-[24px]">
-                <span className="truncate">{friend?.fullname}</span>
+                <span className={`truncate ${isDevs ? "devs-text-gradient font-bold" : ""}`}>{friend?.fullname}</span>
               </div>
-              <div className="username w-full flex justify-center items-center text-[var(--text-muted)] text-[13px] sm:text-[14px] lg:text-[18px]">
+              <div className="username w-full flex justify-center items-center text-[var(--text-muted)] text-[13px] sm:text-[14px] lg:text-[18px] devs:font-mono">
                 <span className="truncate">{friend?.username}</span>
               </div>
             </div>
 
             <div className="viewProfileBtn mt-3 flex justify-center items-center">
               <Link to={`/user/get-profile/${friend?._id}`}>
-                <button className='w-[130px] sm:w-[150px] h-[38px] sm:h-[40px] bg-[var(--bg-elevated)] hover:bg-[var(--bg-menu-hover)] cursor-pointer text-[var(--text-primary)] text-[14px] sm:text-[16px] font-bold rounded-xl'>
+                <button className='w-[130px] sm:w-[150px] h-[38px] sm:h-[40px] bg-[var(--bg-elevated)] hover:bg-[var(--bg-menu-hover)] cursor-pointer text-[var(--text-primary)] text-[14px] sm:text-[16px] font-bold rounded-xl devs:border devs:border-[var(--border-popup)] devs:backdrop-blur-md devs:font-mono devs:text-[12px] devs:uppercase devs:tracking-wider devs:hover:shadow-[0_0_18px_rgba(34,240,255,0.3)]'>
                   View Profile
                 </button>
               </Link>
@@ -1396,12 +1453,13 @@ const Chat = ({ onConversationActivity }) => {
 
           {/* fixed height regardless of loading state, so it never shifts
               the measured offset of the virtualized list below it */}
-          <div className="h-[32px] w-full flex items-center justify-center text-[var(--text-muted)] text-xs">
+          <div className="h-[32px] w-full flex items-center justify-center text-[var(--text-muted)] text-xs devs:font-mono">
             {isLoadingOlder && "Loading earlier messages..."}
           </div>
 
           {initialLoading ? (
-            <div className="w-full h-[100px] flex items-center justify-center text-[var(--text-muted)] text-sm">
+            <div className="w-full h-[100px] flex items-center justify-center text-[var(--text-muted)] text-sm devs:font-mono">
+              {isDevs && <span className="text-[var(--devs-cyan)] mr-2">&gt;</span>}
               Loading conversation...
             </div>
           ) : (
@@ -1439,7 +1497,7 @@ const Chat = ({ onConversationActivity }) => {
                   >
                     {showDateHeader && (
                       <div className="w-full flex justify-center items-center my-3">
-                        <span className="text-[11px] sm:text-[12px] font-medium px-3 py-1 rounded-full bg-[var(--bg-elevated)] text-[var(--text-muted)]">
+                        <span className="text-[11px] sm:text-[12px] font-medium px-3 py-1 rounded-full bg-[var(--bg-elevated)] text-[var(--text-muted)] devs:font-mono devs:uppercase devs:tracking-widest devs:text-[10px] devs:backdrop-blur-md devs:border devs:border-[var(--border-soft)]">
                           {formatDateHeader(msg.createdAt)}
                         </span>
                       </div>
@@ -1464,7 +1522,23 @@ const Chat = ({ onConversationActivity }) => {
 
           {isFriendTyping && (
             <div className="w-full px-4 py-3 text-[var(--text-muted)] text-[15px] sm:text-[18px]">
-              Typing...
+              {isDevs ? (
+                <span className="font-mono text-[13px] flex items-center gap-2">
+                  <span className="text-[var(--devs-cyan)]">&gt;</span>
+                  typing
+                  <span className="flex gap-1">
+                    {[0, 1, 2].map((i) => (
+                      <span
+                        key={i}
+                        className="w-[5px] h-[5px] rounded-full bg-[var(--devs-cyan)] animate-bounce"
+                        style={{ animationDelay: `${i * 0.15}s` }}
+                      />
+                    ))}
+                  </span>
+                </span>
+              ) : (
+                "Typing..."
+              )}
             </div>
           )}
 
@@ -1476,10 +1550,10 @@ const Chat = ({ onConversationActivity }) => {
 
           {/* AI reply suggestions — opened by the blue sparkle button */}
           {isSuggestionPanelOpen && (
-            <div className="aiSuggestions w-[98%] mx-auto mb-2 rounded-2xl p-3 bg-[var(--bg-elevated)] border border-[var(--border-soft)]">
+            <div className="aiSuggestions w-[98%] mx-auto mb-2 rounded-2xl p-3 bg-[var(--bg-elevated)] border border-[var(--border-soft)] devs:backdrop-blur-xl devs:rounded-3xl devs:border-[var(--border-popup)]">
 
               <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-1.5 text-[13px] text-[var(--text-muted)]">
+                <div className="flex items-center gap-1.5 text-[13px] text-[var(--text-muted)] devs:font-mono devs:uppercase devs:tracking-widest devs:text-[10px]">
                   <Sparkles size={15} className="text-[var(--accent-blue)]" />
                   <span>Suggested replies</span>
                 </div>
@@ -1525,7 +1599,7 @@ const Chat = ({ onConversationActivity }) => {
                       key={`${idx}-${suggestion}`}
                       type="button"
                       onClick={() => handlePickSuggestion(suggestion)}
-                      className="w-full text-left px-4 py-2.5 rounded-2xl bg-[var(--bg-app)] hover:bg-[var(--bg-menu-hover)] text-[var(--text-primary)] text-[14px] leading-snug break-words cursor-pointer transition-colors"
+                      className="w-full text-left px-4 py-2.5 rounded-2xl bg-[var(--bg-app)] hover:bg-[var(--bg-menu-hover)] text-[var(--text-primary)] text-[14px] leading-snug break-words cursor-pointer transition-colors devs:border devs:border-[var(--border-soft)] devs:hover:border-[var(--devs-cyan)]"
                     >
                       {suggestion}
                     </button>
@@ -1546,7 +1620,7 @@ const Chat = ({ onConversationActivity }) => {
           )}
 
           {selectedImages.length > 0 && (
-            <div className="imagePreview w-[98%] mx-auto mb-2 flex flex-wrap items-center gap-3 sm:gap-4 bg-[var(--bg-elevated)] rounded-2xl p-3">
+            <div className="imagePreview w-[98%] mx-auto mb-2 flex flex-wrap items-center gap-3 sm:gap-4 bg-[var(--bg-elevated)] rounded-2xl p-3 devs:backdrop-blur-xl devs:border devs:border-[var(--border-popup)]">
 
               {/* tilted fanned stack of selected images */}
               <div className="flex items-center pl-3">
@@ -1584,14 +1658,14 @@ const Chat = ({ onConversationActivity }) => {
                 })}
               </div>
 
-              <span className="text-[var(--text-muted)] text-[13px]">
+              <span className="text-[var(--text-muted)] text-[13px] devs:font-mono">
                 {selectedImages.length}/{MAX_IMAGES} selected
               </span>
 
               <button
                 onClick={clearSelectedImages}
                 disabled={sendingImage}
-                className="ml-auto text-[var(--text-primary)] text-[13px] px-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer hover:text-[var(--text-muted)]"
+                className="ml-auto text-[var(--text-primary)] text-[13px] px-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer hover:text-[var(--text-muted)] devs:font-mono devs:hover:text-[var(--devs-cyan)]"
               >
                 Clear all
               </button>
@@ -1601,7 +1675,7 @@ const Chat = ({ onConversationActivity }) => {
           {/* "Replying to ..." bar — shows what the next message will be a
               reply to. Cleared on send or with the X. */}
           {replyingTo && replyingToPreview && (
-            <div className="replyPreview w-[98%] mx-auto mb-2 flex items-center gap-3 bg-[var(--bg-elevated)] rounded-2xl px-3 py-2">
+            <div className="replyPreview w-[98%] mx-auto mb-2 flex items-center gap-3 bg-[var(--bg-elevated)] rounded-2xl px-3 py-2 devs:backdrop-blur-xl devs:border devs:border-[var(--border-popup)]">
 
               <div className="min-w-0 flex-1 border-l-2 border-[var(--accent-blue)] pl-2.5">
                 <div className="text-[13px] text-[var(--text-primary)] font-medium truncate">
@@ -1632,8 +1706,18 @@ const Chat = ({ onConversationActivity }) => {
           )}
 
           <div
-            style={{ background: inputBarBg, borderColor: inputBarBorder }}
-            className="messageBar relative w-[98%] mx-auto h-[48px] sm:h-[55px] rounded-3xl flex items-center border overflow-hidden"
+            style={{
+              background: inputBarBg,
+              borderColor: inputBarBorder,
+              ...(isDevsChatTheme
+                ? {
+                    backdropFilter: "blur(14px)",
+                    WebkitBackdropFilter: "blur(14px)",
+                    boxShadow: `0 0 24px ${activeTheme.senderBubble}33`,
+                  }
+                : {}),
+            }}
+            className="messageBar relative w-[98%] mx-auto h-[48px] sm:h-[55px] rounded-3xl flex items-center border overflow-hidden devs:focus-within:shadow-[0_0_24px_rgba(34,240,255,0.25)] devs:transition-shadow"
           >
 
             <div className="emojiSection w-[42px] sm:w-[48px] shrink-0 flex justify-center items-center">
@@ -1680,15 +1764,15 @@ const Chat = ({ onConversationActivity }) => {
                 title="Suggest replies"
                 className="aiSuggest w-[36px] h-[36px] flex justify-center items-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
-                <Sparkles size={22} className="text-[var(--accent-blue)]" />
+                <Sparkles size={22} className="text-[var(--accent-blue)] devs:drop-shadow-[0_0_6px_rgba(34,240,255,0.8)]" />
               </button>
               <button
                 type="button"
                 onClick={handleSendMessage}
                 aria-label="Send message"
-                className="send w-[36px] h-[36px] flex justify-center items-center cursor-pointer"
+                className="send w-[36px] h-[36px] flex justify-center items-center cursor-pointer devs:hover:scale-110 devs:active:scale-90 devs:transition-transform"
               >
-                <Send size={22} className="text-[var(--accent-blue)]" />
+                <Send size={22} className="text-[var(--accent-blue)] devs:drop-shadow-[0_0_8px_rgba(34,240,255,0.8)]" />
               </button>
               <button
                 type="button"

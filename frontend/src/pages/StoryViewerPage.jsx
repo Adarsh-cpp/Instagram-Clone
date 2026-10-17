@@ -8,8 +8,10 @@ import {
 import { toast } from "react-toastify";
 import axiosInstance from "../utils/axiosInstance";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import ShareOverlay from "../components/ShareOverlay"; // adjust path if your folder layout differs
 import HighlightPickerSheet from "../components/HighlightPickerSheet";
+import LikeBurst from "../components/devs/LikeBurst";
 
 // Matches the backend's DEFAULT_IMAGE_DURATION in story.controller.js —
 // only used as a fallback if a story somehow has no `duration` at all.
@@ -52,10 +54,37 @@ const mobileCenterCardStyle = {
   transition: "none",
 };
 
+// Devs Mode: glowing HUD brackets on the active story card
+const HUD_CORNERS = [
+  "top-2 left-2 border-t-2 border-l-2 rounded-tl-lg",
+  "top-2 right-2 border-t-2 border-r-2 rounded-tr-lg",
+  "bottom-2 left-2 border-b-2 border-l-2 rounded-bl-lg",
+  "bottom-2 right-2 border-b-2 border-r-2 rounded-br-lg",
+];
+
+const HudCorners = () => (
+  <>
+    {HUD_CORNERS.map((c) => (
+      <span
+        key={c}
+        className={`absolute w-5 h-5 pointer-events-none z-20 ${c}`}
+        style={{
+          borderColor: "rgba(34,240,255,0.75)",
+          filter: "drop-shadow(0 0 4px rgba(34,240,255,0.8))",
+        }}
+      />
+    ))}
+  </>
+);
+
 const StoryViewerPage = () => {
   const { user } = useAuth();
+  const { isDevs, lite } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Heart / liked colour: classic red, neon magenta in Devs Mode
+  const likeColor = isDevs ? "#ff2bd6" : "#ff3040";
 
   const { userId } = useParams();
   const [accounts, setAccounts] = useState(location.state?.feed || []);
@@ -94,6 +123,7 @@ const StoryViewerPage = () => {
   const [shareOpen, setShareOpen] = useState(false);
   const [highlightSheetOpen, setHighlightSheetOpen] = useState(false);
   const [burst, setBurst] = useState(null); // { x, y, key }
+  const [likeBurstKey, setLikeBurstKey] = useState(0); // Devs Mode: heart-button burst
 
   const videoRef = useRef(null);
   const audioRef = useRef(null);
@@ -497,6 +527,8 @@ const StoryViewerPage = () => {
       const res = await axiosInstance.post(`/story/${currentStory._id}/like`);
       setLikedMap((m) => ({ ...m, [currentStory._id]: res.data.liked }));
       setLikesCountMap((m) => ({ ...m, [currentStory._id]: res.data.likesCount }));
+      // Devs Mode: small neon burst around the heart when a like is confirmed
+      if (res.data.liked && isDevs) setLikeBurstKey((n) => n + 1);
     } catch (err) {
       toast.error("Couldn't update like");
     }
@@ -514,7 +546,7 @@ const StoryViewerPage = () => {
     setBurst({ x, y, key });
     setTimeout(() => {
       setBurst((b) => (b?.key === key ? null : b));
-    }, 800);
+    }, isDevs ? 1500 : 800);
 
     if (!likedMap[currentStory._id]) {
       handleLikeToggle();
@@ -675,22 +707,29 @@ const StoryViewerPage = () => {
     const clampedDist = Math.min(dist, 3);
     const scale = CARD_SCALE_BY_DIST[clampedDist];
     const opacity = CARD_OPACITY_BY_DIST[clampedDist];
+    // Devs Mode: cover-flow style 3D tilt (the track gets a CSS perspective)
+    const tilt = isDevs ? ` rotateY(${d * -24}deg)` : "";
     return {
       position: "absolute",
       top: "50%",
       left: "50%",
       width: CARD_WIDTH,
       height: CARD_HEIGHT,
-      transform: `translate(-50%, -50%) translateX(${d * SLOT_GAP}px) scale(${scale})`,
+      transform: `translate(-50%, -50%) translateX(${d * SLOT_GAP}px)${tilt} scale(${scale})`,
       opacity,
       zIndex: CARD_Z_BY_DIST[clampedDist],
-      transition: "transform 0.45s ease, opacity 0.45s ease",
+      transition: isDevs
+        ? "transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.6s ease"
+        : "transform 0.45s ease, opacity 0.45s ease",
       pointerEvents: dist === 0 ? "auto" : opacity > 0 ? "auto" : "none",
     };
   };
 
+  const chevronDevs =
+    "devs:w-11 devs:h-11 devs:rounded-full devs:items-center devs:justify-center devs:bg-[rgba(10,12,32,0.6)] devs:backdrop-blur-md devs:border devs:border-[var(--border-popup)] devs:text-[var(--devs-cyan)] devs:hover:shadow-[0_0_20px_rgba(34,240,255,0.45)] devs:transition-shadow";
+
   return (
-    <div className="w-full h-screen bg-black relative overflow-hidden flex items-center justify-center">
+    <div className="w-full h-screen bg-black devs:bg-[#04050e] relative overflow-hidden flex items-center justify-center">
       <style>{`
         @keyframes heartBurstAnim {
           0% { transform: scale(0); opacity: 0; }
@@ -700,6 +739,22 @@ const StoryViewerPage = () => {
         }
         .heartBurst { animation: heartBurstAnim 0.8s ease forwards; }
       `}</style>
+
+      {/* Devs Mode: blurred copy of the current story as an ambient backdrop */}
+      {isDevs && (
+        <div aria-hidden="true" className="absolute inset-0 pointer-events-none overflow-hidden">
+          {!lite && currentStory.mediaType !== "video" && (
+            <img
+              key={currentStory._id}
+              src={currentStory.mediaUrl}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover opacity-30 blur-3xl scale-125"
+            />
+          )}
+          <div className="devs-grid" />
+          <div className="devs-vignette" />
+        </div>
+      )}
 
       {/* story song — hidden audio element, driven entirely by the effects
           above; nothing else in the tree needs to know it's here.
@@ -723,19 +778,22 @@ const StoryViewerPage = () => {
       <button
         onClick={handlePrevAccount}
         disabled={accountIndex === 0}
-        className="flex absolute left-4 lg:left-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white disabled:opacity-0 z-30"
+        className={`flex absolute left-4 lg:left-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white disabled:opacity-0 z-30 ${chevronDevs}`}
       >
         <ChevronLeft size={30} />
       </button>
       <button
         onClick={handleNextAccount}
-        className="flex absolute right-4 lg:right-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white z-30"
+        className={`flex absolute right-4 lg:right-8 top-1/2 -translate-y-1/2 text-white/70 hover:text-white z-30 ${chevronDevs}`}
       >
         <ChevronRight size={30} />
       </button>
 
       {/* carousel track */}
-      <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+      <div
+        className="relative w-full h-full flex items-center justify-center overflow-hidden"
+        style={isDevs ? { perspective: "1600px" } : undefined}
+      >
         {slots.map(({ dist, idx, isCenter }) => {
           const d = idx - accountIndex;
           const acc = accounts[idx];
@@ -748,7 +806,7 @@ const StoryViewerPage = () => {
                 key={acc.author._id}
                 style={cardStyle(dist, d)}
                 onClick={() => jumpToAccount(idx)}
-                className="rounded-2xl overflow-hidden bg-neutral-900 cursor-pointer hidden md:block"
+                className="rounded-2xl overflow-hidden bg-neutral-900 cursor-pointer hidden md:block devs:ring-1 devs:ring-[rgba(139,92,246,0.45)] devs:shadow-[0_0_40px_rgba(139,92,246,0.25)]"
               >
                 <div className="relative w-full h-full">
                   {previewStory?.mediaType === "video" ? (
@@ -771,9 +829,9 @@ const StoryViewerPage = () => {
                     <img
                       src={acc.author.profilePic || DEFAULT_AVATAR}
                       alt=""
-                      className="w-6 h-6 rounded-full object-cover ring-1 ring-white/30"
+                      className="w-6 h-6 rounded-full object-cover ring-1 ring-white/30 devs:ring-[var(--devs-violet)]"
                     />
-                    <span className="text-white text-xs font-medium truncate max-w-[120px]">
+                    <span className="text-white text-xs font-medium truncate max-w-[120px] devs:font-mono">
                       {acc.author.username}
                     </span>
                   </div>
@@ -787,14 +845,17 @@ const StoryViewerPage = () => {
             <div
               key={acc.author._id}
               style={isMobile ? mobileCenterCardStyle : cardStyle(dist, d)}
-              className={`overflow-hidden bg-neutral-900 ${isMobile ? "" : "rounded-2xl"}`}
+              className={`overflow-hidden bg-neutral-900 ${isMobile ? "" : "rounded-2xl"} devs:ring-1 devs:ring-[rgba(34,240,255,0.35)] devs:shadow-[0_0_70px_rgba(34,240,255,0.2),0_0_120px_rgba(139,92,246,0.15)]`}
             >
+              {/* Devs Mode: HUD brackets */}
+              {isDevs && !isMobile && <HudCorners />}
+
               {/* progress segments — one per story this account has */}
               <div className="absolute top-2 left-2 right-2 flex gap-1 z-20">
                 {currentAccount.stories.map((s, i) => (
-                  <div key={s._id} className="h-1 flex-1 bg-white/30 rounded-full overflow-hidden">
+                  <div key={s._id} className="h-1 flex-1 bg-white/30 devs:bg-white/15 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-white rounded-full"
+                      className="h-full bg-white devs:bg-gradient-to-r devs:from-[#22f0ff] devs:to-[#ff2bd6] devs:shadow-[0_0_8px_rgba(34,240,255,0.8)] rounded-full"
                       style={{
                         width:
                           i < storyIndex ? "100%" : i === storyIndex ? `${progress}%` : "0%",
@@ -810,10 +871,10 @@ const StoryViewerPage = () => {
                   <img
                     src={currentAccount.author.profilePic ? currentAccount.author.profilePic : DEFAULT_AVATAR}
                     alt=""
-                    className="w-8 h-8 rounded-full object-cover ring-1 ring-white/30"
+                    className="w-8 h-8 rounded-full object-cover ring-1 ring-white/30 devs:ring-2 devs:ring-[var(--devs-cyan)]"
                   />
                   <div className="min-w-0">
-                    <p className="text-white text-sm font-semibold truncate">
+                    <p className="text-white text-sm font-semibold truncate devs:font-mono">
                       {currentAccount.author.username}
                     </p>
                   </div>
@@ -853,31 +914,39 @@ const StoryViewerPage = () => {
                         }
                       }}
                       aria-label={muted ? "Unmute" : "Mute"}
+                      className="devs:hover:text-[var(--devs-cyan)]"
                     >
                       {muted ? <VolumeX size={19} /> : <Volume2 size={19} />}
                     </button>
                   )}
                   {isOwnAccount && (
-                    <button onClick={openHighlightSheet} aria-label="Add to highlights">
+                    <button
+                      onClick={openHighlightSheet}
+                      aria-label="Add to highlights"
+                      className="devs:hover:text-[var(--devs-cyan)]"
+                    >
                       <Layers size={19} />
                     </button>
                   )}
                   {isOwnAccount && (
-                    <button onClick={() => setMoreOpen((v) => !v)}>
+                    <button
+                      onClick={() => setMoreOpen((v) => !v)}
+                      className="devs:hover:text-[var(--devs-cyan)]"
+                    >
                       <MoreHorizontal size={19} />
                     </button>
                   )}
-                  <button onClick={() => navigate(-1)}>
+                  <button onClick={() => navigate(-1)} className="devs:hover:text-[var(--devs-cyan)]">
                     <X size={22} />
                   </button>
                 </div>
               </div>
 
               {moreOpen && isOwnAccount && (
-                <div className="absolute top-14 right-3 z-30 bg-[#161616] rounded-lg shadow-xl border border-white/10 overflow-hidden">
+                <div className="absolute top-14 right-3 z-30 bg-[#161616] devs:bg-[rgba(8,10,28,0.95)] devs:backdrop-blur-xl rounded-lg shadow-xl border border-white/10 devs:border-[var(--border-popup)] overflow-hidden">
                   <button
                     onClick={handleDelete}
-                    className="flex items-center gap-2 px-4 py-2 text-red-400 text-sm hover:bg-white/5 w-full"
+                    className="flex items-center gap-2 px-4 py-2 text-red-400 devs:text-[var(--color-danger)] devs:font-mono text-sm hover:bg-white/5 w-full"
                   >
                     <Trash2 size={14} /> Delete story
                   </button>
@@ -922,7 +991,7 @@ const StoryViewerPage = () => {
                   gated on mediaReady until this disappears */}
               {!mediaReady && (
                 <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                  <div className="w-10 h-10 border-[3px] border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-10 h-10 border-[3px] border-white/30 border-t-white devs:border-t-[var(--devs-cyan)] rounded-full animate-spin" />
                 </div>
               )}
 
@@ -944,23 +1013,32 @@ const StoryViewerPage = () => {
                 aria-label="Next story"
               />
 
-              {/* double-tap gradient heart burst */}
-              {burst && (
-                <img
-                  key={burst.key}
-                  src="/images/gradient-like-icon.png"
-                  alt=""
-                  className="absolute w-40 h-30 pointer-events-none z-20 heartBurst"
-                  style={{ left: burst.x - 40, top: burst.y - 40 }}
-                />
-              )}
+              {/* double-tap like burst */}
+              {burst &&
+                (isDevs ? (
+                  <div
+                    key={burst.key}
+                    className="absolute w-0 h-0 pointer-events-none z-20"
+                    style={{ left: burst.x, top: burst.y }}
+                  >
+                    <LikeBurst burstKey={burst.key} variant="big" />
+                  </div>
+                ) : (
+                  <img
+                    key={burst.key}
+                    src="/images/gradient-like-icon.png"
+                    alt=""
+                    className="absolute w-40 h-30 pointer-events-none z-20 heartBurst"
+                    style={{ left: burst.x - 40, top: burst.y - 40 }}
+                  />
+                ))}
 
               {/* footer */}
               <div className="absolute bottom-0 left-0 right-0 px-3 pb-3 z-20">
                 {isOwnAccount ? (
                   <button
                     onClick={openSheet}
-                    className="flex items-center gap-1 text-white/90 text-xs mb-2"
+                    className="flex items-center gap-1 text-white/90 text-xs mb-2 devs:font-mono"
                   >
                     <Eye size={16} /> {viewsCount} view{viewsCount !== 1 ? "s" : ""}
                   </button>
@@ -985,31 +1063,32 @@ const StoryViewerPage = () => {
                       }}
                       disabled={sendingReply}
                       placeholder={`Reply to ${currentAccount.author.username}...`}
-                      className="flex-1 min-w-0 bg-transparent border border-white/40 text-white placeholder-white/60 text-sm rounded-full px-4 py-2 focus:outline-none focus:border-white disabled:opacity-60"
+                      className="flex-1 min-w-0 bg-transparent border border-white/40 text-white placeholder-white/60 text-sm rounded-full px-4 py-2 focus:outline-none focus:border-white disabled:opacity-60 devs:font-mono devs:text-[13px] devs:bg-[rgba(8,10,28,0.5)] devs:backdrop-blur-md devs:border-[var(--border-popup)] devs:focus:border-[var(--devs-cyan)] devs:focus:shadow-[0_0_14px_rgba(34,240,255,0.3)]"
                     />
                   )}
                   {!isOwnAccount && (
-                    <button onClick={handleLikeToggle} className="text-white/90">
-                      <Heart size={22} fill={liked ? "#ff3040" : "none"} color={liked ? "#ff3040" : "currentColor"} />
+                    <button onClick={handleLikeToggle} className="relative text-white/90">
+                      <Heart size={22} fill={liked ? likeColor : "none"} color={liked ? likeColor : "currentColor"} />
+                      {isDevs && <LikeBurst burstKey={likeBurstKey} variant="mini" />}
                     </button>
                   )}
                   {!isOwnAccount && (
                     <button
                       onClick={() => (hasReplyDraft ? handleReplySend() : openShare())}
                       disabled={sendingReply}
-                      className="text-white/90 disabled:opacity-50"
+                      className="text-white/90 disabled:opacity-50 devs:hover:text-[var(--devs-cyan)]"
                       aria-label={hasReplyDraft ? "Send reply" : "Share story"}
                     >
                       {sendingReply ? (
-                        <div className="w-[18px] h-[18px] border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        <div className="w-[18px] h-[18px] border-2 border-white/40 border-t-white devs:border-t-[var(--devs-cyan)] rounded-full animate-spin" />
                       ) : (
                         <Send size={20} />
                       )}
                     </button>
                   )}
                   {isOwnAccount && likesCount > 0 && (
-                    <div className="flex items-center gap-1 text-white/90 text-xs">
-                      <Heart size={16} fill="#ff3040" color="#ff3040" /> {likesCount}
+                    <div className="flex items-center gap-1 text-white/90 text-xs devs:font-mono">
+                      <Heart size={16} fill={likeColor} color={likeColor} /> {likesCount}
                     </div>
                   )}
                 </div>
@@ -1021,24 +1100,28 @@ const StoryViewerPage = () => {
 
       {/* viewers/likes bottom sheet — owner only */}
       {sheetOpen && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50" onClick={closeSheet}>
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 devs:backdrop-blur-sm" onClick={closeSheet}>
           <div
-            className="bg-[#161616] w-full max-w-md rounded-t-2xl max-h-[60vh] overflow-y-auto p-4"
+            className="bg-[#161616] devs:bg-[rgba(8,10,28,0.96)] devs:border-t devs:border-[var(--border-popup)] devs:shadow-[0_-10px_50px_rgba(34,240,255,0.15)] w-full max-w-md rounded-t-2xl devs:rounded-t-3xl max-h-[60vh] overflow-y-auto p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-4 mb-3 border-b border-white/10 pb-2">
               <button
                 onClick={() => setSheetTab("viewers")}
-                className={`text-sm font-semibold pb-1 ${
-                  sheetTab === "viewers" ? "text-white border-b-2 border-white" : "text-white/50"
+                className={`text-sm font-semibold pb-1 devs:font-mono devs:uppercase devs:tracking-widest devs:text-xs ${
+                  sheetTab === "viewers"
+                    ? "text-white border-b-2 border-white devs:text-[var(--devs-cyan)] devs:border-[var(--devs-cyan)]"
+                    : "text-white/50"
                 }`}
               >
                 Viewers {sheetData.viewers.length > 0 && `(${sheetData.viewers.length})`}
               </button>
               <button
                 onClick={() => setSheetTab("likes")}
-                className={`text-sm font-semibold pb-1 ${
-                  sheetTab === "likes" ? "text-white border-b-2 border-white" : "text-white/50"
+                className={`text-sm font-semibold pb-1 devs:font-mono devs:uppercase devs:tracking-widest devs:text-xs ${
+                  sheetTab === "likes"
+                    ? "text-white border-b-2 border-white devs:text-[var(--devs-cyan)] devs:border-[var(--devs-cyan)]"
+                    : "text-white/50"
                 }`}
               >
                 Likes {sheetData.likes.length > 0 && `(${sheetData.likes.length})`}
@@ -1046,10 +1129,10 @@ const StoryViewerPage = () => {
             </div>
 
             {sheetLoading ? (
-              <div className="text-white/60 text-sm">Loading...</div>
+              <div className="text-white/60 text-sm devs:font-mono">Loading...</div>
             ) : sheetTab === "viewers" ? (
               sheetData.viewers.length === 0 ? (
-                <div className="text-white/60 text-sm">No views yet</div>
+                <div className="text-white/60 text-sm devs:font-mono">No views yet</div>
               ) : (
                 sheetData.viewers.map((v) => {
                   const hasLiked = sheetData.likes.some((l) => l.user._id === v.user._id);
@@ -1058,28 +1141,28 @@ const StoryViewerPage = () => {
                       <img
                         src={v.user.profilePic || DEFAULT_AVATAR}
                         alt=""
-                        className="w-8 h-8 rounded-full object-cover"
+                        className="w-8 h-8 rounded-full object-cover devs:ring-1 devs:ring-[var(--devs-violet)]"
                       />
                       <span className="text-white text-sm flex-1 truncate">
                         {v.user.username}
                       </span>
-                      {hasLiked && <Heart size={16} fill="#ff3040" color="#ff3040" />}
+                      {hasLiked && <Heart size={16} fill={likeColor} color={likeColor} />}
                     </div>
                   );
                 })
               )
             ) : sheetData.likes.length === 0 ? (
-              <div className="text-white/60 text-sm">No likes yet</div>
+              <div className="text-white/60 text-sm devs:font-mono">No likes yet</div>
             ) : (
               sheetData.likes.map((l) => (
                 <div key={l.user._id} className="flex items-center gap-2 py-2">
                   <img
                     src={l.user.profilePic || DEFAULT_AVATAR}
                     alt=""
-                    className="w-8 h-8 rounded-full object-cover"
+                    className="w-8 h-8 rounded-full object-cover devs:ring-1 devs:ring-[var(--devs-violet)]"
                   />
                   <span className="text-white text-sm flex-1 truncate">{l.user.username}</span>
-                  <Heart size={16} fill="#ff3040" color="#ff3040" />
+                  <Heart size={16} fill={likeColor} color={likeColor} />
                 </div>
               ))
             )}
