@@ -1,8 +1,122 @@
-import React from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
+import { ArrowUpRight } from "lucide-react";
 import IconSidebar from "../components/IconSidebar";
 import MobileFooter from "../components/MobileFooter";
+import { useTheme } from "../context/ThemeContext";
+
+const IG_GRADIENT = "linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888)";
+const DEVS_GRADIENT = "conic-gradient(from var(--devs-angle), #22f0ff, #8b5cf6, #ff2bd6, #22f0ff)";
+
+/*
+  Developer photo.
+  - Shows a shimmering "AP" placeholder immediately (no empty frame).
+  - The photo fades in once it has loaded; if it was already cached it shows
+    instantly (checked on mount, so there's no flash).
+  - Explicit width/height + decoding="async" + fetchPriority="high" so the
+    browser reserves space and fetches it first.
+  - If the image fails, the placeholder simply stays.
+*/
+const DeveloperPhoto = () => {
+  const { isDevs, lite } = useTheme();
+  const imgRef = useRef(null);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useLayoutEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth > 0) setLoaded(true);
+  }, []);
+
+  return (
+    <div className="relative shrink-0 w-[168px] h-[168px] mx-auto sm:mx-0">
+
+      {/* ambient glow behind the frame */}
+      <div
+        className="absolute -inset-4 rounded-[36px] opacity-60 blur-2xl"
+        style={{
+          background: isDevs
+            ? "linear-gradient(45deg, #22f0ff, #8b5cf6, #ff2bd6)"
+            : IG_GRADIENT,
+        }}
+      />
+
+      {/* gradient ring */}
+      <div
+        className="relative w-full h-full rounded-[28px] p-[3px]"
+        style={{
+          background: isDevs ? DEVS_GRADIENT : IG_GRADIENT,
+          ...(isDevs && !lite ? { animation: "devs-spin 6s linear infinite" } : {}),
+        }}
+      >
+        <div className="relative w-full h-full rounded-[25px] overflow-hidden bg-[var(--bg-elevated)]">
+
+          {/* placeholder: visible until the photo is ready */}
+          {!loaded && (
+            <div
+              className={`absolute inset-0 flex items-center justify-center text-[36px] font-semibold text-[var(--text-primary)] ${
+                isDevs ? "devs-shimmer" : "animate-pulse"
+              }`}
+              aria-hidden="true"
+            >
+              AP
+            </div>
+          )}
+
+          {!failed && (
+            <img
+              ref={imgRef}
+              src="/images/Developer-Pic.JPG"
+              alt="Adarsh Pattanayak"
+              width={168}
+              height={168}
+              loading="eager"
+              decoding="async"
+              fetchPriority="high"
+              onLoad={() => setLoaded(true)}
+              onError={() => setFailed(true)}
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                loaded ? "opacity-100" : "opacity-0"
+              }`}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TECH = [
+  {
+    title: "Web development",
+    body: "HTML, CSS, JavaScript, React, Tailwind CSS, Node.js, Express.js, REST APIs",
+  },
+  {
+    title: "Database & backend",
+    body: "MongoDB, authentication, API development, database design, media management",
+  },
+  {
+    title: "Data science",
+    body: "Python, NumPy, Pandas, Matplotlib, Seaborn, Jupyter, data analysis, web scraping, scikit-learn",
+  },
+  {
+    title: "Tools & services",
+    body: "Git, GitHub, Cloudinary, and other modern development tools",
+  },
+];
 
 const AboutPage = () => {
+  const { isDevs } = useTheme();
+
+  const cardBase =
+    "rounded-xl bg-[var(--bg-surface)] border border-[var(--border-soft)]";
+  const cardDevs =
+    "devs:backdrop-blur-md devs:rounded-2xl devs:transition-all devs:duration-300 devs:hover:border-[var(--devs-cyan)] devs:hover:shadow-[0_0_26px_rgba(34,240,255,0.18)]";
+
+  const linkCard =
+    "flex-1 flex items-center justify-between px-4 py-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-soft)] hover:bg-[var(--bg-row-hover)] transition-colors duration-200 " +
+    "devs:backdrop-blur-md devs:rounded-2xl devs:hover:border-[var(--devs-cyan)] devs:hover:shadow-[0_0_24px_rgba(34,240,255,0.2)] devs:transition-all";
+
   return (
     <div className="aboutPage w-[100vw] h-[100vh] bg-[var(--bg-app)] flex text-[var(--text-primary)] overflow-x-hidden">
       <IconSidebar />
@@ -12,22 +126,27 @@ const AboutPage = () => {
 
           {/* ---------- Page heading ---------- */}
           <header className="w-full mb-14">
-            <p className="text-[13px] font-medium text-[var(--brand-blue)] mb-2">
-              Behind the build
+            <p className="text-[13px] font-medium text-[var(--brand-blue)] mb-2 devs:font-mono devs:uppercase devs:tracking-[0.3em] devs:text-[11px]">
+              {isDevs ? "// behind.the.build" : "Behind the build"}
             </p>
 
-            <h1 className="text-[32px] sm:text-[38px] font-semibold leading-tight text-[var(--text-primary)] max-w-[620px]">
+            <h1
+              className={`text-[32px] sm:text-[38px] font-semibold leading-tight text-[var(--text-primary)] max-w-[620px] ${
+                isDevs ? "devs-text-gradient !font-extrabold tracking-tight" : ""
+              }`}
+              style={isDevs ? { fontFamily: "var(--devs-font-display)" } : undefined}
+            >
               About this project, and the person who built it
             </h1>
           </header>
 
           {/* ---------- About the website ---------- */}
           <section className="w-full mb-16">
-            <h2 className="text-[20px] font-semibold text-[var(--text-primary)] mb-1">
+            <h2 className="text-[20px] font-semibold text-[var(--text-primary)] mb-1 devs:font-bold">
               An independent, Instagram-inspired project
             </h2>
 
-            <p className="text-[14px] text-[var(--text-muted)] mb-6">
+            <p className="text-[14px] text-[var(--text-muted)] mb-6 devs:font-mono devs:text-[12px]">
               What this site is, and what it isn't
             </p>
 
@@ -59,8 +178,8 @@ const AboutPage = () => {
             </div>
 
             {/* Copyright */}
-            <div className="mt-8 p-5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-soft)] max-w-[680px]">
-              <h3 className="text-[15px] font-semibold text-[var(--text-primary)] mb-2">
+            <div className={`mt-8 p-5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-soft)] max-w-[680px] ${isDevs ? "devs-glass" : ""}`}>
+              <h3 className="text-[15px] font-semibold text-[var(--text-primary)] mb-2 devs:font-bold">
                 Copyright &amp; code ownership
               </h3>
 
@@ -101,7 +220,7 @@ const AboutPage = () => {
             {/* Third party + disclaimer */}
             <div className="mt-6 flex flex-col gap-6 max-w-[680px]">
               <div>
-                <h3 className="text-[15px] font-semibold text-[var(--text-primary)] mb-2">
+                <h3 className="text-[15px] font-semibold text-[var(--text-primary)] mb-2 devs:font-bold">
                   Third-party technologies
                 </h3>
 
@@ -116,7 +235,7 @@ const AboutPage = () => {
               </div>
 
               <div>
-                <h3 className="text-[15px] font-semibold text-[var(--text-primary)] mb-2">
+                <h3 className="text-[15px] font-semibold text-[var(--text-primary)] mb-2 devs:font-bold">
                   Disclaimer
                 </h3>
 
@@ -137,64 +256,21 @@ const AboutPage = () => {
 
           {/* ---------- About the developer ---------- */}
           <section className="w-full mb-10">
-            <h2 className="text-[20px] font-semibold text-[var(--text-primary)] mb-1">
+            <h2 className="text-[20px] font-semibold text-[var(--text-primary)] mb-1 devs:font-bold">
               About the developer
             </h2>
 
-            <p className="text-[14px] text-[var(--text-muted)] mb-8">
+            <p className="text-[14px] text-[var(--text-muted)] mb-8 devs:font-mono devs:text-[12px]">
               Who built this, and why
             </p>
 
             <div className="flex flex-col sm:flex-row gap-8 sm:gap-10 items-start">
 
-
-            <div className="relative shrink-0 w-[168px] h-[168px] mx-auto sm:mx-0">
-
-            {/* ambient glow behind the frame */}
-            <div
-                className="absolute -inset-4 rounded-[36px] opacity-60 blur-2xl"
-                style={{
-                background:
-                    "linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888)",
-                }}
-            />
-
-            {/* gradient ring */}
-            <div
-                className="relative w-full h-full rounded-[28px] p-[3px]"
-                style={{
-                background:
-                    "linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888)",
-                }}
-            >
-                <div className="w-full h-full rounded-[25px] overflow-hidden bg-[var(--bg-elevated)] flex items-center justify-center">
-
-                {/* Replace src with your photo, e.g. /images/adarsh.jpg */}
-                <img
-                    src="/images/Developer-Pic.JPG"
-                    alt="Adarsh Pattanayak"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                    e.currentTarget.nextSibling.style.display = "flex";
-                    }}
-                />
-
-                {/* Fallback shown until you add the real photo */}
-                <div
-                    className="hidden w-full h-full items-center justify-center text-[36px] font-semibold text-[var(--text-primary)]"
-                    style={{ display: "none" }}
-                >
-                    AP
-                </div>
-
-                </div>
-            </div>
-            </div>
+              <DeveloperPhoto />
 
               {/* ---- Intro text ---- */}
               <div className="flex-1">
-                <h3 className="text-[19px] font-semibold text-[var(--text-primary)] mb-3">
+                <h3 className="text-[19px] font-semibold text-[var(--text-primary)] mb-3 devs:font-bold">
                   Hi, I'm Adarsh Pattanayak 👋
                 </h3>
 
@@ -225,36 +301,28 @@ const AboutPage = () => {
 
             {/* ---- Technical interests ---- */}
             <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-[680px]">
-              {[
-                {
-                  title: "Web development",
-                  body: "HTML, CSS, JavaScript, React, Tailwind CSS, Node.js, Express.js, REST APIs",
-                },
-                {
-                  title: "Database & backend",
-                  body: "MongoDB, authentication, API development, database design, media management",
-                },
-                {
-                  title: "Data science",
-                  body: "Python, NumPy, Pandas, Matplotlib, Seaborn, Jupyter, data analysis, web scraping, scikit-learn",
-                },
-                {
-                  title: "Tools & services",
-                  body: "Git, GitHub, Cloudinary, and other modern development tools",
-                },
-              ].map((item) => (
-                <div
+              {TECH.map((item, i) => (
+                <motion.div
                   key={item.title}
-                  className="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-soft)]"
+                  {...(isDevs
+                    ? {
+                        initial: { opacity: 0, y: 16 },
+                        whileInView: { opacity: 1, y: 0 },
+                        viewport: { once: true, margin: "0px 0px -40px 0px" },
+                        transition: { duration: 0.4, delay: i * 0.06 },
+                        whileHover: { y: -3 },
+                      }
+                    : {})}
+                  className={`p-4 ${cardBase} ${cardDevs}`}
                 >
-                  <h4 className="text-[14px] font-semibold text-[var(--text-primary)] mb-1.5">
+                  <h4 className="text-[14px] font-semibold text-[var(--text-primary)] mb-1.5 devs:font-bold">
                     {item.title}
                   </h4>
 
-                  <p className="text-[13px] leading-relaxed text-[var(--text-muted)]">
+                  <p className="text-[13px] leading-relaxed text-[var(--text-muted)] devs:font-mono devs:text-[12px]">
                     {item.body}
                   </p>
-                </div>
+                </motion.div>
               ))}
             </div>
 
@@ -273,11 +341,11 @@ const AboutPage = () => {
 
           {/* ---------- Connect ---------- */}
           <section className="w-full mb-16">
-            <h2 className="text-[20px] font-semibold text-[var(--text-primary)] mb-1">
+            <h2 className="text-[20px] font-semibold text-[var(--text-primary)] mb-1 devs:font-bold">
               Connect with me
             </h2>
 
-            <p className="text-[14px] text-[var(--text-muted)] mb-6">
+            <p className="text-[14px] text-[var(--text-muted)] mb-6 devs:font-mono devs:text-[12px]">
               If you'd like to talk about this project, collaborate, or
               just connect
             </p>
@@ -289,14 +357,15 @@ const AboutPage = () => {
                 href="https://www.linkedin.com/in/adarshpattanayak"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 flex items-center justify-between px-4 py-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-soft)] hover:bg-[var(--bg-row-hover)] transition-colors duration-200"
+                className={linkCard}
               >
                 <span className="text-[14px] font-medium text-[var(--text-primary)]">
                   LinkedIn
                 </span>
 
-                <span className="text-[13px] text-[var(--link-muted)]">
+                <span className="flex items-center gap-1 text-[13px] text-[var(--link-muted)]">
                   Adarsh Pattanayak
+                  {isDevs && <ArrowUpRight size={14} />}
                 </span>
               </a>
 
@@ -305,34 +374,36 @@ const AboutPage = () => {
                 href="https://github.com/Adarsh-cpp"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 flex items-center justify-between px-4 py-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-soft)] hover:bg-[var(--bg-row-hover)] transition-colors duration-200"
+                className={linkCard}
               >
                 <span className="text-[14px] font-medium text-[var(--text-primary)]">
                   GitHub
                 </span>
 
-                <span className="text-[13px] text-[var(--link-muted)]">
+                <span className="flex items-center gap-1 text-[13px] text-[var(--link-muted)]">
                   Adarsh-cpp
+                  {isDevs && <ArrowUpRight size={14} />}
                 </span>
               </a>
 
               {/* Email */}
               <a
                 href="mailto:adarshpattanayak2004@gmail.com"
-                className="flex-1 flex items-center justify-between px-4 py-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-soft)] hover:bg-[var(--bg-row-hover)] transition-colors duration-200"
+                className={linkCard}
               >
                 <span className="text-[14px] font-medium text-[var(--text-primary)]">
                   Email
                 </span>
 
-                <span className="text-[13px] text-[var(--link-muted)]">
+                <span className="flex items-center gap-1 text-[13px] text-[var(--link-muted)]">
                   Get in touch
+                  {isDevs && <ArrowUpRight size={14} />}
                 </span>
               </a>
 
             </div>
 
-            <p className="mt-8 text-[13px] text-[var(--text-muted)]">
+            <p className="mt-8 text-[13px] text-[var(--text-muted)] devs:font-mono devs:text-[12px]">
               Built with curiosity, code, and a lot of debugging. ❤️
             </p>
           </section>
