@@ -94,11 +94,24 @@ const ResetPasswordPage = () => {
       let {otp, resetPassword, confirmPassword } = data;
       let resetToken = localStorage.getItem("resetToken")
 
-      let response = await axios.post(url, { otp, resetPassword, confirmPassword, resetToken});
+      // withCredentials lets the browser accept the fresh auth cookie from the response
+      let response = await axios.post(
+        url,
+        { otp, resetPassword, confirmPassword, resetToken },
+        { withCredentials: true }
+      );
+
+      // Save the new session token (use the same key your login page uses)
+      const { token } = response.data;
+      if (token) {
+        localStorage.setItem("token", token);
+      }
+      localStorage.removeItem("resetToken");
+
       navigate("/home");
 
     } catch (error) {
-      alert(error.message);
+      alert(error.response?.data?.message || error.message);
     }
 
 

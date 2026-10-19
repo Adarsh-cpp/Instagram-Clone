@@ -3,13 +3,22 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { AtSign } from "lucide-react";
+import { useTheme } from "../context/ThemeContext";
+import { DevsAuthShell, DevsInput, DevsButton } from "../components/devs/DevsAuthKit";
 
 const usernameRegex = /^(?!.*\.\.)(?!.*\.$)[a-zA-Z0-9._]{1,30}$/;
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
+const usernameRules = {
+  required: "This field is required",
+  pattern: { value: usernameRegex, message: "Enter a valid username" },
+};
+
 const CompleteProfile = () => {
-  const { register, handleSubmit, formState: { errors } } = useForm();
+  const { isDevs } = useTheme();
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm();
   const navigate = useNavigate();
 
   const onSubmit = async (data) => {
@@ -26,15 +35,34 @@ const CompleteProfile = () => {
     }
   };
 
+  /* ---------------- Devs Mode ---------------- */
+  if (isDevs) {
+    return (
+      <DevsAuthShell hero={false} title="Choose a username">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <DevsInput
+            label="handle"
+            icon={AtSign}
+            placeholder="Username"
+            error={errors.username?.message}
+            {...register("username", usernameRules)}
+          />
+
+          <DevsButton type="submit" loading={isSubmitting} className="mt-1">
+            Continue
+          </DevsButton>
+        </form>
+      </DevsAuthShell>
+    );
+  }
+
+  /* ---------------- Classic (light / dark) ---------------- */
   return (
     <div className="h-[100vh] w-[100vw] bg-[var(--bg-app)] flex justify-center items-center">
       <form onSubmit={handleSubmit(onSubmit)} className="w-[270px] flex flex-col items-center">
         <h2 className="text-[var(--text-primary)] text-[18px] font-bold mb-4">Choose a username</h2>
         <input
-          {...register("username", {
-            required: "This field is required",
-            pattern: { value: usernameRegex, message: "Enter a valid username" },
-          })}
+          {...register("username", usernameRules)}
           className={`h-[36px] w-full bg-[var(--bg-input)] text-[12px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px] px-[10px] my-[3px] ${errors.username ? "border border-[var(--color-error)]" : "border border-[var(--border-input)]"}`}
           placeholder="Username"
         />

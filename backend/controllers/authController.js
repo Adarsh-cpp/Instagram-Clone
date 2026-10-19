@@ -4,9 +4,6 @@ import userModel from "../models/user.model.js";
 import generateToken from "../utils/generateToken.js";
 import transporter from "../config/nodemailer.js";
 
-
-
-
 export const signup = async (req, res) => {
 
   const { contact, password, fullname, username } = req.body;
@@ -16,8 +13,8 @@ export const signup = async (req, res) => {
     return res.status(400).json({ message: 'All fields are required.' });
   }
 
-  // 🔍 Determine contact type once
-  const isPhone = /^\d{10}$/.test(contact);          // Indian 10‑digit example
+  // Determine contact type once
+  const isPhone = /^\d{10}$/.test(contact);          // Indian 10-digit example
   const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact);
 
   if (!isPhone && !isEmail) {
@@ -40,10 +37,10 @@ export const signup = async (req, res) => {
       return res.status(409).json({ message: 'Username already exists.' });
     }
 
-    // 🔐 Hash password
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 🆕 Create user
+    // Create user
     const user = await userModel.create({
       phone: isPhone ? contact : undefined,
       email: isPhone ? undefined : contact,
@@ -84,8 +81,8 @@ export const login = async (req, res) => {
         return res.status(400).json({ message: 'All fields are required. lala' });
     }
 
-     // 🔍 Determine contact type once
-  const isPhone = /^\d{10}$/.test(contact);          // Indian 10‑digit example
+     // Determine contact type once
+  const isPhone = /^\d{10}$/.test(contact);          // Indian 10-digit example
   const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact);
   const isUsername = /^[a-zA-Z0-9_-]{4,16}$/.test(contact);
 
@@ -102,14 +99,14 @@ export const login = async (req, res) => {
 
         
 
-        // �� Search for user in database
+        // Search for user in database
         const user = await userModel.findOne(query).select('+password');
         if(!user)
             return res.status(404).json({ message: 'User not found.' });
 
         
 
-        // �� Verify password
+        // Verify password
         const isMatch = await bcrypt.compare(password, user.password);
         if(!isMatch)
             return res.status(401).json({ message: 'Invalid credentials.' });
@@ -301,8 +298,8 @@ export const sendResetOTP = async (req, res) => {
     return res.status(401).json({ success:false, message: "There is no user registered with this email id or phone number" })
   }
 
-  // 🔍 Determine contact type once
-  const isPhone = /^\d{10}$/.test(contact);          // Indian 10‑digit example
+  // Determine contact type once
+  const isPhone = /^\d{10}$/.test(contact);          // Indian 10-digit example
   const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact);
 
   try {
@@ -357,48 +354,61 @@ export const resetPassword = async (req, res) => {
     return res.status(400).json({ message: 'Missing Token' });
   }
 
-
-    let decoded = jwt.verify(resetToken, process.env.JWT_SECRET)
-    
-  let user = await userModel.findOne({email: decoded.email});
-
-  if(!user){
-    return res.status(400).json({ message: "You don't have an account, Please signup" })
-  }
-
-
   if(resetPassword !== confirmPassword){
     return res.status(400).json({ success:false, message: "Confirm your password correctly" })
   }
 
-  if( user.resetOTP == "" ){
-    return res.status(401).json({ success:false, message:"The OTP is invalid" })
-  }
-
-  if(user.resetOTPExpiresAt < Date.now() ){
-    return res.status(401).json({ message:"OTP is expired" })
-  }
-
-
   try {
 
-     
-    // �� Verify OTP
-        const isMatch = await bcrypt.compare(otp, user.resetOTP);
+    // jwt.verify throws on an expired/invalid token, so it must live inside the try
+    let decoded;
+    try {
+      decoded = jwt.verify(resetToken, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({ success:false, message: "Reset session expired. Please request a new OTP." })
+    }
 
-        if(!isMatch){
-            return res.status(401).json({ message: 'Invalid credentials.' });
-        }
+    let user = await userModel.findOne({email: decoded.email});
 
-      //store the new password
-        const hashedPassword = await bcrypt.hash(resetPassword, 10);
-        user.password = hashedPassword;
-        user.resetOTP = "";
-        user.resetOTPExpiresAt = 0;
-        user.isAccountVerified = true;
-        await user.save();
+    if(!user){
+      return res.status(400).json({ message: "You don't have an account, Please signup" })
+    }
 
-      return res.status(200).json({ success: true, message: "Password is changed." })
+    if( !user.resetOTP ){
+      return res.status(401).json({ success:false, message:"The OTP is invalid" })
+    }
+
+    if(user.resetOTPExpiresAt < Date.now() ){
+      return res.status(401).json({ message:"OTP is expired" })
+    }
+
+    // Verify OTP
+    const isMatch = await bcrypt.compare(otp, user.resetOTP);
+
+    if(!isMatch){
+      return res.status(401).json({ message: 'Invalid credentials.' });
+    }
+
+    // Store the new password
+    const hashedPassword = await bcrypt.hash(resetPassword, 10);
+    user.password = hashedPassword;
+    user.resetOTP = "";
+    user.resetOTPExpiresAt = 0;
+    user.isAccountVerified = true;
+    await user.save();
+
+    // Log the user in: issue a fresh token so /home doesn't use a stale one
+    const token = generateToken(user);
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "None",
+      path: "/",
+      maxAge: 3600000,
+    });
+
+    return res.status(200).json({ success: true, token, message: "Password is changed." })
     
   } catch (error) {
      return res.status(400).json({ success:false, message:error.message})

@@ -4,13 +4,22 @@ import { useForm } from "react-hook-form";
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
-import { MessageCircle } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
+import { MessageCircle, KeyRound } from 'lucide-react';
+import {
+  DevsAuthShell,
+  DevsHeroIcon,
+  DevsInput,
+  DevsButton,
+  DevsLink,
+} from '../components/devs/DevsAuthKit';
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
 const ConfirmationPage = () => {
 
-  const { register, handleSubmit, formState: { errors } } = useForm();
+  const { isDevs } = useTheme();
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm();
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
 
@@ -84,6 +93,73 @@ const ConfirmationPage = () => {
     }
   };
 
+  const otpRules = {
+    required: "This field is required",
+    pattern: {
+      value: /^[0-9]{6}$/,
+      message: "Enter the 6-digit numeric code",
+    },
+  };
+
+  /* ---------------- Devs Mode ---------------- */
+  if (isDevs) {
+    return (
+      <DevsAuthShell
+        hero={false}
+        title="Enter confirmation code"
+        subtitle={
+          <>
+            Enter the confirmation code that we sent to{" "}
+            <span className="italic text-[var(--devs-cyan)]">{email}</span>.
+          </>
+        }
+        footer={
+          <div className="mt-6 flex flex-col items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="font-mono text-[12px] text-[var(--text-secondary)] transition-all hover:text-[var(--devs-cyan)] hover:[text-shadow:0_0_12px_rgba(34,240,255,0.7)] cursor-pointer"
+            >
+              Go back
+            </button>
+            <p className="font-mono text-[12px] text-[var(--text-muted)] text-center">
+              Have an account?{" "}
+              <DevsLink to="/" accent>Log in</DevsLink>
+            </p>
+          </div>
+        }
+      >
+        <DevsHeroIcon icon={MessageCircle} />
+
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <DevsInput
+            label="one-time code"
+            icon={KeyRound}
+            type="text"
+            inputMode="numeric"
+            maxLength={6}
+            placeholder="Confirmation Code"
+            error={errors.otp?.message}
+            {...register("otp", otpRules)}
+          />
+
+          <button
+            type="button"
+            onClick={sendOTP}
+            className="self-start font-mono text-[12px] font-bold text-[var(--devs-cyan)] transition-all hover:[text-shadow:0_0_12px_rgba(34,240,255,0.8)] cursor-pointer"
+          >
+            Resend code.
+          </button>
+
+          <DevsButton type="submit" loading={isSubmitting}>
+            Next
+          </DevsButton>
+        </form>
+      </DevsAuthShell>
+    );
+  }
+
+  /* ---------------- Classic (light / dark) ---------------- */
   return (
     <div className="confirmationPage h-[100vh] w-[100vw] flex justify-center items-center bg-[var(--bg-app)]">
       <div className="confirmationContainer w-[350px] h-[460px] flex flex-col items-center justify-between ">
@@ -109,13 +185,7 @@ const ConfirmationPage = () => {
                 <input
                   type="text"
                   maxLength={6}
-                  {...register("otp", {
-                    required: "This field is required",
-                    pattern: {
-                      value: /^[0-9]{6}$/,
-                      message: "Enter the 6-digit numeric code",
-                    },
-                  })}
+                  {...register("otp", otpRules)}
                   className={`h-[36px] w-[270px] bg-[var(--bg-input)] text-[12px] outline-none placeholder-[var(--text-muted)] text-[var(--text-input)] rounded-[5px] px-[10px] my-[3px] ${errors.otp ? " border border-[var(--color-error)]" : "border border-[var(--border-input)]"}`}
                   placeholder="Confirmation Code"
                 />

@@ -5,17 +5,36 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { Cake } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
+import {
+  DevsAuthShell,
+  DevsHeroIcon,
+  DevsButton,
+  DevsLink,
+} from '../components/devs/DevsAuthKit';
 
 axios.defaults.withCredentials = true;
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
+const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const dates = Array.from({ length: 30 }, (_, i) => i + 1);
+const years = Array.from({ length: 2025 - 1925 + 1 }, (_, i) => 2025 - i);
+
+// Devs Mode dropdown styling (native <select>, so keyboard / mobile pickers still work)
+const devsSelect = (hasError) =>
+  `h-[44px] w-full rounded-xl bg-[var(--bg-input)] text-[var(--text-input)] font-mono text-[13px] px-3 outline-none border transition-all duration-200 cursor-pointer
+   ${hasError ? "border-[var(--color-error)]" : "border-[var(--border-input)]"}
+   focus:border-[var(--devs-cyan)] focus:shadow-[0_0_0_3px_rgba(34,240,255,0.15),0_0_20px_rgba(34,240,255,0.2)]`;
+
 const DobPage = () => {
+
+  const { isDevs } = useTheme();
 
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm();
 
   const navigate = useNavigate()
@@ -46,11 +65,86 @@ const DobPage = () => {
 
   const formRef = useRef();
 
-  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  const dates = Array.from({ length: 30 }, (_, i) => i + 1);
-  const years = Array.from({ length: 2025 - 1925 + 1 }, (_, i) => 2025 - i);
+  /* ---------------- Devs Mode ---------------- */
+  if (isDevs) {
+    const hasAnyError = errors.month || errors.date || errors.year;
 
+    return (
+      <DevsAuthShell
+        hero={false}
+        title="Add your date of birth"
+        subtitle="This won't be part of your public profile"
+        footer={
+          <div className="mt-6 flex flex-col items-center gap-3">
+            <DevsLink to="/user/signup">Go back</DevsLink>
+            <p className="font-mono text-[12px] text-[var(--text-muted)] text-center">
+              Have an account?{" "}
+              <DevsLink to="/" accent>Log in</DevsLink>
+            </p>
+          </div>
+        }
+      >
+        <DevsHeroIcon icon={Cake} />
 
+        <form ref={formRef} onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <div className="grid grid-cols-[1.5fr_1fr_1.1fr] gap-2">
+            <select
+              aria-label="Month"
+              {...register("month", { required: "Month is required" })}
+              className={devsSelect(!!errors.month)}
+            >
+              <option value="">Month</option>
+              {months.map((month) => (
+                <option key={month} value={month}>{month}</option>
+              ))}
+            </select>
+
+            <select
+              aria-label="Date"
+              {...register("date", { required: "Date is required" })}
+              className={devsSelect(!!errors.date)}
+            >
+              <option value="">Date</option>
+              {dates.map((date) => (
+                <option key={date} value={date}>{date}</option>
+              ))}
+            </select>
+
+            <select
+              aria-label="Year"
+              {...register("year", { required: "Year is required" })}
+              className={devsSelect(!!errors.year)}
+            >
+              <option value="">Year</option>
+              {years.map((year) => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+
+          {hasAnyError && (
+            <p className="font-mono text-[11px] text-[var(--color-error)]">
+              ! Please select your full date of birth
+            </p>
+          )}
+
+          <div className="font-mono text-[11px] leading-relaxed text-[var(--text-muted)] text-center">
+            <p>You need to enter the date you were born on</p>
+            <p className="mt-2">
+              Use your own date of birth, even if this account is for a
+              business, pet or something else
+            </p>
+          </div>
+
+          <DevsButton type="submit" loading={isSubmitting}>
+            Next
+          </DevsButton>
+        </form>
+      </DevsAuthShell>
+    );
+  }
+
+  /* ---------------- Classic (light / dark) ---------------- */
   return (
     <div className="dobPage h-[100vh] w-[100vw] flex justify-center items-center bg-[var(--bg-app)]">
       <div className="dobContainer w-[350px] h-[550px] flex flex-col justify-between ">
