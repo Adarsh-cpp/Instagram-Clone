@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { KeyRound, Eye, EyeOff, Lock } from 'lucide-react';
 import { PasswordVisibleIcon, PasswordHiddenIcon } from '../components/Icons';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import {
   DevsAuthShell,
   DevsHeroIcon,
@@ -30,6 +31,7 @@ const ResetPasswordPage = () => {
     const { register, handleSubmit, formState: { errors, isSubmitting }, setValue } = useForm();
     const navigate = useNavigate()
     const { isDevs } = useTheme()
+    const { refreshUser } = useAuth()
 
     const [pwVisibility, setPwVisibility] = useState(false);
     const [confirmPwVisibility, setConfirmPwVisibility] = useState(false);
@@ -101,12 +103,16 @@ const ResetPasswordPage = () => {
         { withCredentials: true }
       );
 
-      // Save the new session token (use the same key your login page uses)
+      // Save the new session token under the key the rest of the app reads
       const { token } = response.data;
       if (token) {
-        localStorage.setItem("token", token);
+        localStorage.setItem("authToken", token);
       }
       localStorage.removeItem("resetToken");
+
+      // AuthProvider only loads the user on mount, so reload it now
+      // (needs the new authToken to already be in localStorage)
+      await refreshUser();
 
       navigate("/home");
 

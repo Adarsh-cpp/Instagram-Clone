@@ -32,6 +32,14 @@ export const AuthProvider = ({ children }) => {
       return response.data;
     } catch (error) {
       console.log(error);
+
+      // The server rejected the token (expired / invalid): drop it so the app
+      // doesn't keep running with a dead session and a null user.
+      const status = error.response?.status;
+      if (status === 401 || status === 403) {
+        localStorage.removeItem("authToken");
+        setUser(null);
+      }
     }
   };
 
