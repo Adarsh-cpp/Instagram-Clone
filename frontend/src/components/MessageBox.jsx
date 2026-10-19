@@ -1114,6 +1114,10 @@ const MessageBox = ({
           document.body
         )}
 
+      {/* Shared post/reel opened from a chat: on mobile the user hasn't seen
+          the media yet, so the overlay opens on the post first and only shows
+          the comments after the comment icon is tapped (`mobileMediaFirst`).
+          Desktop is unaffected. */}
       {isCommentsOpen && sharedPostAsItem && (
         <CommentsOverlay
           post={sharedPostAsItem}
@@ -1123,6 +1127,7 @@ const MessageBox = ({
           onSaveChange={(saved) => setIsSaved(saved)}
           initialIsLiked={isLiked}
           initialIsSaved={isSaved}
+          mobileMediaFirst
         />
       )}
 
@@ -1135,6 +1140,7 @@ const MessageBox = ({
           onSaveChange={(saved) => setIsSaved(saved)}
           initialIsLiked={isLiked}
           initialIsSaved={isSaved}
+          mobileMediaFirst
         />
       )}
     </div>

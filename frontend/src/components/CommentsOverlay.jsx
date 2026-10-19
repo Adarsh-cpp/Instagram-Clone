@@ -89,13 +89,15 @@ const CommentsOverlay = ({
   onCommentAdded,
   initialIsLiked,
   initialIsSaved,
-  // When true, the media (image/video) panel is also shown on mobile,
-  // stacked above the comments instead of being hidden below the `lg`
-  // breakpoint. Used for entry points where the user hasn't already
-  // seen the media elsewhere (e.g. opening a shared post/reel straight
-  // from a chat message) — the normal home-feed → comment-icon flow
-  // leaves this false/unset since the user already saw the post there.
-  showMediaOnMobile = false,
+  // MOBILE ONLY. When true, the overlay opens on the post/reel itself
+  // (media + action bar), and the comments only appear after the user taps
+  // the comment icon (tap it again, or the back arrow, to return to the
+  // post). Used for entry points where the user hasn't already seen the
+  // media — e.g. opening a shared post/reel straight from a chat message.
+  // The home feed leaves this false/unset because the post is already
+  // visible there, so the overlay opens straight to the comments.
+  // Desktop (lg and up) always shows media + comments side by side.
+  mobileMediaFirst = false,
 }) => {
   const { user, refreshUser } = useAuth();
   const { theme, isDevs } = useTheme();
@@ -131,6 +133,15 @@ const CommentsOverlay = ({
   const [fetchedComments, setFetchedComments] = useState([]);
   const [showPicker, setShowPicker] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
+
+  // Mobile only: which pane is showing. Starts on the post when
+  // `mobileMediaFirst` is set, otherwise on the comments (original behavior).
+  const [mobileView, setMobileView] = useState(
+    mobileMediaFirst ? "media" : "comments"
+  );
+
+  // true only on mobile-first entry points while the post pane is showing
+  const isMediaView = mobileMediaFirst && mobileView === "media";
 
   // Devs Mode only: carousel direction + like-burst triggers
   const [slideDir, setSlideDir] = useState(1);
@@ -297,6 +308,19 @@ const CommentsOverlay = ({
       aiAbortControllerRef.current?.abort();
     };
   }, []);
+
+  // Comment icon in the action bar. On mobile-first entry points it flips
+  // between the post and the comments; everywhere else (and on desktop,
+  // where both panes are always visible) it does nothing, as before.
+  const handleCommentIconClick = () => {
+    if (!mobileMediaFirst) return;
+
+    setShowPicker(false);
+    setShowToneMenu(false);
+    setMobileView((previous) =>
+      previous === "media" ? "comments" : "media"
+    );
+  };
 
   const toggleLike = async () => {
     try {
@@ -632,9 +656,14 @@ const CommentsOverlay = ({
         className={`${
           isDevs ? "" : "mobile-sheet-anim"
         } relative mx-auto flex w-full flex-col overflow-hidden rounded-t-2xl bg-[var(--bg-surface)] shadow-2xl lg:h-[92vh] lg:w-[90vw] lg:flex-row lg:rounded-2xl ${
-          showMediaOnMobile ? "h-[88vh]" : "h-[75vh]"
+          mobileMediaFirst ? "h-[88vh]" : "h-[75vh]"
         } devs:bg-[rgba(8,10,28,0.94)] devs:border devs:border-[var(--border-popup)] devs:shadow-[0_0_60px_rgba(34,240,255,0.15),0_20px_80px_rgba(0,0,0,0.7)] devs:rounded-t-3xl devs:lg:rounded-3xl`}
       >
+        {/* Media pane.
+            - Desktop (lg+): always visible, left half.
+            - Mobile: hidden by default (the home feed already showed the post).
+              With `mobileMediaFirst` it's visible until the user taps the
+              comment icon, and takes all the free height above the action bar. */}
         <div
           onDoubleClick={doubleClickToLike}
           onTouchStart={
@@ -647,8 +676,8 @@ const CommentsOverlay = ({
               ? handleTouchEnd
               : undefined
           }
-          className={`relative w-full shrink-0 select-none items-center justify-center overflow-hidden bg-black lg:flex lg:h-full lg:w-1/2 ${
-            showMediaOnMobile ? "flex h-[38vh]" : "hidden"
+          className={`relative w-full select-none items-center justify-center overflow-hidden bg-black lg:flex lg:h-full lg:w-1/2 lg:flex-none ${
+            isMediaView ? "flex min-h-0 flex-1" : "hidden"
           }`}
         >
           {isDevs ? (
@@ -769,13 +798,33 @@ const CommentsOverlay = ({
           )}
         </div>
 
-        <div className="flex min-h-0 w-full flex-1 flex-col lg:w-1/2 lg:border-l lg:border-[var(--border-soft)]">
+        {/* Right pane: header + comments + action bar + input.
+            On mobile while the post is showing (isMediaView) it shrinks to
+            just the header, action bar and likes count, so the media gets
+            the rest of the height. */}
+        <div
+          className={`flex min-h-0 w-full flex-col lg:w-1/2 lg:flex-1 lg:border-l lg:border-[var(--border-soft)] ${
+            isMediaView ? "flex-none" : "flex-1"
+          }`}
+        >
           <div className="flex justify-center pt-2 lg:hidden">
             <div className="h-1 w-10 rounded-full bg-[var(--border-soft)]" />
           </div>
 
           <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-4 py-3 sm:px-5 sm:py-4">
             <div className="flex items-center gap-3 min-w-0">
+              {/* Mobile only: from the comments view, go back to the post */}
+              {mobileMediaFirst && !isMediaView && (
+                <button
+                  type="button"
+                  onClick={handleCommentIconClick}
+                  aria-label="Back to post"
+                  className="shrink-0 cursor-pointer text-[var(--text-primary)] hover:opacity-70 transition lg:hidden"
+                >
+                  <ChevronLeft size={22} />
+                </button>
+              )}
+
               {isDevs ? (
                 <span className="relative h-11 w-11 shrink-0">
                   <span
@@ -862,7 +911,12 @@ const CommentsOverlay = ({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-3 py-2 sm:px-4 hide-scrollbar min-h-0">
+          {/* Comments list — hidden on mobile while the post is showing */}
+          <div
+            className={`flex-1 overflow-y-auto px-3 py-2 sm:px-4 hide-scrollbar min-h-0 ${
+              isMediaView ? "hidden lg:block" : ""
+            }`}
+          >
             <Comment
               author={authorName}
               authorDP={
@@ -948,9 +1002,11 @@ const CommentsOverlay = ({
                   <LikeBurst burstKey={likeBurst} variant="mini" />
                 </span>
 
-                {/* Comment (decorative, as in classic) */}
+                {/* Comment — on mobile-first entry points this flips between
+                    the post and the comments; otherwise decorative, as in classic */}
                 <motion.button
                   type="button"
+                  onClick={handleCommentIconClick}
                   whileHover={{ y: -2 }}
                   whileTap={{ scale: 0.88 }}
                   className={roundBtn}
@@ -983,7 +1039,10 @@ const CommentsOverlay = ({
                   }`}
                 />
 
-                <button className="hover:opacity-80 transition cursor-pointer">
+                <button
+                  onClick={handleCommentIconClick}
+                  className="hover:opacity-80 transition cursor-pointer"
+                >
                   <MessageCircle size={22} />
                 </button>
 
@@ -1046,7 +1105,12 @@ const CommentsOverlay = ({
             {likesCount} likes
           </div>
 
-          <div className="flex items-center gap-3 border-t border-[var(--border-soft)] px-4 py-3 sm:px-5">
+          {/* Comment input row — hidden on mobile while the post is showing */}
+          <div
+            className={`items-center gap-3 border-t border-[var(--border-soft)] px-4 py-3 sm:px-5 ${
+              isMediaView ? "hidden lg:flex" : "flex"
+            }`}
+          >
             <button
               onClick={() =>
                 setShowPicker(
