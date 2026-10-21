@@ -9,7 +9,7 @@ import { toast } from "react-toastify";
 import { motion } from "framer-motion";
 import {
   X, Type, Pencil, Palette, Music, Check, Undo2, SlidersHorizontal,
-  CaseSensitive, Baseline, ChevronLeft, Loader2,
+  CaseSensitive, Baseline, ChevronLeft, Loader2, RotateCw,
 } from "lucide-react";
 import { getImageFilterPreset, VIDEO_FILTER_CSS, FILTER_NAMES } from "../utils/storyFilters";
 import SongTrimClipper from "../components/SongTrimClipper";
@@ -181,7 +181,19 @@ fabric.Object.prototype.set({
   cornerSize: 16,
   borderColor: "#4a5df9",
   padding: 6,
+  // ROTATION (PC): the round rotate handle above the selected object is
+  // enabled, and it gently snaps to every 45deg when you get within 5deg.
+  lockRotation: false,
+  hasRotatingPoint: true,
+  snapAngle: 45,
+  snapThreshold: 5,
 });
+// Make the rotate handle sit a bit further from the object so it is easy
+// to grab with a mouse.
+if (fabric.Object.prototype.controls?.mtr) {
+  fabric.Object.prototype.controls.mtr.offsetY = -36;
+  fabric.Object.prototype.controls.mtr.withConnection = true;
+}
 
 // Visible, easy-to-grab corner handle for the video frame (mirrors the
 // fabric.js text-corner styling above so the whole editor feels consistent)
@@ -442,7 +454,7 @@ const UserStoryPage = () => {
             //     width of the container but NOT the full height, so the
             //     entire picture is visible (bars show the background
             //     colour above/below). The user can then pinch / drag /
-            //     resize it as they like.
+            //     resize / rotate it as they like.
             const isLandscapeOrSquare = img.width >= img.height;
             const fitScale = isLandscapeOrSquare
               ? dims.width / img.width
@@ -491,10 +503,12 @@ const UserStoryPage = () => {
   }, [activeFilter]);
 
   // -------------------------------------------------------------------------
-  // PINCH IN / PINCH OUT (two fingers) to resize.
-  //   - Image story  -> scales the selected object (the photo by default, or
-  //                     the selected text box), and two-finger drag pans it.
-  //   - Video story  -> scales / pans the video frame.
+  // PINCH IN / PINCH OUT + TWIST (two fingers) to resize and ROTATE.
+  //   - Image story  -> scales AND rotates the selected object (the photo by
+  //                     default, or the selected text box), and two-finger
+  //                     drag pans it. Pinch, drag and twist all work in one
+  //                     gesture, like Instagram.
+  //   - Video story  -> scales / pans the video frame (no rotation).
   // Registered in the CAPTURE phase on the frame so that fabric.js never sees
   // the two-finger touches (otherwise it would try to drag / draw with them).
   // -------------------------------------------------------------------------
@@ -512,6 +526,9 @@ const UserStoryPage = () => {
       x: (t[0].clientX + t[1].clientX) / 2,
       y: (t[0].clientY + t[1].clientY) / 2,
     });
+    // Angle (radians) of the line between the two fingers.
+    const ang = (t) =>
+      Math.atan2(t[1].clientY - t[0].clientY, t[1].clientX - t[0].clientX);
 
     const startPinch = (touches) => {
       const d0 = dist(touches);
@@ -540,6 +557,7 @@ const UserStoryPage = () => {
       if (!target || target.type === "activeSelection") target = bgImageRef.current;
       if (!target) return null;
 
+      const a0 = ang(touches);
       return {
         kind: "obj",
         target,
@@ -549,6 +567,10 @@ const UserStoryPage = () => {
         sy: target.scaleY,
         left: target.left,
         top: target.top,
+        // rotation bookkeeping
+        angle: target.angle || 0,
+        prevA: a0,
+        accum: 0, // total twist so far, in radians (handles wrap-around)
       };
     };
 
@@ -578,11 +600,22 @@ const UserStoryPage = () => {
         const canvas = fabricRef.current;
         if (!canvas) return;
         const ratio = clamp(ratioRaw, PINCH_MIN_RATIO, PINCH_MAX_RATIO);
+
+        // Accumulate the twist incrementally so crossing the +/-180deg
+        // boundary of atan2 never makes the picture jump.
+        const a = ang(e.touches);
+        let d = a - pinch.prevA;
+        if (d > Math.PI) d -= 2 * Math.PI;
+        else if (d < -Math.PI) d += 2 * Math.PI;
+        pinch.accum += d;
+        pinch.prevA = a;
+
         pinch.target.set({
           scaleX: pinch.sx * ratio,
           scaleY: pinch.sy * ratio,
           left: pinch.left + dx,
           top: pinch.top + dy,
+          angle: pinch.angle + (pinch.accum * 180) / Math.PI,
         });
         pinch.target.setCoords();
         canvas.requestRenderAll();
@@ -734,6 +767,19 @@ const UserStoryPage = () => {
     canvas.setActiveObject(textbox);
     setIsTextSelected(true);
     setMode("select");
+  };
+
+  // Rotates the selected object (or the photo if nothing / a multi-selection
+  // is active) by 90 degrees clockwise. Works the same on PC and mobile.
+  const rotate90 = () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    let target = canvas.getActiveObject();
+    if (!target || target.type === "activeSelection") target = bgImageRef.current;
+    if (!target) return;
+    target.rotate((((target.angle || 0) + 90) % 360));
+    target.setCoords();
+    canvas.requestRenderAll();
   };
 
   const applyTextColor = (color) => {
@@ -1222,6 +1268,17 @@ const UserStoryPage = () => {
                 style={{ backgroundColor: penColor }}
               />
             </button>
+
+            {mediaType === "image" && (
+              <button
+                onClick={rotate90}
+                className={tbtn(false)}
+                aria-label="Rotate 90 degrees"
+                title="Rotate 90°"
+              >
+                <RotateCw size={20} />
+              </button>
+            )}
 
             {mediaType === "image" && (
               <button

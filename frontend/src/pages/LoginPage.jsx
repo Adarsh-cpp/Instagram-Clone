@@ -13,6 +13,7 @@ import {
   DevsDivider,
   DevsLink,
 } from '../components/devs/DevsAuthKit';
+import { useAuth } from '../context/AuthContext';
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
@@ -36,6 +37,8 @@ const passwordRules = {
 
 const LoginPage = () => {
 
+  const { refreshUser } = useAuth()
+
    const { register, handleSubmit, formState: { errors, isSubmitting },  } = useForm();
    const navigate = useNavigate()
    const { isDevs } = useTheme()
@@ -51,6 +54,8 @@ const LoginPage = () => {
     const token = response.data.token;
     console.log(token)
     localStorage.setItem("authToken", token);
+
+    await refreshUser();
 
         navigate("/home", {
             state: {

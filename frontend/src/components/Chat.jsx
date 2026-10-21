@@ -26,6 +26,10 @@ const MAX_IMAGES = 4;
 const MESSAGE_PAGE_SIZE = 30;
 const LOAD_OLDER_THRESHOLD_PX = 300;
 
+// If a "stopTyping" event is ever missed, the indicator clears itself
+// after this long without a fresh "typing" event.
+const TYPING_AUTO_CLEAR_MS = 5000;
+
 // ---- emoji picker data ----
 // Self-contained (no extra package). `icon` is what shows on the category
 // tab; "Recent" is added on top automatically once the user has picked some.
@@ -181,6 +185,10 @@ const EmojiPicker = ({ pickerRef, recentEmojis, onSelect }) => {
 
 const BASE_URL = import.meta.env.VITE_SERVER_URL
 
+// ids can arrive as strings or ObjectId-like objects; always compare as strings
+const idOf = (value) =>
+  value && typeof value === "object" ? String(value._id) : value != null ? String(value) : "";
+
 // What the "Replying to ..." bar above the input shows for the message being
 // replied to: its text if it has any, otherwise a short label for what kind
 // of message it is (plus a thumbnail when it carried an image).
@@ -258,6 +266,7 @@ const Chat = ({ onConversationActivity }) => {
   const suggestAbortRef = useRef(null);
 
   const typingTimeoutRef = useRef(null);
+  const friendTypingTimeoutRef = useRef(null);
   const containerRef = useRef(null);
   const listStartRef = useRef(null);
   const messageInputRef = useRef(null);
@@ -299,12 +308,19 @@ const Chat = ({ onConversationActivity }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const friend = conversation?.participants.find(
-    (participant) => participant?._id !== user?._id
-  );
+  const myId = idOf(user?._id);
 
-  const isFriendOnline = onlineUsers?.includes(friend?._id);
-  const friendLastSeen = lastSeenMap?.[friend?._id] || friend?.lastSeen;
+  // Compared as strings. While `user` is still loading (myId === ""), we
+  // don't guess a friend at all — that is what used to show YOUR name on
+  // every conversation right after login.
+  const friend = myId
+    ? conversation?.participants?.find((participant) => idOf(participant?._id) !== myId)
+    : undefined;
+
+  const friendId = idOf(friend?._id);
+
+  const isFriendOnline = onlineUsers?.includes(friendId);
+  const friendLastSeen = lastSeenMap?.[friendId] || friend?.lastSeen;
 
   const activeStatusText = isFriendOnline
     ? "Active now"
@@ -685,23 +701,40 @@ const Chat = ({ onConversationActivity }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [replyingTo]);
 
+  // The "Typing..." row is rendered BELOW the virtualized list, so when it
+  // appears it adds height at the very bottom of the scroll container. If the
+  // user is already at the bottom, scroll down so the indicator is actually
+  // visible instead of sitting just under the fold.
+  useEffect(() => {
+    if (!isFriendTyping || !isNearBottomRef.current) return;
+
+    requestAnimationFrame(() => {
+      const el = containerRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }, [isFriendTyping]);
+
   // handle the seen feature when new messages arrive
   useEffect(() => {
     const handleNewMessage = (incomingMessage) => {
       if (String(incomingMessage.conversationId) !== String(conversationId)) return;
+
+      const incomingSenderId = idOf(incomingMessage.senderId);
+
+      // the friend just sent something, so they're obviously not "typing"
+      // any more — don't rely on a separate stopTyping event for this
+      if (incomingSenderId !== myId) {
+        clearTimeout(friendTypingTimeoutRef.current);
+        setIsFriendTyping(false);
+      }
 
       // de-duplicated: the same message can't be appended twice, even if
       // the socket delivers it more than once or it's already in the
       // initial fetch
       appendMessageUnique(incomingMessage);
 
-      const incomingSenderId =
-        typeof incomingMessage.senderId === "object"
-          ? incomingMessage.senderId._id
-          : incomingMessage.senderId;
-
       if (
-        incomingSenderId !== user?._id &&
+        incomingSenderId !== myId &&
         document.visibilityState === "visible"
       ) {
         markConversationSeen();
@@ -711,7 +744,7 @@ const Chat = ({ onConversationActivity }) => {
     socket.on("newMessage", handleNewMessage);
     return () => socket.off("newMessage", handleNewMessage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, user?._id, appendMessageUnique]);
+  }, [conversationId, myId, appendMessageUnique]);
 
   // handle a message being unsent — by us (other tab/device) or by the friend
   useEffect(() => {
@@ -758,22 +791,17 @@ const Chat = ({ onConversationActivity }) => {
       if (String(convId) !== String(conversationId)) return;
 
       setMessages((prev) =>
-        prev.map((msg) => {
-          const senderId =
-            typeof msg.senderId === "object"
-              ? msg.senderId._id
-              : msg.senderId;
-
-          return senderId === user?._id
+        prev.map((msg) =>
+          idOf(msg.senderId) === myId
             ? { ...msg, seen: true, updatedAt: seenAt }
-            : msg;
-        })
+            : msg
+        )
       );
     };
 
     socket.on("messagesSeen", handleMessagesSeen);
     return () => socket.off("messagesSeen", handleMessagesSeen);
-  }, [conversationId, user?._id]);
+  }, [conversationId, myId]);
 
   // listen for a reaction change (added/removed/swapped) from the friend —
   // our own reactions are applied optimistically in handleReactToMessage,
@@ -815,26 +843,30 @@ const Chat = ({ onConversationActivity }) => {
   // derive which message gets the "Seen X ago" label
   const lastSeenMessageId = [...messages]
     .reverse()
-    .find((msg) => {
-      const senderId =
-        typeof msg.senderId === "object"
-          ? msg.senderId._id
-          : msg.senderId;
-      return senderId === user?._id && msg.seen === true;
-    })?._id;
+    .find((msg) => idOf(msg.senderId) === myId && msg.seen === true)?._id;
 
   // typing indicator: listen
+  // Ids are compared as strings. A safety timer clears the indicator if the
+  // matching "stopTyping" never arrives (dropped packet, friend closed the tab).
   useEffect(() => {
     const handleTypingEvent = ({ senderId, conversationId: convId }) => {
-      if (String(convId) === String(conversationId) && senderId === friend?._id) {
-        setIsFriendTyping(true);
-      }
+      if (String(convId) !== String(conversationId)) return;
+      if (!friendId || String(senderId) !== friendId) return;
+
+      setIsFriendTyping(true);
+
+      clearTimeout(friendTypingTimeoutRef.current);
+      friendTypingTimeoutRef.current = setTimeout(() => {
+        setIsFriendTyping(false);
+      }, TYPING_AUTO_CLEAR_MS);
     };
 
     const handleStopTypingEvent = ({ senderId, conversationId: convId }) => {
-      if (String(convId) === String(conversationId) && senderId === friend?._id) {
-        setIsFriendTyping(false);
-      }
+      if (String(convId) !== String(conversationId)) return;
+      if (!friendId || String(senderId) !== friendId) return;
+
+      clearTimeout(friendTypingTimeoutRef.current);
+      setIsFriendTyping(false);
     };
 
     socket.on("typing", handleTypingEvent);
@@ -844,11 +876,20 @@ const Chat = ({ onConversationActivity }) => {
       socket.off("typing", handleTypingEvent);
       socket.off("stopTyping", handleStopTypingEvent);
     };
-  }, [conversationId, friend?._id]);
+  }, [conversationId, friendId]);
 
   useEffect(() => {
-    return () => clearTimeout(typingTimeoutRef.current);
+    return () => {
+      clearTimeout(typingTimeoutRef.current);
+      clearTimeout(friendTypingTimeoutRef.current);
+    };
   }, []);
+
+  // a different conversation must never inherit the previous one's typing state
+  useEffect(() => {
+    clearTimeout(friendTypingTimeoutRef.current);
+    setIsFriendTyping(false);
+  }, [conversationId]);
 
   // switching to another conversation must not carry over the previous
   // chat's suggestions (or leave a request running for it)
@@ -993,17 +1034,20 @@ const Chat = ({ onConversationActivity }) => {
   const handleTyping = (e) => {
     setMessage(e.target.value);
 
+    // can't address the event until both ids are known
+    if (!myId || !friendId) return;
+
     socket.emit("typing", {
-      senderId: user._id,
-      receiverId: friend?._id,
+      senderId: myId,
+      receiverId: friendId,
       conversationId,
     });
 
     clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
       socket.emit("stopTyping", {
-        senderId: user._id,
-        receiverId: friend?._id,
+        senderId: myId,
+        receiverId: friendId,
         conversationId,
       });
     }, 2000);
@@ -1020,7 +1064,7 @@ const Chat = ({ onConversationActivity }) => {
       const url = `${BASE_URL}/message/${conversationId}`;
 
       clearTimeout(typingTimeoutRef.current);
-      socket.emit("stopTyping", { senderId: user._id, receiverId: friend?._id, conversationId });
+      socket.emit("stopTyping", { senderId: myId, receiverId: friendId, conversationId });
 
       let response;
 
@@ -1070,7 +1114,7 @@ const Chat = ({ onConversationActivity }) => {
       const url = `${BASE_URL}/message/${conversationId}`;
 
       clearTimeout(typingTimeoutRef.current);
-      socket.emit("stopTyping", { senderId: user._id, receiverId: friend?._id, conversationId });
+      socket.emit("stopTyping", { senderId: myId, receiverId: friendId, conversationId });
 
       const response = await axios.post(
         url,
@@ -1119,10 +1163,7 @@ const Chat = ({ onConversationActivity }) => {
         if (msg._id !== messageId) return msg;
 
         const reactions = msg.reactions || [];
-        const existingIndex = reactions.findIndex((r) => {
-          const rid = typeof r.userId === "object" ? r.userId?._id : r.userId;
-          return rid === user?._id;
-        });
+        const existingIndex = reactions.findIndex((r) => idOf(r.userId) === myId);
 
         let nextReactions;
         if (existingIndex !== -1 && reactions[existingIndex].emoji === emoji) {
@@ -1211,14 +1252,11 @@ const Chat = ({ onConversationActivity }) => {
   // above the input. Nothing is auto-sent: tapping a suggestion only fills
   // the input so the user can edit it first.
   const fetchReplySuggestions = async () => {
-    const senderIdOf = (msg) =>
-      typeof msg.senderId === "object" ? msg.senderId?._id : msg.senderId;
-
     const context = messages
       .filter((msg) => typeof msg.text === "string" && msg.text.trim())
       .slice(-AI_REPLY_CONTEXT_SIZE)
       .map((msg) => ({
-        sender: senderIdOf(msg) === user?._id ? "me" : "friend",
+        sender: idOf(msg.senderId) === myId ? "me" : "friend",
         text: msg.text.trim(),
       }));
 

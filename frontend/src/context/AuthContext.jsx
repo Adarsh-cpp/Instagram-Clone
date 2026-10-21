@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import axios from "axios";
-import socket from "../socket";
 
 const AuthContext = createContext();
 
@@ -48,12 +47,8 @@ export const AuthProvider = ({ children }) => {
     refreshUser();
   }, []);
 
-  // Join socket room when user changes
-  useEffect(() => {
-    if (user?._id) {
-      socket.emit("join", user._id);
-    }
-  }, [user]);
+  // NOTE: joining the socket is handled in SocketProvider (it also re-joins
+  // on reconnect). Doing it here too only produced duplicate, pre-connect emits.
 
   return (
     <AuthContext.Provider
