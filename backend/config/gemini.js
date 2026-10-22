@@ -8,7 +8,7 @@
 // Uses the global fetch shipped with Node 18+ (same as the Nominatim
 // calls in post.controller.js), so no HTTP dependency is needed.
 
-import { DEFAULT_AI_MODEL } from "../constants/ai.js";
+import { DEFAULT_AI_MODEL, EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from "../constants/ai.js";
 
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -277,5 +277,150 @@ export const callGemini = async ({
   );
 };
 
+// ---------------------------------------------------------------------------
+// Embeddings
+// ---------------------------------------------------------------------------
 
+// Gemini only pre-normalises the full 3072-dim output. Truncated sizes
+// (768, 1536) must be normalised by us so cosine/dot-product behave.
+const normalizeVector = (values) => {
+  const norm = Math.sqrt(values.reduce((sum, v) => sum + v * v, 0));
+  return norm > 0 ? values.map((v) => v / norm) : values;
+};
 
+/**
+ * Turns text into an embedding vector.
+ *
+ * @param {Object} options
+ * @param {string} options.text
+ * @param {"RETRIEVAL_DOCUMENT"|"RETRIEVAL_QUERY"} [options.taskType]
+ * @param {number} [options.dimensions]
+ * @param {string} [options.model]
+ * @returns {Promise<{ values: number[], model: string }>}
+ */
+export const embedText = async ({
+  text,
+  taskType,
+  dimensions = EMBEDDING_DIMENSIONS,
+  model = EMBEDDING_MODEL,
+}) => {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+
+  if (!apiKey) {
+    console.error("[AI] GEMINI_API_KEY is missing from the environment");
+    throw new AIError("AI features are not configured on this server.", 503, "AI_NOT_CONFIGURED");
+  }
+
+  const input = typeof text === "string" ? text.trim() : "";
+  if (!input) {
+    throw new AIError("No text was provided to embed.", 400, "AI_BAD_REQUEST");
+  }
+
+  // taskType improves retrieval quality, but if Google ever stops accepting
+  // it for a model we drop it and retry once rather than breaking search.
+  let includeTaskType = Boolean(taskType);
+  let lastError = null;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(`${GEMINI_BASE_URL}/${model}:embedContent`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          model: `models/${model}`,
+          content: { parts: [{ text: input }] },
+          outputDimensionality: dimensions,
+          ...(includeTaskType && { taskType }),
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (response.ok) {
+        const data = await response.json();
+        const values = data?.embedding?.values;
+
+        if (!Array.isArray(values) || values.length === 0) {
+          throw new AIError("The AI returned an empty embedding.", 502, "AI_EMPTY");
+        }
+
+        if (values.length !== dimensions) {
+          throw new AIError(
+            `Embedding size mismatch (got ${values.length}, expected ${dimensions}).`,
+            502,
+            "AI_BAD_DIMENSIONS"
+          );
+        }
+
+        return { values: normalizeVector(values), model };
+      }
+
+      const errorPayload = await response.json().catch(() => null);
+      const upstreamMessage = errorPayload?.error?.message || response.statusText;
+
+      console.error(
+        `[AI] Gemini embed responded ${response.status} (attempt ${attempt + 1}):`,
+        upstreamMessage
+      );
+
+      if (response.status === 400 && includeTaskType && /task/i.test(upstreamMessage || "")) {
+        includeTaskType = false;
+        attempt -= 1; // this wasn't a real failed attempt
+        continue;
+      }
+
+      if (isRetryableStatus(response.status) && attempt < MAX_RETRIES) {
+        await sleep(BASE_BACKOFF_MS * Math.pow(2, attempt));
+        continue;
+      }
+
+      if (response.status === 429) {
+        throw new AIError("The AI service is busy right now.", 429, "AI_RATE_LIMITED");
+      }
+      if (response.status === 400) {
+        throw new AIError("The AI could not process this text.", 400, "AI_BAD_REQUEST");
+      }
+      if (response.status === 401 || response.status === 403 || response.status === 404) {
+        if (response.status === 404) {
+          console.error(
+            `[AI] Embedding model "${model}" was not found (404). Check GEMINI_EMBEDDING_MODEL.`
+          );
+        }
+        throw new AIError("AI features are unavailable right now.", 503, "AI_NOT_CONFIGURED");
+      }
+
+      throw new AIError("The AI service is temporarily unavailable.", 503, "AI_UNAVAILABLE");
+    } catch (error) {
+      clearTimeout(timeout);
+
+      if (error instanceof AIError) throw error;
+
+      lastError = error;
+      const isAbort = error.name === "AbortError";
+      console.error(
+        `[AI] Embed request failed (attempt ${attempt + 1}):`,
+        isAbort ? "timed out" : error.message
+      );
+
+      if (attempt < MAX_RETRIES) {
+        await sleep(BASE_BACKOFF_MS * Math.pow(2, attempt));
+        continue;
+      }
+
+      throw new AIError(
+        isAbort ? "The AI took too long to respond." : "Could not reach the AI service.",
+        504,
+        isAbort ? "AI_TIMEOUT" : "AI_NETWORK"
+      );
+    }
+  }
+
+  throw new AIError(lastError?.message || "The AI service is unavailable.", 503, "AI_UNAVAILABLE");
+};

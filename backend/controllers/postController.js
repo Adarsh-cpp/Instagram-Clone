@@ -8,6 +8,12 @@ import notificationModel from "../models/notification.model.js";
 import { createNotification, removeNotification } from "../services/notification.service.js";
 import { uploadMultipleMedia } from "../services/upload.service.js";
 import { deleteCloudinaryAssetWithRetry } from "../utils/cloudinaryRetry.js";
+import { enqueuePostIndexing } from "../services/postIndexing.service.js";
+import {
+  hybridSearchPosts,
+  searchUsersByName,
+  normalizeQuery,
+} from "../services/semanticSearch.service.js";
 
 const MAX_IMAGES = 5;
 
@@ -80,10 +86,20 @@ export const createPost = async (req, res) => {
       author: req.user._id,
       ...(parsedLocation && { location: parsedLocation }),
       taggedUsers: taggedUserIds,
+      // queued for AI search indexing; picked up by the background worker
+      ai: { status: "pending" },
     });
 
     user.postsCount = user.postsCount + 1;
     await user.save();
+
+    // Fire-and-forget: analysis runs in the background and can never fail
+    // or slow down post creation. If it fails, the sweeper retries it.
+    try {
+      enqueuePostIndexing(post._id);
+    } catch (aiError) {
+      console.error("Could not queue AI indexing:", aiError.message);
+    }
 
     // notify anyone the author tagged
     await Promise.all(
@@ -102,8 +118,11 @@ export const createPost = async (req, res) => {
     // new post immediately without a refresh.
     await post.populate("author", "username profilePic role");
 
+    // `ai` is internal search metadata, never sent to the client.
+    const { ai, ...postData } = post.toObject();
+
     const postResponse = {
-      ...post.toObject(),
+      ...postData,
       likes: post.likes || [],
       commentsCount: post.commentsCount ?? 0,
       isSaved: false,
@@ -630,5 +649,38 @@ export const getTaggedItems = async (req, res) => {
   } catch (error) {
     console.error("Get Tagged Items Error:", error);
     return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// ---- new: main search (posts: caption / hashtag / AI semantic; users: username / fullname) ----
+// GET /post/search?q=...&type=all|posts|users&limit=20
+export const searchPostsAndUsers = async (req, res) => {
+  try {
+    const query = normalizeQuery(typeof req.query.q === "string" ? req.query.q : "");
+
+    // Search-as-you-type friendly: a too-short query is an empty result, not an error.
+    if (query.length < 2) {
+      return res.status(200).json({ success: true, posts: [], users: [], semanticUsed: false });
+    }
+
+    const type = ["posts", "users"].includes(req.query.type) ? req.query.type : "all";
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 30);
+
+    const [postResult, users] = await Promise.all([
+      type === "users"
+        ? { posts: [], semanticUsed: false }
+        : hybridSearchPosts({ query, userId: req.user._id, limit }),
+      type === "posts" ? [] : searchUsersByName({ query, limit: 10 }),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      posts: postResult.posts,
+      users,
+      semanticUsed: postResult.semanticUsed,
+    });
+  } catch (error) {
+    console.error("Search Posts Error:", error);
+    return res.status(500).json({ success: false, message: "Search failed" });
   }
 };

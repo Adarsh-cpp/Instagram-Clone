@@ -1,7 +1,8 @@
 import express from "express";
 import { authUser } from "../middlewares/authMiddleware.js";
-import { createPost, deletePost, getAllPosts, getComments, getFeedPosts, getSavedPosts, getSuggestedTagUsers, getTaggedItems, postComment, reverseGeocodeLocation, searchLocations, searchUsersToTag, toggleLikes, toggleSavePosts } from "../controllers/postController.js";
+import { createPost, deletePost, getAllPosts, getComments, getFeedPosts, getSavedPosts, getSuggestedTagUsers, getTaggedItems, postComment, reverseGeocodeLocation, searchLocations, searchPostsAndUsers, searchUsersToTag, toggleLikes, toggleSavePosts } from "../controllers/postController.js";
 import { upload } from "../config/multer.js"
+import { postSearchRateLimit } from "../middlewares/aiRateLimit.js";
 
 
 const router = express.Router();
@@ -22,6 +23,6 @@ router.get("/search-users", authUser, searchUsersToTag);
 router.get("/suggested-tag-users", authUser, getSuggestedTagUsers);
 router.get("/tagged-items", authUser, getTaggedItems);
 router.get("/tagged-items/:userId", authUser, getTaggedItems);
-
+router.get("/search", authUser, postSearchRateLimit, searchPostsAndUsers);
 
 export default router;

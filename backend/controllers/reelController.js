@@ -204,6 +204,7 @@ export const createReel = async (req, res) => {
       });
     } catch (err) {
       // Unique index on media.publicId: a concurrent duplicate call won the race.
+      // That call is the one that increments reelsCount, so we don't.
       if (err?.code === 11000) {
         const dup = await Reel.findOne({
           "media.publicId": publicId,
@@ -212,6 +213,16 @@ export const createReel = async (req, res) => {
         if (dup) return res.status(201).json({ reel: dup });
       }
       throw err;
+    }
+
+    // Only reached when THIS call actually created the reel, so the counter
+    // goes up exactly once per reel. Logged instead of thrown: the reel
+    // already exists, so a counter hiccup shouldn't turn into a failed upload
+    // (a retry would hit the replay check above and never increment anyway).
+    try {
+      await userModel.findByIdAndUpdate(req.user._id, { $inc: { reelsCount: 1 } });
+    } catch (err) {
+      console.error("[createReel] reelsCount increment failed", reel._id.toString(), err.message);
     }
 
     watchReelProcessing(reel._id, publicId);
@@ -348,9 +359,14 @@ export const deleteReel = async (req, res) => {
       { $set: { sharedReel: null } }
     );
 
-    await userModel.findByIdAndUpdate(reel.author, { $inc: { reelsCount: -1 } });
-
     await reel.deleteOne();
+
+    // Decrement only after the reel is really gone, and never below 0.
+    // Uses reel.author (not req.user) so an admin delete adjusts the right user.
+    await userModel.updateOne(
+      { _id: reel.author, reelsCount: { $gt: 0 } },
+      { $inc: { reelsCount: -1 } }
+    );
 
     return res.status(200).json({ message: "Reel deleted" });
   } catch (err) {

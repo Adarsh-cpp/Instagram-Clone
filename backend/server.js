@@ -5,6 +5,9 @@ console.log("DNS:", dns.getServers());
 
 import "dotenv/config";
 
+console.log("Loaded FRONTEND_URL:", process.env.FRONTEND_URL);
+console.log("Working directory:", process.cwd());
+
 // import fs from "fs";
 // import path from "path";
 // import crypto from "crypto";
@@ -26,10 +29,12 @@ import express from "express";
 import cors from "cors";
 import session from "express-session";
 import cookieParser from "cookie-parser";
+import mongoose from "mongoose";
 
 import { initializeSocket } from "./config/socket.js";
 import connectDB from "./config/mongodb.js";
 import passport from "./config/passport-google.js";
+import { startPostIndexingWorker } from "./services/postIndexing.service.js";
 
 import authRoutes from "./routes/authRoutes.js";
 import profileRoutes from "./routes/profileRoutes.js";
@@ -98,6 +103,13 @@ app.use("/api/ai", aiRoutes);
 const port = process.env.PORT || 4000;
 
 connectDB();
+
+// Start the AI post-indexing worker once MongoDB is connected.
+if (mongoose.connection.readyState === 1) {
+  startPostIndexingWorker();
+} else {
+  mongoose.connection.once("open", startPostIndexingWorker);
+}
 
 app.get("/", (req, res) => {
   res.send("helllo world !!!");

@@ -129,3 +129,12 @@ export const replyRateLimit = createAiRateLimit({
   maxPerWindow: 10,
   maxPerDay: 150,
 });
+
+// Post search: each uncached query costs one embedding call (username and
+// caption matching are cheap but share the same limiter). The frontend must
+// debounce, or better, search on Enter / after a pause of at least 500ms.
+export const postSearchRateLimit = createAiRateLimit({
+  name: "post-search",
+  maxPerWindow: 30,
+  maxPerDay: 500,
+});

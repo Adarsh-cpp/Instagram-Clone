@@ -20,6 +20,48 @@ const DEVS_CROP_STYLE = {
   },
 };
 
+// Animated icon styles for Devs Mode. Scoped to `html.devs`, so classic
+// themes are untouched. Hover plays the animation once; `.is-active`
+// (menu/slider open) loops it.
+const DEVS_ICON_CSS = `
+@keyframes dico-crop {
+  0%   { transform: rotate(0) scale(1); }
+  25%  { transform: rotate(-14deg) scale(1.15); }
+  50%  { transform: rotate(10deg) scale(1.2); }
+  75%  { transform: rotate(-6deg) scale(1.1); }
+  100% { transform: rotate(0) scale(1); }
+}
+@keyframes dico-zoom {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.3); }
+  70%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+@keyframes dico-nudge-left {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(-4px); }
+}
+@keyframes dico-nudge-right {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(4px); }
+}
+
+html.devs .dico svg {
+  color: var(--devs-cyan);
+  filter: drop-shadow(0 0 4px rgba(34, 240, 255, 0.75));
+  transform-origin: center;
+}
+
+html.devs .dico-crop:hover svg  { animation: dico-crop 0.7s var(--devs-ease) 1; }
+html.devs .dico-zoom:hover svg  { animation: dico-zoom 0.6s var(--devs-ease) 1; }
+html.devs .dico-back:hover svg  { animation: dico-nudge-left 0.5s ease-in-out infinite; }
+html.devs .dico-prev:hover svg  { animation: dico-nudge-left 0.5s ease-in-out infinite; }
+html.devs .dico-next:hover svg  { animation: dico-nudge-right 0.5s ease-in-out infinite; }
+
+html.devs .dico-crop.is-active svg { animation: dico-crop 1.4s ease-in-out infinite; }
+html.devs .dico-zoom.is-active svg { animation: dico-zoom 1.2s ease-in-out infinite; }
+`;
+
 const CropImagePage = ({
   images,
   setEditedImages,
@@ -91,10 +133,12 @@ const CropImagePage = ({
 
   // toolbar round buttons: classic dark circle / glass neon circle
   const toolBtn =
-    "w-[34px] h-[34px] rounded-full flex justify-center items-center bg-[rgba(0,0,0,0.6)] cursor-pointer flex-shrink-0 devs:backdrop-blur-md devs:border devs:border-[var(--border-popup)] devs:transition-all devs:hover:shadow-[0_0_16px_rgba(34,240,255,0.5)] devs:active:scale-90";
+    "dico w-[34px] h-[34px] rounded-full flex justify-center items-center bg-[rgba(0,0,0,0.6)] cursor-pointer flex-shrink-0 devs:backdrop-blur-md devs:border devs:border-[var(--border-popup)] devs:transition-all devs:hover:shadow-[0_0_16px_rgba(34,240,255,0.5)] devs:active:scale-90";
 
   return (
     <div className="w-[100vw] h-[100vh] flex justify-center items-center bg-[var(--bg-app)]">
+      <style>{DEVS_ICON_CSS}</style>
+
       <div className="cropContainerOverlay w-full h-full flex justify-center items-center bg-[rgba(0,0,0,0)] px-2 sm:px-4">
         <div
           className={`cropContainer relative w-full max-w-[500px] md:w-[70%] lg:w-[50%] xl:w-[30%] h-[70%] rounded-2xl overflow-hidden ${
@@ -105,7 +149,7 @@ const CropImagePage = ({
         >
           {/* Header */}
           <div className="header w-full h-[40px] px-3 sm:px-4 flex justify-between items-center bg-[var(--bg-app)] border-b border-[var(--border-soft)] devs:bg-transparent">
-            <div onClick={back} className="back cursor-pointer devs:hover:drop-shadow-[0_0_8px_rgba(34,240,255,0.8)] devs:transition-all">
+            <div onClick={back} className="back dico dico-back cursor-pointer devs:transition-all">
               <ArrowLeft size={24} color="var(--text-primary)" />
             </div>
 
@@ -141,7 +185,7 @@ const CropImagePage = ({
             {hasMultiple && activeIndex > 0 && (
               <div
                 onClick={() => setActiveIndex((i) => i - 1)}
-                className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10 devs:backdrop-blur-md devs:border devs:border-[var(--border-popup)]"
+                className="dico dico-prev absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10 devs:backdrop-blur-md devs:border devs:border-[var(--border-popup)]"
               >
                 <ChevronLeft size={18} color="white" />
               </div>
@@ -149,7 +193,7 @@ const CropImagePage = ({
             {hasMultiple && activeIndex < images?.length - 1 && (
               <div
                 onClick={() => setActiveIndex((i) => i + 1)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10 devs:backdrop-blur-md devs:border devs:border-[var(--border-popup)]"
+                className="dico dico-next absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center cursor-pointer z-10 devs:backdrop-blur-md devs:border devs:border-[var(--border-popup)]"
               >
                 <ChevronRight size={18} color="white" />
               </div>
@@ -216,14 +260,14 @@ const CropImagePage = ({
             <div className="left w-[50%] h-full px-2 flex gap-2 items-center">
               <div
                 onClick={() => setShowAspectMenu(!showAspectMenu)}
-                className={`crop ${toolBtn}`}
+                className={`crop dico-crop ${toolBtn} ${showAspectMenu ? "is-active" : ""}`}
               >
                 <Crop size={18} color="white" />
               </div>
 
               <div
                 onClick={() => setShowZoomSlider(!showZoomSlider)}
-                className={`magnify ${toolBtn}`}
+                className={`magnify dico-zoom ${toolBtn} ${showZoomSlider ? "is-active" : ""}`}
               >
                 <ZoomIn size={18} color="white" />
               </div>

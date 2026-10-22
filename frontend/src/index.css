@@ -295,6 +295,15 @@ html.devs :focus-visible {
   box-shadow: 0 0 0 4px rgba(34, 240, 255, 0.18);
 }
 
+/* Text fields (search bars, inputs, textareas) get no inner focus rectangle
+   in Devs Mode. Their wrapper/border already shows the focus state.
+   More specific than the global :focus-visible rule above, so it wins. */
+html.devs input:focus-visible,
+html.devs textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 /* Smooth, springy micro-interactions on every button and link */
 html.devs button,
 html.devs a {
