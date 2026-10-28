@@ -56,6 +56,17 @@ const server = http.createServer(app);
 // Harmless locally — does nothing when not behind a proxy.
 app.set("trust proxy", 1);
 
+// Health check — pinged by cron-job.org every 10 minutes to keep Render's
+// free instance awake. Kept ABOVE cors/session/passport on purpose so each
+// ping is tiny and does not create a session or touch the database.
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 initializeSocket(server);
 
 app.use(express.json({ limit: "1mb" }));
